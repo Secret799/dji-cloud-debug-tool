@@ -1,0 +1,95 @@
+{
+  "name": "dji-cloud-debug-tool",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A macOS desktop workbench for DJI Cloud API and MQTT debugging.",
+  "main": "./out/main/index.js",
+  "author": {
+    "name": "Secret799",
+    "url": "https://github.com/Secret799"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "packageManager": "npm@10.8.2",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "npm run typecheck && electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "smoke:ui": "npm run build && node scripts/electron-smoke.mjs",
+    "smoke:toast": "npm run build && node scripts/toast-smoke.mjs",
+    "smoke:logs": "npm run build && node scripts/remote-log-smoke.mjs",
+    "smoke:mqtt": "npm run build && node scripts/mqtt-smoke.mjs",
+    "build:zlm": "bash scripts/build-zlmediakit-macos.sh",
+    "release:verify": "npm test && npm run build",
+    "package:mac": "npm run package:mac:arm64",
+    "package:mac:arm64": "npm run release:verify && electron-builder --mac dmg zip --arm64",
+    "package:mac:x64": "npm run release:verify && electron-builder --mac dmg zip --x64"
+  },
+  "dependencies": {
+    "hls.js": "^1.7.1",
+    "lucide-react": "^0.468.0",
+    "mpegts.js": "^1.8.2",
+    "mqtt": "^5.15.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^44.0.0",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "playwright-core": "^1.62.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.6",
+    "vitest": "^4.1.11"
+  },
+  "build": {
+    "appId": "com.dji-cloud-studio.desktop",
+    "productName": "DJI Cloud Studio",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "vendor/zlmediakit/${arch}",
+        "to": "zlmediakit",
+        "filter": [
+          "MediaServer"
+        ]
+      },
+      {
+        "from": "vendor/zlmediakit/LICENSE",
+        "to": "zlmediakit/LICENSE"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.png",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "hardenedRuntime": true
+    },
+    "dmg": {
+      "title": "DJI Cloud Studio ${version}",
+      "window": {
+        "width": 560,
+        "height": 380
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+node_modules/
+out/
+dist/
+release/
+coverage/
+build/icon.iconset/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example

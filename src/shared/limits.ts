@@ -1,0 +1,4 @@
+export const MAX_MQTT_PAYLOAD_BYTES = 1024 * 1024
+export const MAX_EXPORT_RECORDS = 2_000
+export const MAX_EXPORT_BYTES = 32 * 1024 * 1024
+export const MAX_PROFILE_DOCUMENT_BYTES = 4 * 1024 * 1024
