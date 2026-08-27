@@ -5,6 +5,7 @@ import {
   CircleAlert,
   Database,
   Download,
+  FileJson,
   Info,
   LayoutDashboard,
   ListTree,
@@ -51,6 +52,7 @@ import { MediaCenter } from './views/MediaCenter'
 import { Overview } from './views/Overview'
 import { TelemetryManager } from './views/TelemetryManager'
 import { ErrorCodeManager } from './views/ErrorCodeManager'
+import { ErrorCodeSourceData } from './views/ErrorCodeSourceData'
 import { OssManager } from './views/OssManager'
 import { errorCodeStats, formatServiceError } from './lib/dji-error-codes'
 import {
@@ -71,13 +73,14 @@ import {
   objectStorageConfigToProfile,
 } from './lib/object-storage'
 
-type WorkspaceView = 'overview' | 'media' | 'oss' | 'errors' | 'telemetry'
+type WorkspaceView = 'overview' | 'media' | 'oss' | 'errors' | 'source' | 'telemetry'
 
 const viewMeta: Record<WorkspaceView, { label: string; description: string }> = {
   overview: { label: '设备工作台', description: '设备状态与调试功能' },
   media: { label: '媒体中心', description: '外部视频源与本地流媒体' },
   oss: { label: 'OSS 管理', description: '多个远程日志存储目标与临时凭证' },
   errors: { label: '错误码管理', description: '上云回复码、机场 HMS 与常见问题' },
+  source: { label: '源数据', description: '查看错误码库的结构化原始数据' },
   telemetry: { label: '遥测项管理', description: '遥测页签、指标顺序与字段说明' },
 }
 
@@ -1171,6 +1174,9 @@ export default function App() {
             <Tooltip label="错误码管理">
               <button className={activeView === 'errors' ? 'active' : ''} onClick={() => setActiveView('errors')}><CircleAlert size={20} /></button>
             </Tooltip>
+            <Tooltip label="源数据">
+              <button className={activeView === 'source' ? 'active' : ''} onClick={() => setActiveView('source')}><FileJson size={20} /></button>
+            </Tooltip>
             <Tooltip label="遥测项管理">
               <button className={activeView === 'telemetry' ? 'active' : ''} onClick={() => setActiveView('telemetry')}><ListTree size={20} /></button>
             </Tooltip>
@@ -1222,6 +1228,11 @@ export default function App() {
                   <span>{errorCodeStats.hms} 条 HMS 告警</span>
                   <span>{errorCodeStats.faq} 条常见问题</span>
                 </div>
+              ) : activeView === 'source' ? (
+                <div className="workspace-status">
+                  <span>{errorCodeStats.total} 条结构化记录</span>
+                  <span>JSON Schema v1</span>
+                </div>
               ) : activeView === 'telemetry' ? (
                 <div className="workspace-status">
                   <span>{Object.values(effectiveTelemetryLayout.devices).reduce((count, layout) => count + layout.fields.length, 0)} 个配置字段</span>
@@ -1269,6 +1280,7 @@ export default function App() {
               />
             )}
             {activeView === 'errors' && <ErrorCodeManager />}
+            {activeView === 'source' && <ErrorCodeSourceData />}
             {activeView === 'telemetry' && (
               <TelemetryManager
                 config={effectiveTelemetryLayout}
