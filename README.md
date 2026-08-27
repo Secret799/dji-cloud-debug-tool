@@ -24,7 +24,15 @@
 - 媒体中心可保存多个远程 ZLMediaKit / SRS / SecretEMS 服务：ZLMediaKit 和 SRS 按应用名、流 ID 生成 RTMP、RTSP、WebRTC 与 HLS 地址；SecretEMS 则生成 RTMP 推流地址，并按其标准网关规范生成 WHIP 推流和 WHEP 播放地址。
 - HLS.js 直接预览所选媒体服务中的 HLS 流；API Secret 通过 Electron `safeStorage` 加密，Renderer 不读取已保存明文。
 - `services` / `services_reply` 按 `tid` 自动关联，展示成功、失败和 10 秒超时。
+- 错误码管理整合 551 条上云错误码、92 条机场 HMS 告警和 26 条常见问题，支持按错误码、现象、原因、处理措施和物料搜索。
+- 设备 `services_reply` 返回非零 `result` 时，自动关联错误说明、可能原因、建议日志和处理措施；HMS 同时支持十六进制与十进制错误码查询。
 - 危险指令二次确认，断开连接时禁用发布和控制按钮。
+
+## 错误码数据
+
+程序使用的结构化数据位于 `src/renderer/src/data/dji-error-codes.json`，从 `DJI上云常见问题汇总.xlsx` 的“上云错误码”、“机场HMS告警”和“上云常见问题解决”三个工作表提取。源工作簿注明数据来自 DJI 官方论坛、交流群等公开渠道。
+
+上云错误码的首位表示上报来源；对 `328XXX` 类回复码，程序会按源工作簿规则减去 `328000`，再将差值转为十六进制 HMS 错误码进行二次查询。
 
 ## 开发运行
 

@@ -50,7 +50,9 @@ import {
 import { MediaCenter } from './views/MediaCenter'
 import { Overview } from './views/Overview'
 import { TelemetryManager } from './views/TelemetryManager'
+import { ErrorCodeManager } from './views/ErrorCodeManager'
 import { OssManager } from './views/OssManager'
+import { errorCodeStats, formatServiceError } from './lib/dji-error-codes'
 import {
   loadTelemetryLayout,
   reconcileTelemetryLayout,
@@ -69,12 +71,13 @@ import {
   objectStorageConfigToProfile,
 } from './lib/object-storage'
 
-type WorkspaceView = 'overview' | 'media' | 'oss' | 'telemetry'
+type WorkspaceView = 'overview' | 'media' | 'oss' | 'errors' | 'telemetry'
 
 const viewMeta: Record<WorkspaceView, { label: string; description: string }> = {
   overview: { label: '设备工作台', description: '设备状态与调试功能' },
   media: { label: '媒体中心', description: '外部视频源与本地流媒体' },
   oss: { label: 'OSS 管理', description: '多个远程日志存储目标与临时凭证' },
+  errors: { label: '错误码管理', description: '上云回复码、机场 HMS 与常见问题' },
   telemetry: { label: '遥测项管理', description: '遥测页签、指标顺序与字段说明' },
 }
 
@@ -463,6 +466,9 @@ export default function App() {
       if (event.type === 'message') {
         const reply = parseServiceReply(event.message)
         if (reply) {
+          if (reply.result !== undefined && reply.result !== 0) {
+            showToast(formatServiceError(reply.result), 'error')
+          }
           const key = serviceReplyKey(event.profileId, reply.gatewaySn, reply.tid)
           const pending = pendingServiceRepliesRef.current.get(key)
           if (pending && (!pending.bid || !reply.bid || pending.bid === reply.bid)) {
@@ -478,7 +484,7 @@ export default function App() {
                 ? undefined
                 : reply.result === undefined
                   ? '设备回执缺少 result 字段'
-                  : `设备返回错误码 ${reply.result}`,
+                  : formatServiceError(reply.result),
             })
           }
         }
@@ -1162,6 +1168,9 @@ export default function App() {
             </Tooltip>
           </div>
           <div className="rail-bottom">
+            <Tooltip label="错误码管理">
+              <button className={activeView === 'errors' ? 'active' : ''} onClick={() => setActiveView('errors')}><CircleAlert size={20} /></button>
+            </Tooltip>
             <Tooltip label="遥测项管理">
               <button className={activeView === 'telemetry' ? 'active' : ''} onClick={() => setActiveView('telemetry')}><ListTree size={20} /></button>
             </Tooltip>
@@ -1206,6 +1215,12 @@ export default function App() {
                   {subscriptionSyncing[activeProfile.id] && <span>正在恢复订阅</span>}
                   <span>{activeRecords.length.toLocaleString()} 条消息</span>
                   <span>{activeTelemetry.length} 台已发现设备</span>
+                </div>
+              ) : activeView === 'errors' ? (
+                <div className="workspace-status">
+                  <span>{errorCodeStats.cloud} 条上云错误码</span>
+                  <span>{errorCodeStats.hms} 条 HMS 告警</span>
+                  <span>{errorCodeStats.faq} 条常见问题</span>
                 </div>
               ) : activeView === 'telemetry' ? (
                 <div className="workspace-status">
@@ -1253,6 +1268,7 @@ export default function App() {
                 onNotify={showToast}
               />
             )}
+            {activeView === 'errors' && <ErrorCodeManager />}
             {activeView === 'telemetry' && (
               <TelemetryManager
                 config={effectiveTelemetryLayout}

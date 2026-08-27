@@ -1,0 +1,5533 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "fileName": "DJI上云常见问题汇总.xlsx",
+    "extractedOn": "2026-08-27",
+    "attribution": "数据来源于源工作簿中注明的 DJI 官方论坛、交流群等公开渠道。",
+    "cloudCodeFormat": "ABCDEF：A 为上报来源，BC 为功能模块，DEF 为模块自定义错误。",
+    "hmsConversion": "328XXX 类回复码可减去 328000，将差值转十六进制后结合 HMS 错误码定位。"
+  },
+  "cloudErrors": [
+    {
+      "code": "219004",
+      "source": "司空 2",
+      "message": "飞行任务已过期，无法执行",
+      "logs": "机场日志",
+      "cause": "任务过期",
+      "solution": "司空2重新选择任务执行时间"
+    },
+    {
+      "code": "219014",
+      "source": "司空 2",
+      "message": "机场不属于该项目，无法执行当前操作或执行飞行任务，请将机场迁回该项目或到机场所在项目重试",
+      "logs": "机场日志",
+      "cause": "机场不属于该项目，权限隔离",
+      "solution": "检查机场工作项目是否匹配"
+    },
+    {
+      "code": "219016",
+      "source": "司空 2",
+      "message": "飞行任务已被挂起，无法执行",
+      "logs": "机场日志",
+      "cause": "任务挂起",
+      "solution": "检查任务是否挂起"
+    },
+    {
+      "code": "219018",
+      "source": "司空 2",
+      "message": "机场执行飞行任务过程中超时未响应，1小时未上报任何状态",
+      "logs": "机场日志",
+      "cause": "设备离线或设备mqtt连接中断，无法上报信息",
+      "solution": "1.检查机场是否开机\n2.检查机场网络是否正常\n3.如仍未解决拉取机场日志反馈售后分析。"
+    },
+    {
+      "code": "219101",
+      "source": "司空 2",
+      "message": "服务器异常，请稍后重试",
+      "logs": "机场日志",
+      "cause": "dtcp服务异常",
+      "solution": "拉取机场日志联系售后分析。"
+    },
+    {
+      "code": "219102",
+      "source": "司空 2",
+      "message": "机场已离线，无法执行飞行任务，请检查机场是否已断电，机场网络连接是否正常",
+      "logs": "机场日志",
+      "cause": "设备离线或设备mqtt连接中断，无法上报信息",
+      "solution": "1.检查机场是否开机\n2.检查机场网络是否正常\n3.如仍未解决问题拉取机场日志联系售后分析"
+    },
+    {
+      "code": "219103",
+      "source": "司空 2",
+      "message": "项目中不存在此机场，无法执行飞行任务",
+      "logs": "机场日志",
+      "cause": "机场不属于该项目，权限隔离",
+      "solution": "1.检查机场工作项目是否匹配"
+    },
+    {
+      "code": "219104",
+      "source": "司空 2",
+      "message": "服务器内部错误，无法执行飞行任务",
+      "logs": "机场日志",
+      "cause": "服务配置错误，无法识别该命令",
+      "solution": "拉取机场日志反馈售后分析"
+    },
+    {
+      "code": "219105",
+      "source": "司空 2",
+      "message": "云端与机场通信异常，无法执行飞行任务",
+      "logs": "机场日志",
+      "cause": "机场没有在10s内回复任务命令reply",
+      "solution": "拉取机场日志反馈售后分析"
+    },
+    {
+      "code": "219304",
+      "source": "司空 2",
+      "message": "机场数据雨量过大",
+      "logs": "机场日志",
+      "cause": "天气阻飞",
+      "solution": "检查是否开启项目在线天气阻飞，如没有则为气象站阻飞"
+    },
+    {
+      "code": "219305",
+      "source": "司空 2",
+      "message": "机场数据风速过大",
+      "logs": "机场日志",
+      "cause": "天气阻飞",
+      "solution": "检查是否开启项目在线天气阻飞，如没有则为气象站阻飞"
+    },
+    {
+      "code": "312001",
+      "source": "设备端",
+      "message": "一致性升级失败",
+      "logs": null,
+      "cause": "触发一致性升级，但设备没有请求一致性升级，会返回该错误码",
+      "solution": "尝试在固件升级时开启无人机，并关闭无人机的4G增强"
+    },
+    {
+      "code": "312003",
+      "source": "设备端",
+      "message": "固件升级失败",
+      "logs": null,
+      "cause": "校验文件MD5失败",
+      "solution": "检查下发文件的MD5"
+    },
+    {
+      "code": "312010",
+      "source": "设备端",
+      "message": "固件升级错误",
+      "logs": null,
+      "cause": "下发的升级请求命令与协议不符合",
+      "solution": "1、检查下发升级请求命令内容与是否符合文档中的示例要求\n2、 回复ota_progress方法可以解决"
+    },
+    {
+      "code": "312013",
+      "source": "设备端",
+      "message": "固件升级失败",
+      "logs": null,
+      "cause": "需要关闭4G，并在无人机开机状态下更新固件",
+      "solution": null
+    },
+    {
+      "code": "312014",
+      "source": "设备端",
+      "message": "设备升级中，请勿重复操作",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "312015",
+      "source": "设备端",
+      "message": "机场：{dock_org_name} 业务繁忙无法进行设备升级，请等待机场处于空闲中后再试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "312016",
+      "source": "设备端",
+      "message": "升级失败，机场和飞行器图传链路异常，请重启机场和飞行器后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "312022",
+      "source": "设备端",
+      "message": "飞行器开机失败或未连接，请检查飞行器是否在舱内，是否安装电池，机场和飞行器是否已对频",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "312023",
+      "source": "设备端",
+      "message": "推杆闭合失败无法升级飞行器，请检查急停按钮是否被按下，推杆是否有异物卡住",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "312026",
+      "source": "设备端",
+      "message": "离线升级包解压失败",
+      "logs": null,
+      "cause": null,
+      "solution": "检查一下下载的离线固件报有没有损坏，或者重新下发一下"
+    },
+    {
+      "code": "312027",
+      "source": "设备端",
+      "message": "升级失败，机场未检测到飞行器",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "312028",
+      "source": "设备端",
+      "message": "升级失败，设备升级过程中设备被重启",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "312029",
+      "source": "设备端",
+      "message": "设备重启中无法进行设备升级，请等待设备重启完成后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "312030",
+      "source": "设备端",
+      "message": "升级失败，飞行器增强图传开启后无法升级，请关闭飞行器增强图传后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "312031",
+      "source": "设备端",
+      "message": "重试升级出错",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "312306",
+      "source": "设备端",
+      "message": "升级失败，固件文件包下载失败，网络异常，请检查网络状态",
+      "logs": null,
+      "cause": "网络环境导致固件下载失败",
+      "solution": null
+    },
+    {
+      "code": "312307",
+      "source": "设备端",
+      "message": "升级失败，固件文件包下载失败，网络异常，请检查网络状态",
+      "logs": null,
+      "cause": "网络异常、网络差、有防火墙等",
+      "solution": null
+    },
+    {
+      "code": "312502",
+      "source": "设备端",
+      "message": "升级失败",
+      "logs": null,
+      "cause": "无",
+      "solution": "无"
+    },
+    {
+      "code": "312534",
+      "source": "设备端",
+      "message": "无",
+      "logs": null,
+      "cause": "无",
+      "solution": "无"
+    },
+    {
+      "code": "312704",
+      "source": "设备端",
+      "message": "飞行器电量过低，请充电至20%以上后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "314000",
+      "source": "设备端",
+      "message": "设备当前无法支持该操作，建议检查设备当前工作状态",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "314001",
+      "source": "设备端",
+      "message": "飞行任务下发失败，请稍后重试",
+      "logs": "机场日志",
+      "cause": "司空2服务异常",
+      "solution": "拉取机场日志反馈售后分析。"
+    },
+    {
+      "code": "314002",
+      "source": "设备端",
+      "message": "飞行任务下发失败，请稍后重试",
+      "logs": null,
+      "cause": "任务没下发fingerprint",
+      "solution": null
+    },
+    {
+      "code": "314003",
+      "source": "设备端",
+      "message": "航线文件格式不兼容，请检查航线文件是否正确",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "314004",
+      "source": "设备端",
+      "message": "飞行任务下发失败，请稍后重试或重启机场后重试（文件地址获取不到）",
+      "logs": "机场日志",
+      "cause": "1. 机场网络不稳定存在数据波动\n2. 网络DNS服务器解析失败",
+      "solution": "1.重新下发任务\n2.如果使用静态IP，需要把DNS服务也设置成静态的\n3.多次尝试下发依然失败，更换路由器或检查网络设置\n4.若都无法解决，拉取机场日志反馈售后分析。"
+    },
+    {
+      "code": "314005",
+      "source": "设备端",
+      "message": "飞行任务下发失败，请稍后重试或重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "314006",
+      "source": "设备端",
+      "message": "飞行器初始化失败，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "314007",
+      "source": "设备端",
+      "message": "机场传输航线至飞行器失败，请重启机场后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "1、图传信号质量不佳\n2、设备存在异常",
+      "solution": "1、重启机场和飞行器重试\n2、交叉验证飞行器或机场的图传功能是否正常\n3、拉取机场和飞行器日志提单给售后分析\n4、检查机场拖链处馈线是否发生断裂，主控模块处SMA接口是否拧紧"
+    },
+    {
+      "code": "314008",
+      "source": "设备端",
+      "message": "飞行器起飞前准备超时，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "314009",
+      "source": "设备端",
+      "message": "飞行器初始化失败，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "314010",
+      "source": "设备端",
+      "message": "航线执行失败，请重启机场后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "1、航线距离机场过远\n2、航线未知原因退出",
+      "solution": "1、重新下发任务\n2、重启机场再次尝试\n3、多次尝试仍未解决拉取机场和飞机日志联系售后分析"
+    },
+    {
+      "code": "314011",
+      "source": "设备端",
+      "message": "机场系统异常，无法获取飞行任务执行结果",
+      "logs": null,
+      "cause": null,
+      "solution": "重启机场再次尝试"
+    },
+    {
+      "code": "314012",
+      "source": "设备端",
+      "message": "飞行器起飞前准备失败，无法执行飞行任务，请重启机场后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "1、固件版本过低\n2、设备逻辑异常",
+      "solution": "1、请升级最新固件\n2、如果升级后还有问题，请检查是否有阻飞的HMS上报，按对应提示排查解决\n3、如果仍无法解决请拉取机场和飞行器日志联系售后分析"
+    },
+    {
+      "code": "314013",
+      "source": "设备端",
+      "message": "飞行任务下发失败，机场无法获取到本次飞行任务的航线，无法执行飞行任务，请稍后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "1.机场网络不稳定存在数据波动\n2.云端url下发为空",
+      "solution": "1.重新下发任务\n2.多次尝试仍未解决拉取机场和飞机日志联系售后分析\n3.https://sdk-forum.dji.net/hc/zh-cn/articles/16745838728985"
+    },
+    {
+      "code": "314014",
+      "source": "设备端",
+      "message": "机场系统异常，飞行任务执行失败，请稍后重试",
+      "logs": "机场日志",
+      "cause": "机场异常重启（上一次任务未执行完成，本地缓存了该任务执行信息，下次启动会将上次任务结果上报）",
+      "solution": "1、重新下发任务\n2、如果重新下发任务无法恢复，需要关掉“设备运维界面”里面的“用户改善计划”"
+    },
+    {
+      "code": "314015",
+      "source": "设备端",
+      "message": "机场传输精准复拍航线至飞行器失败，无法执行飞行任务，请稍后重试或重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "314016",
+      "source": "设备端",
+      "message": "航线文件解析失败，无法执行飞行任务，请检查航线文件",
+      "logs": null,
+      "cause": "机场不支持执行除了精准复拍外的其他航线类型，kmz超过1Mb",
+      "solution": "删除kmz中的res目录（地形信息）"
+    },
+    {
+      "code": "314017",
+      "source": "设备端",
+      "message": "机场系统异常，飞行任务执行失败，请稍后重试",
+      "logs": null,
+      "cause": "精准复拍类型kmz文件错误",
+      "solution": null
+    },
+    {
+      "code": "314018",
+      "source": "设备端",
+      "message": "飞行器 RTK 定位异常，无法执行飞行任务，请稍后重试或重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "314019",
+      "source": "设备端",
+      "message": "飞行器 RTK 收敛失败，无法执行飞行任务，请稍后重试或重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "314020",
+      "source": "设备端",
+      "message": "飞行器不在停机坪正中间或飞行器朝向不正确，无法执行飞行任务，请检查飞行器位置和朝向",
+      "logs": "机场日志、飞机日志",
+      "cause": "1、飞行器不在机场停机坪正中间或飞行器摆放方向不正确\n2、电离层闪烁\n3、飞行器内部定位异常",
+      "solution": "1、确认飞机在机场上的摆放位置和方向是否正确\n2、确认没有电离层闪烁现象\n3、查看HMS报错信息，根据提示进行排查\n4、重启飞行器，多次重启后仍存在问题请拉取机场和飞行器日志联系售后分析"
+    },
+    {
+      "code": "314021",
+      "source": "设备端",
+      "message": "飞行器 RTK 定位异常，无法执行飞行任务，请稍后重试或重启机场后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "1、电离层闪烁\n2、飞行器内部定位异常",
+      "solution": "1、确认没有电离层闪烁现象\n2、查看HMS报错信息\n3、重启飞行器，多次重启后仍存在问题请拉取机场和飞行器日志联系售后分析"
+    },
+    {
+      "code": "314200",
+      "source": "设备端",
+      "message": "网络断开，飞机自动返航",
+      "logs": null,
+      "cause": "检查机场网络情况，然后重试",
+      "solution": null
+    },
+    {
+      "code": "315000",
+      "source": "设备端",
+      "message": "机场通信异常，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315001",
+      "source": "设备端",
+      "message": "机场通信异常，请远程开启飞机并等待 1min 后，再次下发任务重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315002",
+      "source": "设备端",
+      "message": "机场通信异常，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315003",
+      "source": "设备端",
+      "message": "机场通信异常，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315004",
+      "source": "设备端",
+      "message": "任务失败，请等待两个机场都空闲后，再次下发任务重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315005",
+      "source": "设备端",
+      "message": "机场通信异常，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315006",
+      "source": "设备端",
+      "message": "机场通信异常，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315007",
+      "source": "设备端",
+      "message": "机场通信异常，请将机场升级到最新版本或重启机场后重试",
+      "logs": null,
+      "cause": "RTK异常，RTK配置信息失败",
+      "solution": "1、确保起飞时RTK收敛\n2、2代机库即使是模拟飞行也要保证RTK收敛才可以模拟"
+    },
+    {
+      "code": "315008",
+      "source": "设备端",
+      "message": "降落机场和起飞机场标定信息不一致，请确认两个机场均链路通畅且使用了相同的网络信息标定",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315009",
+      "source": "设备端",
+      "message": "机场通信异常，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315010",
+      "source": "设备端",
+      "message": "无法停止飞行任务，请稍后重试，如果仍报错请联系大疆售后",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315011",
+      "source": "设备端",
+      "message": "无法停止飞行任务，请稍后重试，如果仍报错请联系大疆售后",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315012",
+      "source": "设备端",
+      "message": "无法停止飞行任务，请稍后重试，如果仍报错请联系大疆售后",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315013",
+      "source": "设备端",
+      "message": "飞行任务下发失败，请稍后重试，如果仍报错请联系大疆售后",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315014",
+      "source": "设备端",
+      "message": "当前任务类型不支持设置返航点",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315015",
+      "source": "设备端",
+      "message": "返航点设置失败，请稍后重试，如果仍报错请联系大疆售后",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315016",
+      "source": "设备端",
+      "message": "飞行任务下发失败，请稍后重试，如果仍报错请联系大疆售后",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315017",
+      "source": "设备端",
+      "message": "飞行任务下发失败，请稍后重试，如果仍报错请联系大疆售后",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315018",
+      "source": "设备端",
+      "message": "任务失败，请等待两个机场都空闲后，再次下发任务重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315050",
+      "source": "设备端",
+      "message": "机场系统异常，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315051",
+      "source": "设备端",
+      "message": "任务失败，请重启机场并再次下发任务后重试，如果仍报错请联系大疆售后",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315052",
+      "source": "设备端",
+      "message": "机场位置未收敛，请等待一段时间后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315053",
+      "source": "设备端",
+      "message": "任务失败，请重启机场并再次下发任务后重试，如果仍报错请联系大疆售后",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315054",
+      "source": "设备端",
+      "message": "任务失败，请重启机场并再次下发任务后重试，如果仍报错请联系大疆售后",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315055",
+      "source": "设备端",
+      "message": "任务失败，请重启机场并再次下发任务后重试，如果仍报错请联系大疆售后",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315056",
+      "source": "设备端",
+      "message": "任务失败，请重启机场并再次下发任务后重试，如果仍报错请联系大疆售后",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315057",
+      "source": "设备端",
+      "message": "任务失败，请重启机场并再次下发任务后重试，如果仍报错请联系大疆售后",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315058",
+      "source": "设备端",
+      "message": "任务失败，请重启机场并再次下发任务后重试，如果仍报错请联系大疆售后",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315059",
+      "source": "设备端",
+      "message": "任务失败，请重启机场并再次下发任务后重试，如果仍报错请联系大疆售后",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315060",
+      "source": "设备端",
+      "message": "任务失败，请重启机场并再次下发任务后重试，如果仍报错请联系大疆售后",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315061",
+      "source": "设备端",
+      "message": "任务失败，请重启机场并再次下发任务后重试，如果仍报错请联系大疆售后",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315062",
+      "source": "设备端",
+      "message": "任务失败，请重启机场并再次下发任务后重试，如果仍报错请联系大疆售后",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315063",
+      "source": "设备端",
+      "message": "任务失败，请重启机场并再次下发任务后重试，如果仍报错请联系大疆售后",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315064",
+      "source": "设备端",
+      "message": "任务失败，请重启机场并再次下发任务后重试，如果仍报错请联系大疆售后",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "315065",
+      "source": "设备端",
+      "message": "任务失败，请重启机场并再次下发任务后重试，如果仍报错请联系大疆售后",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316001",
+      "source": "设备端",
+      "message": "备降点设置失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316002",
+      "source": "设备端",
+      "message": "备降安全转移高度设置失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316003",
+      "source": "设备端",
+      "message": "飞行器参数配置失败，请重启机场后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "设置起飞高度失败（图传链路不稳导致）",
+      "solution": "1、重新下发任务\n2、重试多次后依然存在请拉取机场和飞行器日志"
+    },
+    {
+      "code": "316004",
+      "source": "设备端",
+      "message": "失控行为设置失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316005",
+      "source": "设备端",
+      "message": "飞行器 RTK 收敛失败，无法执行飞行任务，请稍后重试或重启机场后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "1、安装环境存在遮挡\n2、电离层闪烁\n3、机场RTK未标定\n4、图传断链\n5、设备工作异常",
+      "solution": "1、确认APP踏勘选址结果是否大于80分\n2、确认没有电离层闪烁现象\n3、确认机场RTK完成标定\n4、重新下发任务\n5、重试多次依然失败后拉取机场和飞机的日志"
+    },
+    {
+      "code": "316006",
+      "source": "设备端",
+      "message": "任务超时，飞行器已丢失或降落时机场未开启舱盖或展开推杆，飞行器无法降落回机场，请尽快至机场部署现场检查飞行器状况",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316007",
+      "source": "设备端",
+      "message": "飞行器初始化失败，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316008",
+      "source": "设备端",
+      "message": "机场获取飞行器控制权失败，无法执行飞行任务，请确认遥控器未锁定控制权",
+      "logs": "机场日志、飞机日志",
+      "cause": "1、飞行控制权获取失败\n2、遥控器B控接管后锁定控制权\n3、机场与飞行器图传链路逻辑错误",
+      "solution": "1、确认飞机和机场已经对频\n2、如有B控连接，请关闭遥控器后重试\n3、重启机场和飞行器重试"
+    },
+    {
+      "code": "316009",
+      "source": "设备端",
+      "message": "飞行器电量低，无法执行飞行任务，请充电后（建议≥50%）重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "飞行器电量不足",
+      "solution": "等待充电至30%以上"
+    },
+    {
+      "code": "316010",
+      "source": "设备端",
+      "message": "机场未检测到飞行器，无法执行飞行任务，请检查舱内是否有飞行器，机场与飞行器是否已对频，或重启机场后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "1.图传未推送飞控OSD\n2、飞行器与机场图传链路不稳定",
+      "solution": "1.重启飞行器和机场，重新下发任务\n2.多次下发依然不行，请拉取机场和飞机日志进一步分析"
+    },
+    {
+      "code": "316011",
+      "source": "设备端",
+      "message": "飞行器降落位置偏移过大，请检查飞行器是否需要现场摆正",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316012",
+      "source": "设备端",
+      "message": "飞行器起飞前准备失败，无法执行飞行任务，请重启机场后重试",
+      "logs": null,
+      "cause": "图传质量差导致",
+      "solution": null
+    },
+    {
+      "code": "316013",
+      "source": "设备端",
+      "message": "电池电量查询失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316014",
+      "source": "设备端",
+      "message": "飞行器起飞前准备失败，无法执行飞行任务，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316015",
+      "source": "设备端",
+      "message": "飞行器 RTK 收敛位置距离机场过远，无法执行飞行任务，请重启机场后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "1、安装环境存在遮挡\n2、电离层闪烁\n3、设备工作异常",
+      "solution": "1、确认APP踏勘选址结果是否大于80分\n2、确认没有电离层闪烁现象\n3、确认机场RTK完成标定\n4、重新下发任务\n5、重试多次依然失败后拉取机场和飞机的日志"
+    },
+    {
+      "code": "316016",
+      "source": "设备端",
+      "message": "飞行器降落至机场超时，可能是机场与飞行器断连导致，请通过直播查看飞行器是否降落至舱内",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316017",
+      "source": "设备端",
+      "message": "获取飞行器媒体数量超时，可能是机场与飞行器断连导致，请通过直播查看飞行器是否降落至舱内",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316018",
+      "source": "设备端",
+      "message": "飞行任务执行超时，可能是机场与飞行器断连导致，请通过直播查看飞行器是否降落至舱内",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316019",
+      "source": "设备端",
+      "message": "机场系统错误，无法执行飞行任务，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316020",
+      "source": "设备端",
+      "message": "飞行器使用的 RTK 信号源错误，请稍后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "1、飞行器rtk源使用错误\n2、飞行器在与机场对频使用前连接过D-RTK2基站/网络RTK/自定义网络RTK等",
+      "solution": "1.重新下发任务\n2.多次下发依然异常，请拉取机场和飞机日志联系售后分析"
+    },
+    {
+      "code": "316021",
+      "source": "设备端",
+      "message": "飞行器  RTK 信号源检查超时，请稍后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "图传断链不稳定",
+      "solution": "1.重启飞行器和机场，重新下发任务\n2.多次下发依然不行，请拉取机场和飞机日志进一步分析"
+    },
+    {
+      "code": "316022",
+      "source": "设备端",
+      "message": "飞行器无法执行返航指令，请检查飞行器是否已开机，机场与飞行器是否已断连，请确认无以上问题后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316023",
+      "source": "设备端",
+      "message": "飞行器无法执行返航指令，飞行器已被 B 控接管，请在 B 控操控飞行器，或关闭 B 控后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316024",
+      "source": "设备端",
+      "message": "飞行器执行返航指令失败，请检查飞行器是否已起飞，确认飞行器已起飞后请重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316025",
+      "source": "设备端",
+      "message": "飞行器参数配置失败，请稍后重试或重启机场后重试",
+      "logs": null,
+      "cause": "设置返航高度失败",
+      "solution": null
+    },
+    {
+      "code": "316026",
+      "source": "设备端",
+      "message": "机场急停按钮被按下，无法执行飞行任务，请释放急停按钮后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "急停按钮被按下",
+      "solution": "向外拔出急停按钮"
+    },
+    {
+      "code": "316027",
+      "source": "设备端",
+      "message": "飞行器参数配置超时，请稍后重试或重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316029",
+      "source": "设备端",
+      "message": "机场急停按钮被按下，飞行器将飞往备降点降落，请立即检查飞行器是否已安全降落并将飞行器放回至机场",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316030",
+      "source": "设备端",
+      "message": "返航点刷新失败，请稍后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "链路不稳定",
+      "solution": "1.重启飞行器和机场，重新下发任务\n2.多次下发依然不行，请拉取机场和飞机日志进一步分析"
+    },
+    {
+      "code": "316031",
+      "source": "设备端",
+      "message": "机场系统运行异常，请重新下发任务",
+      "logs": "机场日志、飞机日志",
+      "cause": "设置返航模式失败；",
+      "solution": "2代机库下发任务需指定返航模式"
+    },
+    {
+      "code": "316032",
+      "source": "设备端",
+      "message": "获取电池数据超时，请稍后重试或重启飞行器后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "图传丢包",
+      "solution": "1.重新下发任务\n2.多次下发依然异常，请拉取机场和飞机日志联系售后分析"
+    },
+    {
+      "code": "316033",
+      "source": "设备端",
+      "message": "飞行器电池循环次数过高，为保证飞行安全，已自动终止任务，建议更换该电池",
+      "logs": "机场日志、飞机日志",
+      "cause": "电池循环次数超过500次",
+      "solution": "1. 检查电池循环次数是否过高\n2. 确认没有超过500次需要拉取机场和飞机的日志联系售后分析"
+    },
+    {
+      "code": "316034",
+      "source": "设备端",
+      "message": "无法起飞，飞行器固件版本与机场固件版本不匹配，为保证飞行安全请升级固件后再试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316050",
+      "source": "设备端",
+      "message": "飞行器因电量过低在舱外降落，请立即检查飞行器是否已安全降落并将飞行器放回至机场",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316051",
+      "source": "设备端",
+      "message": "飞行任务异常，飞行器在舱外降落，请立即检查飞行器是否已安全降落并将飞行器放回至机场",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316052",
+      "source": "设备端",
+      "message": "飞行任务异常，飞行器将飞往备降点降落，请立即检查飞行器是否已安全降落并将飞行器放回至机场",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316053",
+      "source": "设备端",
+      "message": "用户已操控飞行器降落，请立即检查飞行器是否已安全降落并将飞行器放回至机场",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316054",
+      "source": "设备端",
+      "message": "无",
+      "logs": "无",
+      "cause": "无",
+      "solution": "1、重启机场和飞机再次尝试\n2、遥控器关闭"
+    },
+    {
+      "code": "316100",
+      "source": "设备端",
+      "message": "获取相机概要信息失败，请重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316101",
+      "source": "设备端",
+      "message": "设置相机为单拍模式失败，请重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316102",
+      "source": "设备端",
+      "message": 6016,
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316103",
+      "source": "设备端",
+      "message": "设置测光模式到平均测光失败，请重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316104",
+      "source": "设备端",
+      "message": "切换镜头到广角镜头失败，请重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316105",
+      "source": "设备端",
+      "message": "设置相机存储照片失败，请重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316106",
+      "source": "设备端",
+      "message": "红外变焦倍数设置失败，请重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316107",
+      "source": "设备端",
+      "message": "照片尺寸设置4k失败，请重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316108",
+      "source": "设备端",
+      "message": "设置照片存储格式为jpeg格式失败，请重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316109",
+      "source": "设备端",
+      "message": "关闭相机畸变矫正失败，请重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316110",
+      "source": "设备端",
+      "message": "打开相机机械快门失败，请重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "316111",
+      "source": "设备端",
+      "message": "设置对焦模式失败，请重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "317001",
+      "source": "设备端",
+      "message": "获取飞行器媒体文件数量失败，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "317002",
+      "source": "设备端",
+      "message": "飞行器存储格式化失败，飞行器未开机、未连接或未检测到相机，请确认无以上问题后重试，或重启飞行器后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "317003",
+      "source": "设备端",
+      "message": "飞行器存储格式化失败，请重启飞行器后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "317004",
+      "source": "设备端",
+      "message": "机场媒体文件格式化失败，请稍后重试或重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "317005",
+      "source": "设备端",
+      "message": "飞行器结束录像失败，本次飞行任务的媒体文件可能无法上传",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "317006",
+      "source": "设备端",
+      "message": "无法格式化，请等待当前飞行器媒体文件下载完成后再试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "317007",
+      "source": "设备端",
+      "message": "无法格式化，请等待当前飞行器媒体文件下载完成后再试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "318101",
+      "source": "设备端",
+      "message": "飞行因HMS告警，无法执行飞行任务",
+      "logs": null,
+      "cause": null,
+      "solution": "检查HMS相关告警"
+    },
+    {
+      "code": "319001",
+      "source": "设备端",
+      "message": "机场作业中或设备异常反馈上传日志中，无法执行飞行任务，请等待当前飞行任务或操作执行完成后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319002",
+      "source": "设备端",
+      "message": "机场系统运行异常，请重启机场后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "机场内部通讯异常",
+      "solution": "1.重启飞行器和机场，重新下发任务\n2.多次下发依然不行，请拉取机场和飞机日志进一步分析"
+    },
+    {
+      "code": "319003",
+      "source": "设备端",
+      "message": "机场系统运行异常，请重新下发任务",
+      "logs": "机场日志、飞机日志",
+      "cause": "1.云端下发了不存在的flight_id任务\n2.机场内部缓存任务异常",
+      "solution": "1.重启飞行器和机场，重新下发任务\n2.多次下发依然不行，请拉取机场和飞机日志进一步分析\n3、是否任务下发过于频繁\n4、任务执行时间是否超出设定的execute_time 前后30s。"
+    },
+    {
+      "code": "319004",
+      "source": "设备端",
+      "message": "飞行任务执行超时，已自动终止本次飞行任务",
+      "logs": "机场日志、飞机日志",
+      "cause": "机场与云端时间不同步",
+      "solution": "1.检查机场与云端时间是否一致\n2.立即任务下发任务与执行任务指令间隔不得超过30s\n3.断点续飞时任务id需与之前的航线任务id不同"
+    },
+    {
+      "code": "319005",
+      "source": "设备端",
+      "message": "云端与机场通信异常，无法执行飞行任务",
+      "logs": "机场日志、飞机日志",
+      "cause": "机场与云端时间不同步",
+      "solution": "1.重启飞行器和机场，重新下发任务\n2.多次下发依然不行，请拉取机场和飞机日志进一步分析"
+    },
+    {
+      "code": "319006",
+      "source": "设备端",
+      "message": "取消飞行任务失败，飞行任务已经在执行中",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319007",
+      "source": "设备端",
+      "message": "修改飞行任务失败，飞行任务已经在执行中",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319008",
+      "source": "设备端",
+      "message": "机场时间与云端时间不同步，机场无法执行飞行任务",
+      "logs": "机场日志",
+      "cause": "机场与云端时间不同步",
+      "solution": "1.重启飞行器和机场，重新下发任务\n2.多次下发依然不行，请拉取机场和飞机日志进一步分析"
+    },
+    {
+      "code": "319009",
+      "source": "设备端",
+      "message": "飞行任务下发失败，请稍后重试或重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319010",
+      "source": "设备端",
+      "message": "机场固件版本过低，无法执行飞行任务，请升级机场固件为最新版本后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319015",
+      "source": "设备端",
+      "message": "机场正在初始化中，无法执行飞行任务，请等待机场初始化完成后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319016",
+      "source": "设备端",
+      "message": "机场正在执行其他飞行任务，无法执行本次飞行任务",
+      "logs": "机场日志、飞机日志",
+      "cause": "机场正在执行上一个任务",
+      "solution": "等待上个任务执行完成，再下发任务"
+    },
+    {
+      "code": "319017",
+      "source": "设备端",
+      "message": "机场正在处理上次飞行任务媒体文件，无法执行本次飞行任务，请稍后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "1.机场正在获取飞行器媒体列表\n2.上个任务未收到云端ACK消息",
+      "solution": "等待列表获取完成"
+    },
+    {
+      "code": "319018",
+      "source": "设备端",
+      "message": "机场正在自动导出日志中（设备异常反馈），无法执行飞行任务，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319019",
+      "source": "设备端",
+      "message": "机场正在拉取日志中（设备异常反馈），无法执行飞行任务，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319020",
+      "source": "设备端",
+      "message": "航线中断失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319021",
+      "source": "设备端",
+      "message": "退出远程控制失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319022",
+      "source": "设备端",
+      "message": "指点飞行失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319023",
+      "source": "设备端",
+      "message": "指点飞行停止失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319024",
+      "source": "设备端",
+      "message": "一键起飞失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319025",
+      "source": "设备端",
+      "message": "机场未准备完成，无法执行云端下发的飞行任务，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319026",
+      "source": "设备端",
+      "message": "飞行器电池电量低于用户设置的任务开始执行的电量，请等待充电完成后再执行飞行任务",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319027",
+      "source": "设备端",
+      "message": "机场或飞行器剩余存储容量过低，无法执行飞行任务，请等待媒体文件上传，机场和飞行器存储容量释放后再执行飞行任务",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319028",
+      "source": "设备端",
+      "message": "正在更新自定义飞行区",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319029",
+      "source": "设备端",
+      "message": "正在更新离线地图",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319030",
+      "source": "设备端",
+      "message": "操作失败，无飞行器控制权",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319031",
+      "source": "设备端",
+      "message": "控制权异常，请刷新重试",
+      "logs": null,
+      "cause": "使用Method: drone_control\n\n进行飞行控制时，需要保证seq从0开始连续递增，不论是单次发送，还是连续发送。",
+      "solution": null
+    },
+    {
+      "code": "319032",
+      "source": "设备端",
+      "message": "指点飞行失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319033",
+      "source": "设备端",
+      "message": "虚拟摇杆操作失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": "检查发送的指令seq是否递增的。"
+    },
+    {
+      "code": "319034",
+      "source": "设备端",
+      "message": "虚拟摇杆操作失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319035",
+      "source": "设备端",
+      "message": "急停失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319036",
+      "source": "设备端",
+      "message": "设备远程调试中，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319037",
+      "source": "设备端",
+      "message": "设备远程调试中，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319038",
+      "source": "设备端",
+      "message": "设备正在升级，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319042",
+      "source": "设备端",
+      "message": "航线恢复失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319043",
+      "source": "设备端",
+      "message": "取消返航失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319044",
+      "source": "设备端",
+      "message": "航线任务已结束，无法恢复",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319045",
+      "source": "设备端",
+      "message": "急停成功，请重新按键操作",
+      "logs": null,
+      "cause": null,
+      "solution": "飞行器报错319045后，下一条下发的指令飞行控制需要seq参数从0开始递增。\n\n注意：飞行控制drone_control与DRC心跳heart_beat的seq是独立的。"
+    },
+    {
+      "code": "319046",
+      "source": "设备端",
+      "message": "无法暂停航线，飞行器尚未进入航线或已退出航线",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "319999",
+      "source": "设备端",
+      "message": "机场系统运行异常，请重启机场后重试",
+      "logs": null,
+      "cause": "未知错误，需要根据下发的指令来判断是那个业务导致问题",
+      "solution": null
+    },
+    {
+      "code": "321000",
+      "source": "设备端",
+      "message": "航线执行异常，请稍后重试或重启机场后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "航线未知原因退出",
+      "solution": "拉取机场和飞机日志联系售后分析"
+    },
+    {
+      "code": "321001",
+      "source": "设备端",
+      "message": "mission id 不存在",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321002",
+      "source": "设备端",
+      "message": "wayline info错误",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321003",
+      "source": "设备端",
+      "message": "要执行的航线文件版本不匹配",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321004",
+      "source": "设备端",
+      "message": "航线文件解析失败，无法执行飞行任务，请检查航线文件",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321005",
+      "source": "设备端",
+      "message": "航线缺少断点信息，机场无法执行飞行任务",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321006",
+      "source": "设备端",
+      "message": "无效的命令",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321016",
+      "source": "设备端",
+      "message": "模拟器打开失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321257",
+      "source": "设备端",
+      "message": "飞行任务已在执行中，请勿重复执行",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321258",
+      "source": "设备端",
+      "message": "飞行任务无法终止，请检查飞行器状态",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321259",
+      "source": "设备端",
+      "message": "飞行任务未开始执行，无法终止飞行任务",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321260",
+      "source": "设备端",
+      "message": "飞行任务未开始执行，无法中断飞行任务",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321261",
+      "source": "设备端",
+      "message": "飞行任务冲突，无法获取飞机控制权",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321262",
+      "source": "设备端",
+      "message": "该状态下无法恢复航线",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321513",
+      "source": "设备端",
+      "message": "航线规划高度已超过飞行器限高，机场无法执行飞行任务",
+      "logs": "机场日志、飞机日志",
+      "cause": "1、存在限飞区\n2、用户设置了限高",
+      "solution": "1、检查是否存在限飞区\n2、检查用户设置的限高\n3、检查航线文件\n4、检查飞机位置"
+    },
+    {
+      "code": "321514",
+      "source": "设备端",
+      "message": "任务失败，起点或终点位于限远区域的缓冲区内或超过了限远距离，机场无法执行飞行任务",
+      "logs": "机场日志、飞机日志",
+      "cause": "1、存在限飞区\n2、用户设置了限远",
+      "solution": "1、检查是否存在限飞区\n2、检查用户设置的限远\n3、检查航线文件\n4、检查飞机位置"
+    },
+    {
+      "code": "321515",
+      "source": "设备端",
+      "message": "航线穿过限飞区，机场无法执行飞行任务",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321516",
+      "source": "设备端",
+      "message": "飞行器飞行高度过低，飞行任务执行被终止",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321517",
+      "source": "设备端",
+      "message": "飞行器触发避障，飞行任务执行被终止",
+      "logs": "飞机日志",
+      "cause": "1、存在障碍物\n2、存在有雾或有雨天气\n3、概率偶现误检测",
+      "solution": "1、检查航线上是否会离障碍物距离小于5m\n2、检查是否存在降雨天气或有雾天气\n3、手动触发返航，并对飞行器视觉进行标定\n4、多次重试标定依然存在问题，拉取飞机日志反馈售后分析。"
+    },
+    {
+      "code": "321518",
+      "source": "设备端",
+      "message": "RTK信号弱，为保证飞行安全，已自动终止本次飞行任务",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321519",
+      "source": "设备端",
+      "message": "飞行器接近限飞区或限远距离自动返航，无法完成航线飞行",
+      "logs": "飞机日志",
+      "cause": "存在限飞区",
+      "solution": "检查是否存在限飞区与飞机位置高度"
+    },
+    {
+      "code": "321520",
+      "source": "设备端",
+      "message": "打pitch/roll杆中断航线(农机航线专用)",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321521",
+      "source": "设备端",
+      "message": "超过机场限飞区限高",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321522",
+      "source": "设备端",
+      "message": "请求自动起飞失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321523",
+      "source": "设备端",
+      "message": "飞行器起桨失败，请稍后重试，如果仍报错请联系大疆售后。",
+      "logs": "机场日志、飞机日志",
+      "cause": "1、桨叶存在破损\n2、桨叶垫片过紧\n3、飞机摆放位置变化导致误检测",
+      "solution": "1、检查桨叶状态\n2、检查桨叶垫片是否过紧\n3、将飞行器在停机坪上摆放正确"
+    },
+    {
+      "code": "321524",
+      "source": "设备端",
+      "message": "飞行器起飞前准备失败，可能是飞行器无发定位或档位错误导致，请检查飞行器状态",
+      "logs": "飞机日志",
+      "cause": "有可能是因为没有gps、当前档位不对等原因导致，具体原因需要分析log",
+      "solution": "1、拉取飞行器日志联系售后分析"
+    },
+    {
+      "code": "321525",
+      "source": "设备端",
+      "message": "农机航线：仿地绕行失败，暂停航线",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321528",
+      "source": "设备端",
+      "message": "触碰自定义飞行区边界，航线任务已暂停",
+      "logs": "机场日志、飞机日志",
+      "cause": "规划的航线任务与规划的自定义飞行区有冲突",
+      "solution": "重新规划并下发航线任务或重新规划并上传自定义飞行区"
+    },
+    {
+      "code": "321529",
+      "source": "设备端",
+      "message": "目标点位于禁飞区域或者障碍物内，无法到达，航线任务已暂停，请重新规划后再试。",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321530",
+      "source": "设备端",
+      "message": "飞行航线过程中轨迹规划失败，航线任务已暂停",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321769",
+      "source": "设备端",
+      "message": "飞行器卫星定位信号差，无法执行飞行任务，请重启机场后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "飞行器GPS信号弱",
+      "solution": "1、检查飞行器是否会飞过信号较差的地方\n2、检查飞行器是否有受到信号干扰的hms错误码\n3、重复发生请拉取飞行器日志联系售后分析"
+    },
+    {
+      "code": "321770",
+      "source": "设备端",
+      "message": "飞行器档位错误，无法执行飞行任务，请重启机场后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "B控接管，且B控不是N档或接管后切换档位",
+      "solution": "检查B控状态"
+    },
+    {
+      "code": "321771",
+      "source": "设备端",
+      "message": "飞行器返航点未设置，无法执行飞行任务，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321772",
+      "source": "设备端",
+      "message": "飞行器电量低于30%，无法执行飞行任务，请充电后重试（建议电量≥50%）",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321773",
+      "source": "设备端",
+      "message": "低电量返航",
+      "logs": "机场日志、飞机日志",
+      "cause": "飞机电量过低",
+      "solution": "1、确认航线是否过长\n2、确认飞机执行任务时电量是否充足\n3、确认是否有风速过大的hms错误码\n4、确认是否有电池相关错误码\n5、确认电池是否健康有正常保养\n6、重复发生请拉取飞机日志"
+    },
+    {
+      "code": "321774",
+      "source": "设备端",
+      "message": "ADSB（触发ads-b主动避让功能才会有）",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321775",
+      "source": "设备端",
+      "message": "飞行器航线飞行过程中失联，无法完成航线飞行",
+      "logs": "机场日志、飞机日志",
+      "cause": "飞行器与机场图传断连",
+      "solution": "1、确认失去RC信号时飞行器位置是否过远\n2、确认失去RC信号时飞行器位置与机场间是否存在遮挡\n3、在确认没有以上因素的情况下多次出现请拉取机场和飞行器日志"
+    },
+    {
+      "code": "321776",
+      "source": "设备端",
+      "message": "飞行器 RTK 收敛失败，无法执行飞行任务，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321777",
+      "source": "设备端",
+      "message": "飞行器未悬停，无法开始执行飞行任务",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321778",
+      "source": "设备端",
+      "message": "用户使用 B 控操控飞行器起桨，机场无法执行飞行任务",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321779",
+      "source": "设备端",
+      "message": "实时仿地过程中，相机状态有问题（过亮，过暗，两侧亮度不一致）",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321780",
+      "source": "设备端",
+      "message": "实时仿地用户设置的仿地高度不合法（大于200或者小于30m）",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321781",
+      "source": "设备端",
+      "message": "实时仿地过程中全局地图计算出错",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321782",
+      "source": "设备端",
+      "message": "home点未匹配rtk开关状态",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "321784",
+      "source": "设备端",
+      "message": "任务过程中遇到大风紧急返航",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322023",
+      "source": "设备端",
+      "message": "飞机严重故障，无法执行(hms level为3的故障)",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322025",
+      "source": "设备端",
+      "message": "找不到对应的负载（多负载情况下才有用）",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322026",
+      "source": "设备端",
+      "message": "航点动作执行失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322027",
+      "source": "设备端",
+      "message": "农机大田果树航线：喷洒药箱无药、播撒料箱无料",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322028",
+      "source": "设备端",
+      "message": "农机航线：避障开启，但雷达断链",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322281",
+      "source": "设备端",
+      "message": "用户退出航线",
+      "logs": null,
+      "cause": "例如按停止航线按钮导致",
+      "solution": null
+    },
+    {
+      "code": "322282",
+      "source": "设备端",
+      "message": "机场执行飞行任务过程中被中断，飞行器被云端设备或B控接管",
+      "logs": "机场日志、飞机日志",
+      "cause": "B控接管后，按暂停键中断航线",
+      "solution": "确认用户是否有操作"
+    },
+    {
+      "code": "322283",
+      "source": "设备端",
+      "message": "机场执行飞行任务过程中被用户触发返航，无法完成航线飞行",
+      "logs": "机场日志、飞机日志",
+      "cause": "用户通过司空2或遥控器主动触发返航",
+      "solution": "确认用户是否有操作"
+    },
+    {
+      "code": "322284",
+      "source": "设备端",
+      "message": "农机航线：用户在航线飞行过程中，主动开/关仿地绕行开关",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322285",
+      "source": "设备端",
+      "message": "用户切换RC-Mode档位",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322332",
+      "source": "设备端",
+      "message": "航点坐标超出了合理范围",
+      "logs": null,
+      "cause": null,
+      "solution": "1、检查航线是否过远\n2、检查航线是否过高或过低"
+    },
+    {
+      "code": "322536",
+      "source": "设备端",
+      "message": "航线任务WP平台初始化失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322537",
+      "source": "设备端",
+      "message": "Job退出但Mission异常运行",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322538",
+      "source": "设备端",
+      "message": "飞机已经起桨，不允许直接起飞。需要停桨才能开始航线",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322539",
+      "source": "设备端",
+      "message": "航线的断点信息错误，机场无法执行飞行任务",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322540",
+      "source": "设备端",
+      "message": "使用不支持的坐标系",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322541",
+      "source": "设备端",
+      "message": "使用不支持的高度模式",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322542",
+      "source": "设备端",
+      "message": "使用不支持的过渡航线模式",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322543",
+      "source": "设备端",
+      "message": "使用不支持的yaw模式",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322544",
+      "source": "设备端",
+      "message": "使用不支持的转yaw方向模式",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322545",
+      "source": "设备端",
+      "message": "使用不支持的航点类型",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322546",
+      "source": "设备端",
+      "message": "航线文件格式错误，首尾航点不能使用协调转弯类型",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322547",
+      "source": "设备端",
+      "message": "航线文件格式错误，航线全局速度超过合理范围",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322548",
+      "source": "设备端",
+      "message": "航线文件格式错误，航点数量异常",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322549",
+      "source": "设备端",
+      "message": "航线文件格式错误，经纬度数据异常",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322550",
+      "source": "设备端",
+      "message": "航线文件格式错误，转弯参数异常",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322551",
+      "source": "设备端",
+      "message": "航段最大速度超过合理范围",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322552",
+      "source": "设备端",
+      "message": "航段目标速度超过合理范围",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322553",
+      "source": "设备端",
+      "message": "航点yaw角度超过合理范围",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322554",
+      "source": "设备端",
+      "message": "垂直航段yaw模式异常",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322555",
+      "source": "设备端",
+      "message": "断点续飞的mission_id输入错误",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322556",
+      "source": "设备端",
+      "message": "断点续飞的progress信息输入错误",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322557",
+      "source": "设备端",
+      "message": "断点续飞的任务状态异常",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322558",
+      "source": "设备端",
+      "message": "断点续飞的航点index信息输入错误",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322559",
+      "source": "设备端",
+      "message": "断点续飞的经纬度信息输入错误",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322560",
+      "source": "设备端",
+      "message": "断点续飞的航点yaw输入错误",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322561",
+      "source": "设备端",
+      "message": "断点续飞的标志位设置错误",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322562",
+      "source": "设备端",
+      "message": "读取轨迹信息失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322563",
+      "source": "设备端",
+      "message": "航线轨迹生成失败，请检查飞机视觉镜头是否存在脏污或重启飞机后再试，如果仍报错请联系大疆售后。",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322564",
+      "source": "设备端",
+      "message": "轨迹库运行失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322565",
+      "source": "设备端",
+      "message": "航线避障紧急刹车",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322588",
+      "source": "设备端",
+      "message": "找不到对应动作",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322591",
+      "source": "设备端",
+      "message": "动作INDEX不能重复",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322592",
+      "source": "设备端",
+      "message": "动作数量异常（过多或者过少）",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322593",
+      "source": "设备端",
+      "message": "动作树不能为空",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322594",
+      "source": "设备端",
+      "message": "航线文件格式错误，航点动作有误",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322595",
+      "source": "设备端",
+      "message": "航线文件格式错误，动作ID不能重复",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322596",
+      "source": "设备端",
+      "message": "动作节点子节点数量不能小于2",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322597",
+      "source": "设备端",
+      "message": "动作INDEX超过合理范围",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322598",
+      "source": "设备端",
+      "message": "动作ID值不能为65535",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322599",
+      "source": "设备端",
+      "message": "动作树生成错误（子节点数量不等于下层节点数量）",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322600",
+      "source": "设备端",
+      "message": "动作树层级过多",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322601",
+      "source": "设备端",
+      "message": "动作树层级过少",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322602",
+      "source": "设备端",
+      "message": "动作组数量超过合理范围",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322603",
+      "source": "设备端",
+      "message": "航线文件格式错误，动作树生效范围错误",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322604",
+      "source": "设备端",
+      "message": "动作树根节点状态错误",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322605",
+      "source": "设备端",
+      "message": "动作树普通节点状态错误",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322606",
+      "source": "设备端",
+      "message": "断点续飞中动作index超过合理范围",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322607",
+      "source": "设备端",
+      "message": "动作树数量错误",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322608",
+      "source": "设备端",
+      "message": "断点信息中触发器运行结果异常",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322609",
+      "source": "设备端",
+      "message": "断点续飞中动作组ID信息不能重复",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322610",
+      "source": "设备端",
+      "message": "断点续飞中动作组位置不能重复",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322611",
+      "source": "设备端",
+      "message": "断点续飞中动作组位置超过合理范围",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322612",
+      "source": "设备端",
+      "message": "续飞中动作id不在断点信息中",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322613",
+      "source": "设备端",
+      "message": "续飞中不能修改动作状态为中断",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322614",
+      "source": "设备端",
+      "message": "断点信息错误导致续飞失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322634",
+      "source": "设备端",
+      "message": "未找到对应的动作执行器",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322649",
+      "source": "设备端",
+      "message": "未找到触发器",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "322650",
+      "source": "设备端",
+      "message": "到点触发参数设置错误",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "324012",
+      "source": "设备端",
+      "message": "日志压缩过程超时，所选日志过多，请减少选择的日志后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "324013",
+      "source": "设备端",
+      "message": "设备日志列表获取失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "324014",
+      "source": "设备端",
+      "message": "设备日志列表为空，请刷新页面或重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "324015",
+      "source": "设备端",
+      "message": "飞行器已关机或未连接，无法获取日志列表，请确认飞行器在舱内，通过远程调试将飞行器开机后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "324016",
+      "source": "设备端",
+      "message": "机场存储空间不足，日志压缩失败，请清理机场存储空间或稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "324017",
+      "source": "设备端",
+      "message": "日志压缩失败，无法获取所选飞行器日志，请刷新页面或重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "324018",
+      "source": "设备端",
+      "message": "日志文件拉取失败，导致本次设备异常反馈上传失败，请稍后重试或重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "324019",
+      "source": "设备端",
+      "message": "因机场网络异常，日志上传失败，请稍后重试。如果连续多次出现该问题，请联系代理商或大疆售后进行网络排障",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "324021",
+      "source": "设备端",
+      "message": "因机场重启中断日志导出，日志导出失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "324030",
+      "source": "设备端",
+      "message": "因机场网络异常、飞行器图传链路异常等原因，媒体文件暂时无法上传或文件已上传但云端读取失败",
+      "logs": null,
+      "cause": "1、该任务已经不存在于上传队列中",
+      "solution": null
+    },
+    {
+      "code": "325000",
+      "source": "设备端",
+      "message": "机场没有收到4G发送的dongle信息",
+      "logs": null,
+      "cause": "1、在打开4G或者关闭4G时会报这个错\n2、命令超时",
+      "solution": null
+    },
+    {
+      "code": "325001",
+      "source": "设备端",
+      "message": "云端下发给机场的命令不符合格式要求，机场无法执行",
+      "logs": null,
+      "cause": "JSON解析错误",
+      "solution": "1、数据格式与文档对不上\n2、数据超出了允许的范围"
+    },
+    {
+      "code": "325003",
+      "source": "设备端",
+      "message": "设备端命令响应错误，请重试",
+      "logs": null,
+      "cause": "命令未知错误",
+      "solution": "1、检查一下下发参数的指令与文档是否一致\n2、需要起飞后才可以使用drc命令控云台\n3、相机模式错误。比如录像模式下拍照。\n4、非直播红外镜头的情况下，设置红外参数\n5、双光相机设置保存的照片类型。"
+    },
+    {
+      "code": "325004",
+      "source": "设备端",
+      "message": "设备端命令请求已超时，请重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "325005",
+      "source": "设备端",
+      "message": "当前机场无法响应任务，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "325006",
+      "source": "设备端",
+      "message": "当前机场启动检查中，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "325007",
+      "source": "设备端",
+      "message": "当前机场执行作业任务中，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "325008",
+      "source": "设备端",
+      "message": "当前机场处理作业任务结果中，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "325009",
+      "source": "设备端",
+      "message": "当前机场执行远程日志导出中，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "325010",
+      "source": "设备端",
+      "message": "当前机场更新自定义飞行区中，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "325011",
+      "source": "设备端",
+      "message": "当前机场更新离线地图中，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "325012",
+      "source": "设备端",
+      "message": "当前飞机未连接，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "326002",
+      "source": "设备端",
+      "message": "飞行器未安装 DJI Cellualr 模块",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "326003",
+      "source": "设备端",
+      "message": "飞行器 DJI Cellualr 模块中未安装 SIM 卡",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "326004",
+      "source": "设备端",
+      "message": "飞行器 DJI Cellualr 模块需要强制升级，否则无法使用",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "326005",
+      "source": "设备端",
+      "message": "操作失败，增强图传无法建立连接，请检查 4G 信号强度，或咨询运营商查询套餐流量和 APN 设置",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "326006",
+      "source": "设备端",
+      "message": "增强图传开关切换失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "326007",
+      "source": "设备端",
+      "message": "切换链路的json请求无效",
+      "logs": null,
+      "cause": "json数据异常",
+      "solution": null
+    },
+    {
+      "code": "326008",
+      "source": "设备端",
+      "message": "机场未安装 DJI Cellualr 模块",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "326009",
+      "source": "设备端",
+      "message": "机场 DJI Cellualr 模块中未安装 SIM 卡",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "326010",
+      "source": "设备端",
+      "message": "机场 DJI Cellualr 模块需要强制升级，否则无法使用",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "326015",
+      "source": "设备端",
+      "message": "设备繁忙，稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "326103",
+      "source": "设备端",
+      "message": "当前 eSIM 正在激活中，请稍后再试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "326104",
+      "source": "设备端",
+      "message": "当前 eSIM 正在切换运营商中，请稍后再试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "326105",
+      "source": "设备端",
+      "message": "DJI 增强图传模块正在切换模式中，请稍后再试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "326106",
+      "source": "设备端",
+      "message": "DJI 增强图传模块异常，请重启设备后再试，如果仍报错请联系大疆售后",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "326107",
+      "source": "设备端",
+      "message": "请在设备管理 > 机场 > 设备运维中激活DJI增强图传模块的 eSIM 或插入 SIM 卡后再试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327000",
+      "source": "设备端",
+      "message": "参数设置失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327001",
+      "source": "设备端",
+      "message": "参数设置失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327002",
+      "source": "设备端",
+      "message": "获取控制权失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327003",
+      "source": "设备端",
+      "message": "获取控制权失败，请稍后重试",
+      "logs": null,
+      "cause": "被抢夺的设备不在线",
+      "solution": null
+    },
+    {
+      "code": "327004",
+      "source": "设备端",
+      "message": "画面拖动失败，请重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327005",
+      "source": "设备端",
+      "message": "双击画面归中失败",
+      "logs": null,
+      "cause": null,
+      "solution": "https://sdk-forum.dji.net/hc/zh-cn/articles/20319918034073"
+    },
+    {
+      "code": "327006",
+      "source": "设备端",
+      "message": "拍照失败",
+      "logs": null,
+      "cause": null,
+      "solution": "检查相机模式和负载控制权"
+    },
+    {
+      "code": "327007",
+      "source": "设备端",
+      "message": "开始录像失败",
+      "logs": null,
+      "cause": null,
+      "solution": "检查相机模式和负载控制权"
+    },
+    {
+      "code": "327008",
+      "source": "设备端",
+      "message": "停止录像失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327009",
+      "source": "设备端",
+      "message": "切换相机模式失败",
+      "logs": null,
+      "cause": "可能原因：\n1、没有插SD卡\n2、SD卡有问题，不兼容",
+      "solution": null
+    },
+    {
+      "code": "327010",
+      "source": "设备端",
+      "message": "ZOOM相机变焦失败",
+      "logs": null,
+      "cause": null,
+      "solution": "1、在机场上报的osd中查看上报的zoom_factor是否有变化。 2、使用遥控器连接飞机，查看变焦倍数是否有变化。 3、设置变焦倍数为其它值，查看云端是否能获知到变焦倍数变化。"
+    },
+    {
+      "code": "327011",
+      "source": "设备端",
+      "message": "IR相机变焦失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327012",
+      "source": "设备端",
+      "message": "获取控制权失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327013",
+      "source": "设备端",
+      "message": "参数设置失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327014",
+      "source": "设备端",
+      "message": "云台已达限位",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327015",
+      "source": "设备端",
+      "message": "直播启动失败，建议刷新直播或重新打开设备小窗",
+      "logs": null,
+      "cause": "无效的相机镜头类型",
+      "solution": null
+    },
+    {
+      "code": "327016",
+      "source": "设备端",
+      "message": "失联动作设置失败，请重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327017",
+      "source": "设备端",
+      "message": "指点飞行高度设置失败，请重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327018",
+      "source": "设备端",
+      "message": "指点飞行模式切换失败，请重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327019",
+      "source": "设备端",
+      "message": "当前状态无法看向标注点",
+      "logs": null,
+      "cause": "当前状态不支持look at",
+      "solution": null
+    },
+    {
+      "code": "327020",
+      "source": "设备端",
+      "message": "全景拍照停止命令超时",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327050",
+      "source": "设备端",
+      "message": "当前设备状态不支持播放音频",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327051",
+      "source": "设备端",
+      "message": "下载音频文件失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327052",
+      "source": "设备端",
+      "message": "喊话器处理模式切换失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327053",
+      "source": "设备端",
+      "message": "上传音频文件失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327054",
+      "source": "设备端",
+      "message": "播放音频失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327055",
+      "source": "设备端",
+      "message": "设置工作模式失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327056",
+      "source": "设备端",
+      "message": "上传文本失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327057",
+      "source": "设备端",
+      "message": "停止播放失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327058",
+      "source": "设备端",
+      "message": "设置播放模式失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327059",
+      "source": "设备端",
+      "message": "设置音量失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327060",
+      "source": "设备端",
+      "message": "设置控件值失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327061",
+      "source": "设备端",
+      "message": "发送文本值失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327062",
+      "source": "设备端",
+      "message": "切换系统语言失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327063",
+      "source": "设备端",
+      "message": "获取设备功能列表失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327064",
+      "source": "设备端",
+      "message": "获取设备配置文件失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327065",
+      "source": "设备端",
+      "message": "获取设备图片文件失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327066",
+      "source": "设备端",
+      "message": "设备文件压缩失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327067",
+      "source": "设备端",
+      "message": "设备文件上传失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327068",
+      "source": "设备端",
+      "message": "上传音频文件失败，md5校验失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327069",
+      "source": "设备端",
+      "message": "上传音频文件失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327070",
+      "source": "设备端",
+      "message": "上传音频文件失败，异常终止",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327071",
+      "source": "设备端",
+      "message": "上传TTS文本失败，md5校验失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327072",
+      "source": "设备端",
+      "message": "上传TTS文本失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327073",
+      "source": "设备端",
+      "message": "上传TTS文本失败，异常终止",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327074",
+      "source": "设备端",
+      "message": "喊话器重播失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327075",
+      "source": "设备端",
+      "message": "喊话器编码失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327201",
+      "source": "设备端",
+      "message": "全景拍照失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327202",
+      "source": "设备端",
+      "message": "全景拍摄终止",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327203",
+      "source": "设备端",
+      "message": "当前设备不支持全景拍照",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327204",
+      "source": "设备端",
+      "message": "系统繁忙，无法全景拍照",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327205",
+      "source": "设备端",
+      "message": "请求失败，无法全景拍照",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327206",
+      "source": "设备端",
+      "message": "飞机未起飞，无法开始全景拍摄",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327207",
+      "source": "设备端",
+      "message": "控制权获取失败，全景拍摄终止",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327208",
+      "source": "设备端",
+      "message": "未知相机错误，无法开始全景拍摄",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327209",
+      "source": "设备端",
+      "message": "相机超时，全景拍摄终止",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327210",
+      "source": "设备端",
+      "message": "无法全景拍照",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327211",
+      "source": "设备端",
+      "message": "存储空间不足，全景拍摄终止",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327212",
+      "source": "设备端",
+      "message": "飞机运动中，无法开始全景拍摄",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327213",
+      "source": "设备端",
+      "message": "云台运动中，无法开始全景拍摄",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327214",
+      "source": "设备端",
+      "message": "用户操作摇杆，全景拍摄终止",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327215",
+      "source": "设备端",
+      "message": "碰到限飞区，全景拍摄终止",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327216",
+      "source": "设备端",
+      "message": "触发距离限制，全景拍摄终止",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327217",
+      "source": "设备端",
+      "message": "云台受阻，全景拍摄终止",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327218",
+      "source": "设备端",
+      "message": "拍照失败，全景拍摄终止",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327219",
+      "source": "设备端",
+      "message": "全景图片拼接失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327220",
+      "source": "设备端",
+      "message": "加载标定参数失败，全景拍摄终止",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327221",
+      "source": "设备端",
+      "message": "调整相机参数失败，全景拍摄终止",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "327500",
+      "source": "设备端",
+      "message": "飞行器镜头除雾失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "328023",
+      "source": "设备端",
+      "message": "因飞机告警导致无法起飞",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "328051",
+      "source": "设备端",
+      "message": "飞机未完成实名登记，请连接遥控器，按照指引完成、实名登记后飞行",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "328052",
+      "source": "设备端",
+      "message": "飞机实名登记状态已注销，请连接遥控器，按照指引完成实名登记后飞行",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "332514",
+      "source": "设备端",
+      "message": "HMS告警导致的无法起飞",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "336000",
+      "source": "设备端",
+      "message": "指点飞行命令发送失败，请重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "336001",
+      "source": "设备端",
+      "message": "飞行器数据异常，无法响应指令",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "336002",
+      "source": "设备端",
+      "message": "飞行器GPS信号差",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "336003",
+      "source": "设备端",
+      "message": "飞行器定位失效，无法响应指令",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "336004",
+      "source": "设备端",
+      "message": "指点飞行自主规划失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "336005",
+      "source": "设备端",
+      "message": "飞行器返航点未更新",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "336006",
+      "source": "设备端",
+      "message": "飞行器已失联，已退出指点飞行",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "336017",
+      "source": "设备端",
+      "message": "飞行器电量不足以完成当前任务",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "336018",
+      "source": "设备端",
+      "message": "已切换飞行器规划模式",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "336019",
+      "source": "设备端",
+      "message": "指点飞行因限高自动调整飞行高度",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "336513",
+      "source": "设备端",
+      "message": "目标点在禁飞区内",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "336514",
+      "source": "设备端",
+      "message": "目标点超出飞行器限远",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "336515",
+      "source": "设备端",
+      "message": "目标点在禁飞区内",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "336516",
+      "source": "设备端",
+      "message": "目标点超出飞行器限高",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "336517",
+      "source": "设备端",
+      "message": "目标点超出飞行器限低",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "337025",
+      "source": "设备端",
+      "message": "飞行器无法起飞",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "337026",
+      "source": "设备端",
+      "message": "目标点异常，请重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "337027",
+      "source": "设备端",
+      "message": "飞行器速度设置异常，请重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "337028",
+      "source": "设备端",
+      "message": "飞行器版本异常，请检查飞行器版本",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "337029",
+      "source": "设备端",
+      "message": "飞行器无法响应当前任务，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "337030",
+      "source": "设备端",
+      "message": "指令飞行安全离场高过低",
+      "logs": null,
+      "cause": "起飞高度输入过低",
+      "solution": null
+    },
+    {
+      "code": "337537",
+      "source": "设备端",
+      "message": "已触碰禁飞区",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "337538",
+      "source": "设备端",
+      "message": "已触碰飞行器限远",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "337539",
+      "source": "设备端",
+      "message": "已触碰禁飞区",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "337540",
+      "source": "设备端",
+      "message": "已触碰飞行器限高或限高区",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "337541",
+      "source": "设备端",
+      "message": "已触碰飞行器限低",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "337542",
+      "source": "设备端",
+      "message": "飞行器起飞失败，请重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "337543",
+      "source": "设备端",
+      "message": "目标点可能在障碍物内，请检查周边环境",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "337544",
+      "source": "设备端",
+      "message": "检测到障碍物，请检查周边环境",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "337545",
+      "source": "设备端",
+      "message": "飞行器规划异常，请重试",
+      "logs": null,
+      "cause": "规划因为某种原因删除了路径",
+      "solution": null
+    },
+    {
+      "code": "337546",
+      "source": "设备端",
+      "message": "已触碰自定义飞行区边界",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338001",
+      "source": "设备端",
+      "message": "飞行器通信异常，无法执行飞行任务，请重启飞行器与机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338002",
+      "source": "设备端",
+      "message": "飞行器通信异常，无法执行飞行任务，请重启飞行器与机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338003",
+      "source": "设备端",
+      "message": "飞行器通信异常，无法执行飞行任务，请重启飞行器与机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338004",
+      "source": "设备端",
+      "message": "飞行器通信异常，无法执行飞行任务，请重启飞行器与机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338005",
+      "source": "设备端",
+      "message": "起飞机场与降落机场部署距离超出限制，无法执行飞行任务，请选择两个部署距离不超过 15km 的机场执行任务",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338006",
+      "source": "设备端",
+      "message": "无法执行飞行任务，请检查降落机场是否已申请解禁证书、是否位于自定义禁飞区或是否位于自定义飞行区外",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338007",
+      "source": "设备端",
+      "message": "目标降落机场部署突破限高区限高，无法执行任务，请申请解禁证书后再试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338008",
+      "source": "设备端",
+      "message": "目标降落机场部署突破飞行器设置的限高，无法执行任务，请调整限高后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338009",
+      "source": "设备端",
+      "message": "飞行器 GPS 定位信号差，无法执行任务，请重启飞行器后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338010",
+      "source": "设备端",
+      "message": "飞行器定位失效，无法执行任务，请重启飞行器后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338011",
+      "source": "设备端",
+      "message": "任务失败，目标机场处于地理鸟笼作业区域外，请重新规划任务后再试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338017",
+      "source": "设备端",
+      "message": "飞行器数据更新失败，无法执行任务，请重启飞行器后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338018",
+      "source": "设备端",
+      "message": "飞行器数据更新失败，无法执行任务，请重启飞行器后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338019",
+      "source": "设备端",
+      "message": "飞行器到目标机场的返航路线正在规划中，无法执行任务，请重启飞行器后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338020",
+      "source": "设备端",
+      "message": "飞行器无法根据规划的路径到达目标降落机场，无法执行任务，请重新选择降落机场后再试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338021",
+      "source": "设备端",
+      "message": "飞行器当前电量不足以到达目标降落机场，无法执行任务，请给飞行器充电后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338049",
+      "source": "设备端",
+      "message": "响应遥控器杆量，已退出指点飞行",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338050",
+      "source": "设备端",
+      "message": "响应终止指令，已退出指点飞行",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338051",
+      "source": "设备端",
+      "message": "飞行器低电量返航，已退出指点飞行",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338052",
+      "source": "设备端",
+      "message": "飞行器低电量降落，已退出指点飞行",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338053",
+      "source": "设备端",
+      "message": "附近有载人机，已退出指点飞行",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338054",
+      "source": "设备端",
+      "message": "响应其他高优先级任务，已退出指点飞行",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "338255",
+      "source": "设备端",
+      "message": "飞行器通信异常，无法执行飞行任务，请重启飞行器与机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "386534",
+      "source": "设备端",
+      "message": "无",
+      "logs": "无",
+      "cause": "无",
+      "solution": "无"
+    },
+    {
+      "code": "386535",
+      "source": "设备端",
+      "message": "航线执行异常，请稍后重试或重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "513001",
+      "source": "设备端",
+      "message": "直播失败，飞行器不存在或飞行器类型错误",
+      "logs": "机场日志、飞机日志",
+      "cause": "云端直播命令内容有误，例如本地机场或飞机的SN是4SEDL13001002C，但实际收到的云端命令中SN与本地SN不匹配。需要查看云端日志定位。",
+      "solution": "请检查云端发送到机场的命令格式是否正确（机场上报的直播能力中携带了机场及飞机设备的SN号，需要检查云端下发的直播命令中的SN号是否与其匹配）"
+    },
+    {
+      "code": "513002",
+      "source": "设备端",
+      "message": "直播失败，相机不存在或相机类型错误",
+      "logs": "机场日志、飞机日志",
+      "cause": "直播错误，相机不存在，飞机没有挂Z30，却要求Z30的图传，就需要报此错误",
+      "solution": "请检查云端发送到机场的命令格式是否正确（机场上报的直播能力中携带了相机的video_id，需要检查云端下发的直播命令中的video_id是否与其匹配）"
+    },
+    {
+      "code": "513003",
+      "source": "设备端",
+      "message": "相机已经在直播中，请勿重复开启直播",
+      "logs": "机场日志、飞机日志",
+      "cause": "重复点播，相机已经在直播中（云端已特殊处理）",
+      "solution": "请检查云端发送命令流程是否正确（设备已经在直播状态，无需重复发送直播命令）"
+    },
+    {
+      "code": "513005",
+      "source": "设备端",
+      "message": "直播失败，直播参数（清晰度）设置错误",
+      "logs": "机场日志、飞机日志",
+      "cause": "直播错误，策略不支持，比如app只支持标清，高清，超清，自适应四种直播策略，不支持其他类型的策略",
+      "solution": "请检查云端发送到机场的直播命令格式是否正确（直播命令中携带的清晰度枚举值是否在合理范围内）"
+    },
+    {
+      "code": "513006",
+      "source": "设备端",
+      "message": "操作失败，相机未开启直播，无法响应直播设置",
+      "logs": "机场日志、飞机日志",
+      "cause": "直播视频没有图传订阅（liveview订阅中没有该码流）\n直播错误，当前app不在liveview界面，无法响应某些直播设置",
+      "solution": "非正常流程，请上传机场及飞机日志反馈售后进行故障分析"
+    },
+    {
+      "code": "513008",
+      "source": "设备端",
+      "message": "操作失败，相机未开启直播，无法响应直播设置",
+      "logs": "机场日志、飞机日志",
+      "cause": "liveview订阅的图传通道数据异常（图传码流为0）",
+      "solution": "检查飞机与机场之间的图传质量（由于图传受干扰，导致机场接收到的飞机图传码流异常；如果确认图传质量良好但仍出现513008错误码，请上传机场及飞机日志用于定位）"
+    },
+    {
+      "code": "513009",
+      "source": "设备端",
+      "message": "无",
+      "logs": "无",
+      "cause": "无",
+      "solution": "无"
+    },
+    {
+      "code": "513010",
+      "source": "设备端",
+      "message": "直播失败，设备无法联网",
+      "logs": "机场日志、飞机日志",
+      "cause": "无法连接流媒体服务",
+      "solution": "检查机场的网络配置"
+    },
+    {
+      "code": "513011",
+      "source": "设备端",
+      "message": "操作失败，设备未开启直播",
+      "logs": "机场日志、飞机日志",
+      "cause": "停止或设置清晰度请求失败，因为没有正在直播",
+      "solution": "请检查云端发送命令流程是否正确"
+    },
+    {
+      "code": "513012",
+      "source": "设备端",
+      "message": "操作失败，设备已在直播中，不支持切换镜头",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "513013",
+      "source": "设备端",
+      "message": "直播失败，直播使用的视频传输协议不支持",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "513014",
+      "source": "设备端",
+      "message": "直播失败，直播参数错误或者不完整",
+      "logs": "机场日志、飞机日志",
+      "cause": "URL参数错误",
+      "solution": "请检查云端发送到机场的直播命令格式是否正确"
+    },
+    {
+      "code": "513015",
+      "source": "设备端",
+      "message": "直播异常，网络卡顿",
+      "logs": "机场日志、飞机日志",
+      "cause": "网络拥塞",
+      "solution": "请检查机场网络状态（机场上行带宽至少10Mbps）"
+    },
+    {
+      "code": "513016",
+      "source": "设备端",
+      "message": "直播异常，视频解码失败",
+      "logs": "机场日志、飞机日志",
+      "cause": "视频关键帧错误（长时间收不到关键帧）",
+      "solution": "1、非正常流程，请上传机场及飞机日志用于定位编码问题\n2、检查是否网络原因导致关键帧丢失"
+    },
+    {
+      "code": "513017",
+      "source": "设备端",
+      "message": "直播已暂停，请等待当前飞机业务完成后再试",
+      "logs": "机场日志、飞机日志",
+      "cause": "由于相机进入回放导致无法直播",
+      "solution": "检查飞机是否处于执行完毕航线任务后上传传媒过程中，此时无法开启飞机直播。其他情况如出现513017请上传机场及飞机日志反馈售后分析"
+    },
+    {
+      "code": "513099",
+      "source": "设备端",
+      "message": "直播失败，请稍后重试",
+      "logs": null,
+      "cause": "内部错误",
+      "solution": "重启机场和飞行器后重试"
+    },
+    {
+      "code": "514100",
+      "source": "设备端",
+      "message": "机场运行异常，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514101",
+      "source": "设备端",
+      "message": "推杆闭合失败，请检查停机坪上是否存在异物，飞行器方向是否放反，或重启机场后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "1、停机坪电源线断裂\n2、推杆舵机损坏\n3、推杆被异物卡住",
+      "solution": "1、根据HMS报错信息进行故障排查\n2、重启机场后进行重试\n3、检查推杆状态\n4、可能存在硬件损坏：停机坪电源线断裂/推杆舵机损坏/推杆被异物卡住"
+    },
+    {
+      "code": "514102",
+      "source": "设备端",
+      "message": "推杆展开失败，请检查停机坪上是否存在异物，或重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514103",
+      "source": "设备端",
+      "message": "飞行器电量低，无法执行飞行任务，请充电后（建议≥50%）重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "飞行器电量低",
+      "solution": "等待充电至30%以上,重新下发任务"
+    },
+    {
+      "code": "514104",
+      "source": "设备端",
+      "message": "飞行器电池开始充电失败，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514105",
+      "source": "设备端",
+      "message": "飞行器电池停止充电失败，请重启机场后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "1、内部逻辑异常\n2、充电链路通讯异常",
+      "solution": "1、升级最新固件\n2、重启机场和飞行器\n2、拉取机场和飞行器日志联系售后分析"
+    },
+    {
+      "code": "514106",
+      "source": "设备端",
+      "message": "飞行器电源控制异常，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514107",
+      "source": "设备端",
+      "message": "舱盖开启失败，请检查舱盖周围是否存在异物，或重启机场后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "1、舱盖卡住或重物覆盖导致堵转\n2、电机刹车异常，无法正常解锁\n3、主控模块异常\n4、电机减速机损坏卡死\n5、驱动器损坏\n6、电机线圈短路\n7、位置反馈磁环位置发生移动",
+      "solution": "1、机场上电，手动按下解锁按钮，检查是否有“咔哒”的解锁声音，手动开启舱盖，检查是否可以正常开启或关闭舱盖以及是否有异响。\n2、若无则解锁声音可能为刹车损坏或刹车连接器接触不良，需卸下摆臂把舱盖取下并掀开停机坪。先排查主控模块刹车接口的供电，更换主控模块或电机进行交叉测试。\n3、若有解锁声音，但无法开启舱盖，则可能电机卡死损坏，需更换电机\n4、若手动可正常开启，但APP控制不动作，则可能是驱动器或电机损坏\n5、使用APP重新标定舱盖位置"
+    },
+    {
+      "code": "514108",
+      "source": "设备端",
+      "message": "舱盖关闭失败，请检查舱盖周围是否存在异物，或重启机场后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "1、舱盖卡住或重物覆盖导致堵转\n2、磁环位置发生移动\n3、主控模块损坏\n4、电机减速机损坏卡死\n5、驱动器损坏\n6、霍尔传感器异常",
+      "solution": "1、机场上电，手动按下解锁按钮，检查是否有“咔哒”的解锁声音，手动开启舱盖，检查是否可以正常开启或关闭舱盖以及是否有异响。\n2、若无则解锁声音可能为刹车损坏或刹车连接器接触不良，需卸下摆臂把舱盖取下并掀开停机坪。先排查主控模块刹车接口的供电，再测量刹车线圈的电阻。根据测量结果更换主控模块或电机\n3、若有解锁声音，但无法开启舱盖，则可能电机卡死损坏，需更换电机\n4、若手动可正常开启，但APP控制不动作，则可能是驱动器或电机线损坏，主控损坏\n5、使用APP重新标定舱盖位置"
+    },
+    {
+      "code": "514109",
+      "source": "设备端",
+      "message": "飞行器开机失败，请检查飞行器是否仓和飞机电量是否正常，或重启机场后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "1、飞行器电池电量低\n2、电池固件不兼容\n3、充电连接器通讯异常",
+      "solution": "1、检查飞机电池量是否大于30%\n2、升级到最新的机场和飞机固件\n3、检查修复以上问题，重启机场，重试"
+    },
+    {
+      "code": "514110",
+      "source": "设备端",
+      "message": "飞行器关机失败，请重启机场后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "1、固件版本过低\n2、充电连接器通讯异常",
+      "solution": "1、升级飞行器和机场固件至最新版本\n2、重新启动后进行尝试\n3、检查充电连接器金属片是否插入到飞行器内"
+    },
+    {
+      "code": "514111",
+      "source": "设备端",
+      "message": "飞行器慢转收桨控制异常，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514112",
+      "source": "设备端",
+      "message": "飞行器慢转收桨控制异常，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514113",
+      "source": "设备端",
+      "message": "机场与飞行器无法建立有线连接，请检查飞行器是否在舱内，推杆闭合时是否被卡住，充电连接器是否脏污或损坏",
+      "logs": "机场日志、飞机日志",
+      "cause": "1、停机坪下充电连接线断裂\n2、飞机不在机场停机坪上\n3、推杆片簧金属片没有插入飞机内",
+      "solution": "1、检查飞行器是否在停机坪上\n2、检查左右充电线连接是否正常是否存在断裂\n3、远程调试是否可以控制飞行器开关机或充电\n4、检查充电连接器金属片是否插入到飞行器内"
+    },
+    {
+      "code": "514114",
+      "source": "设备端",
+      "message": "获取飞行器电源状态失败，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514116",
+      "source": "设备端",
+      "message": "无法执行当前操作，机场正在执行其他控制指令，请稍后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "指令冲突",
+      "solution": "等待上一步操作执行完毕后再进行操作"
+    },
+    {
+      "code": "514117",
+      "source": "设备端",
+      "message": "舱盖开启或关闭未到位，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514118",
+      "source": "设备端",
+      "message": "推杆展开或闭合未到位，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514120",
+      "source": "设备端",
+      "message": "机场与飞行器断连，请重启机场后重试或重新对频",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514121",
+      "source": "设备端",
+      "message": "机场急停按钮被按下，请释放急停按钮",
+      "logs": "机场日志、飞机日志",
+      "cause": "急停按钮被按下",
+      "solution": "向外拔出急停按钮"
+    },
+    {
+      "code": "514122",
+      "source": "设备端",
+      "message": "获取飞行器充电状态失败，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514123",
+      "source": "设备端",
+      "message": "飞行器电池电量过低无法开机",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514124",
+      "source": "设备端",
+      "message": "获取飞行器电池信息失败，无法执行飞行任务，请重启机场后重试",
+      "logs": "机场日志",
+      "cause": "1、电池没插到位\n2、电池电量低，进入休眠状态",
+      "solution": "1：检查飞机双电池是否插入到位\n2：确认电池电量是否为0\n3：打开远程调试，给飞机充电，充电到40%以上，重试下发任务；"
+    },
+    {
+      "code": "514125",
+      "source": "设备端",
+      "message": "飞行器电池电量已接近满电状态，无法开始充电，请使用至95%以下再进行充电",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514134",
+      "source": "设备端",
+      "message": "雨量过大，机场无法执行飞行任务，请稍后重试",
+      "logs": "机场日志",
+      "cause": "大雨无法飞行",
+      "solution": "等待雨量减小后再下发任务"
+    },
+    {
+      "code": "514135",
+      "source": "设备端",
+      "message": "风速过大（≥12m/s），机场无法执行飞行任务，请稍后重试",
+      "logs": "机场日志",
+      "cause": "大风无法飞行",
+      "solution": "等待风速降低后再下发任务"
+    },
+    {
+      "code": "514136",
+      "source": "设备端",
+      "message": "机场供电断开，机场无法执行飞行任务，请恢复机场供电后重试",
+      "logs": "机场日志",
+      "cause": "1、无市电输入\n2、ACDC损坏\n3、ACDC与主控模块连接线缆断开",
+      "solution": "1、检查市电供电是否正常\n2、检查ACDC输出是否正常\n3、检查ACDC与主控模块的连接线缆是否正常\n4、更换ACDC或主控模块"
+    },
+    {
+      "code": "514137",
+      "source": "设备端",
+      "message": "环境温度过低于-20℃ (-4°F)，机场无法执行飞行任务，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514138",
+      "source": "设备端",
+      "message": "飞行器电池正在保养中，机场无法执行飞行任务，请等待保养结束后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514139",
+      "source": "设备端",
+      "message": "飞行器电池无法执行保养指令，飞行器电池无需保养",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514140",
+      "source": "设备端",
+      "message": "飞行器电池无法执行保养指令，飞行器电池无需保养",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514141",
+      "source": "设备端",
+      "message": "机场系统运行异常，请重启机场后重试",
+      "logs": "机场日志、飞机日志",
+      "cause": "设备逻辑异常",
+      "solution": "远程重启机场和飞行器后重新下发任务，如仍存在问题 拉取机场和飞行器日志联系售后分析"
+    },
+    {
+      "code": "514142",
+      "source": "设备端",
+      "message": "飞行器起飞前，机场与飞行器无法建立有线连接，请检查飞行器是否在舱内，推杆闭合时是否被卡住，充电连接器是否脏污或损坏",
+      "logs": "机场日志、飞机日志",
+      "cause": "1、起飞前检查充电连接器通讯异常\n2、飞机不在机场停机坪上\n3、推杆片簧金属片没有插入飞机内\n4、检查修复以上异常，重启机场",
+      "solution": "1、远程调试是否可以控制飞行器开关机或充电\n2、检查飞行器是否在停机坪上\n3、检查充电连接器金属片是否插入到飞行器内\n4、检查停机坪下方充电连接线是否连接正常"
+    },
+    {
+      "code": "514143",
+      "source": "设备端",
+      "message": "推杆未闭合或闭合不到位，请稍后重试或重启机场后重试",
+      "logs": "机场日志",
+      "cause": "1、停机坪与主控模块电源线连接不良\n2、推杆舵机损坏\n3、推杆被异物卡住\n4、检查修复以上异常后，重启机场",
+      "solution": "1、远程调试控制推杆运动，查看是否正常运行\n2、通过机场监控摄像头查看推杆是否有异物卡住\n3、机场断电，手动推动推杆，现场检查推杆是否被卡住\n4、可能硬件损坏：停机坪与主控模块电源线连接不良/推杆舵机损坏"
+    },
+    {
+      "code": "514144",
+      "source": "设备端",
+      "message": "舱盖未关闭或关闭不到位，请稍后重试或重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514145",
+      "source": "设备端",
+      "message": "机场处于现场调试中，无法执行当前操作或执行飞行任务，请断开遥控器和机场的数据线连接后重试",
+      "logs": "机场日志",
+      "cause": "处于现场调试无法作业",
+      "solution": "机场处于现场调试中，无法执行当前操作或执行飞行任务，请断开遥控器和机场的数据线连接后重试"
+    },
+    {
+      "code": "514146",
+      "source": "设备端",
+      "message": "机场处于远程调试中，无法执行飞行任务，请退出远程调试后重试",
+      "logs": "机场日志",
+      "cause": "处于远程调试无法作业",
+      "solution": "机场处于远程调试中，无法执行飞行任务，请退出远程调试后重试"
+    },
+    {
+      "code": "514147",
+      "source": "设备端",
+      "message": "设备升级中，无法进行远程调试或执行飞行任务，请等待升级完成后重试",
+      "logs": "机场日志",
+      "cause": "处于升级状态无法作业",
+      "solution": "设备升级中，无法进行远程调试或执行飞行任务，请等待升级完成后重试"
+    },
+    {
+      "code": "514148",
+      "source": "设备端",
+      "message": "机场已经在作业中，无法进行远程调试或再次执行飞行任务，请等待当前任务执行完成后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514149",
+      "source": "设备端",
+      "message": "机场系统运行异常，无法执行飞行任务，请重启机场后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514150",
+      "source": "设备端",
+      "message": "设备重启中，无法执行飞行任务，请等待重启完成后重试",
+      "logs": "机场日志",
+      "cause": "机场重启中",
+      "solution": "等待重启完成"
+    },
+    {
+      "code": "514151",
+      "source": "设备端",
+      "message": "设备升级中，无法执行设备重启指令，请等待升级完成后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514153",
+      "source": "设备端",
+      "message": "机场已退出远程调试模式，无法执行当前操作",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514154",
+      "source": "设备端",
+      "message": "获取内循环出风口温度失败，请稍后再试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514156",
+      "source": "设备端",
+      "message": "飞机不在舱内，请立即检查飞行器是否已安全降落并将飞行器放回至机场",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514157",
+      "source": "设备端",
+      "message": "执行开机失败，无线充电线圈业务繁忙，请重启机场后再试复",
+      "logs": null,
+      "cause": null,
+      "solution": "1、检查市电是否断开"
+    },
+    {
+      "code": "514158",
+      "source": "设备端",
+      "message": "无法起飞，机场 RTK 业务异常，请重启机场后再试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514159",
+      "source": "设备端",
+      "message": "任务失败，降落机场检测到飞行器，请确保降落机场没有飞行器后再试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514162",
+      "source": "设备端",
+      "message": "飞机和机场连接失败，请关闭机场舱盖或重启机场后再试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514163",
+      "source": "设备端",
+      "message": "请确保飞机电池插入到位或重启飞机后再试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514164",
+      "source": "设备端",
+      "message": "设备重启失败，请稍后重试，如果仍报错请联系大疆售后。",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514165",
+      "source": "设备端",
+      "message": "设备重启失败，请稍后重试，如果仍报错请联系大疆售后。",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514170",
+      "source": "设备端",
+      "message": "机场系统初始化中，无法执行当前操作或指令，请等待机场系统初始化完成后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514171",
+      "source": "设备端",
+      "message": "云端下发给机场的命令不符合格式要求，机场无法执行",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514172",
+      "source": "设备端",
+      "message": "飞行器无法关机，蓝牙连接状态为未连接，请尝试重启飞行器和机场，或去现场重新对频飞行器与机场后再试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514173",
+      "source": "设备端",
+      "message": "由于天气原因（环境温度低于5度并且降雨大于等于中雨），可能导致桨叶结冰影响作业安全，暂无法执行任务",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514174",
+      "source": "设备端",
+      "message": "飞行器充电失败，机场舱盖开启或关闭未到位，请关闭舱盖后再试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514180",
+      "source": "设备端",
+      "message": "停止空调制冷或停止空调制热失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514181",
+      "source": "设备端",
+      "message": "开启空调制冷失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514182",
+      "source": "设备端",
+      "message": "开启空调制热失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514183",
+      "source": "设备端",
+      "message": "开启空调除湿失败，请稍后重试",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514184",
+      "source": "设备端",
+      "message": "当前温度低于 0 ℃（32°F），无法开启空调制冷",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514185",
+      "source": "设备端",
+      "message": "当前温度高于 45 ℃（115°F），无法开启空调制热",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514300",
+      "source": "设备端",
+      "message": "网关异常",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514301",
+      "source": "设备端",
+      "message": "请求超时，连接断开",
+      "logs": null,
+      "cause": null,
+      "solution": "表示​​心跳超时。如果 10 秒内未发送心跳信号或未发出 DRC（无人机远程控制）命令，则与机场 DRC 的连接将自动断开。要保持连接，请在飞行过程中持续发送心跳信号或发出 DRC 命令。"
+    },
+    {
+      "code": "514302",
+      "source": "设备端",
+      "message": "网络证书异常，连接失败",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514303",
+      "source": "设备端",
+      "message": "网络异常，连接断开",
+      "logs": null,
+      "cause": null,
+      "solution": null
+    },
+    {
+      "code": "514304",
+      "source": "设备端",
+      "message": "机场请求被拒，连接失败",
+      "logs": null,
+      "cause": "1、大概率会是网络问题。目前DRC和普通MQTT是共用一条链路的，而DRC连接的网络质量要求比较高，且超时时间短，不会反复重试，很容易失败。所以使用DRC需要保证网络稳定\n\n2、云端下发参数错误，或者机场网络无法连接服务器",
+      "solution": null
+    }
+  ],
+  "hmsErrors": [
+    {
+      "code": "0x19110000",
+      "message": "%dock_cover_index舱盖电机堵转",
+      "faq": "请检查舱盖是否夹到异物，被冰雪覆盖，或舱盖上被放置重物，在确认没有以上问题或者问题解决后，如果机场仍存在此告警，请联系大疆售后。",
+      "cause": "1、舱盖卡住或重物覆盖导致堵转\n2、电机刹车异常，无法正常解锁\n3、主控模块电磁锁接口供电异常\n4、电机减速机损坏卡死\n5、驱动器损坏\n6、电机线圈短路",
+      "solution": "1、机场上电，手动按下解锁按钮，检查是否有“咔哒”的解锁声音，手动开启舱盖，检查是否可以正常开启或关闭舱盖以及是否有异响。\n2、若无则解锁声音可能为刹车损坏或刹车连接器接触不良，需卸下摆臂把舱盖取下并掀开停机坪。先排查主控模块刹车接口的供电，再测量刹车线圈的电阻。根据测量结果更换主控模块或电机\n3、若有解锁声音，但无法开启舱盖，则可能电机卡死损坏，需更换电机\n4、若手动可正常开启，但APP控制不动作，则可能是驱动器或电机线圈损坏",
+      "materials": [
+        "电机驱动器组件",
+        "电机组件"
+      ]
+    },
+    {
+      "code": "0x19110002",
+      "message": "%dock_cover_index舱盖位置误差过大",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、电机霍尔信号线与驱动器接触不良\n2、驱动器损坏\n3、电机霍尔传感器损坏",
+      "solution": "1、检查电机与驱动器之间的霍尔信号线连接是否稳固\n2、尝试更换电机驱动器，如故障依旧尝试更换电机",
+      "materials": [
+        "电机驱动器组件",
+        "电机组件",
+        "霍尔板组件",
+        "16PIN信号线（主控-右霍尔）（一分四）",
+        "16PIN信号线（主控-左霍尔）（一分四）"
+      ]
+    },
+    {
+      "code": "0x19110003",
+      "message": "%dock_cover_index舱盖电机运动超速",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、外力手动开启/关闭舱盖\n2、舱盖因重力快速掉下\n2、驱动器损坏",
+      "solution": "1、只是手动开关盖时出现是正常表现，无需关注\n2、如一直报错无法消掉可尝试更换电机驱动器",
+      "materials": [
+        "电机驱动器组件"
+      ]
+    },
+    {
+      "code": "0x19110006",
+      "message": "%dock_cover_index舱盖电机电压过高",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、主控模块输出电压高于90V\n2、驱动器损坏",
+      "solution": "1、使用万用表测量电机驱动器电源输入口电压，正常应为24V~28V\n2、如测量电压均正常，可尝试更换电机驱动器",
+      "materials": [
+        "电机驱动器组件",
+        "主控模块"
+      ]
+    },
+    {
+      "code": "0x1911000F",
+      "message": "%dock_cover_index舱盖驱动器通讯异常",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、驱动器供电异常\n2、驱动器485通讯异常\n3、驱动器损坏",
+      "solution": "1、确认驱动器电源输入口的接线良好，无松动接触不良\n2、使用万用表测量电机驱动器电源输入口电压，正常应为24V~28V，如无电压，需排查主控模块端的电压是否正常，以及急停按钮的触点是否为导通状态\n3、检查驱动器右侧的通讯线是否完好以及是否插入到底\n4、如供电和信号线连接均正常，可尝试更换电机驱动器",
+      "materials": [
+        "电机驱动器组件",
+        "16PIN信号线（主控-右霍尔）（一分四）",
+        "16PIN信号线（主控-左霍尔）（一分四）",
+        "信号线（急停开关-主控模块输出线）",
+        "急停开关电源线（急停开关-电机电调线）",
+        "急停开关",
+        "主控模块"
+      ]
+    },
+    {
+      "code": "0x19110011",
+      "message": "%dock_cover_index舱盖运行未知错误",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "未知错误",
+      "solution": "尝试更换电机驱动器",
+      "materials": [
+        "电机驱动器组件"
+      ]
+    },
+    {
+      "code": "0x19110012",
+      "message": "%dock_cover_index舱盖位置校准数据错误",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、更换主控模块后未标定\n2、磁环位置发生移动\n3、位置传感器损坏",
+      "solution": "1、检查驱动轴磁环与轴是否锁紧，无相对滑动\n2、检查位置传感器霍尔板连接器有无松动或未插入到位\n3、最后使用APP重新标定舱盖",
+      "materials": [
+        "主控模块",
+        "16PIN信号线（主控-右霍尔）（一分四）",
+        "16PIN信号线（主控-左霍尔）（一分四）",
+        "霍尔板组件"
+      ]
+    },
+    {
+      "code": "0x19110013",
+      "message": "%dock_cover_index舱盖开启或关闭时位置不到位",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、更换主控模块后未标定\n2、磁环位置发生移动\n3、位置传感器损坏",
+      "solution": null,
+      "materials": [
+        "传动轴磁环"
+      ]
+    },
+    {
+      "code": "0x19110014",
+      "message": "%dock_cover_index舱盖开启超时",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、传动轴磁环松动空转\n2、电机轴键漏装",
+      "solution": "1、检查驱动轴磁环与轴是否锁紧，无相对滑动\n2、检查电机传动轴的平键是否按照，如未安装平键，舱盖将无法锁住",
+      "materials": [
+        "传动轴磁环"
+      ]
+    },
+    {
+      "code": "0x19110015",
+      "message": "%dock_cover_index舱盖关闭超时",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、传动轴磁环松动空转\n2、电机轴键漏装",
+      "solution": null,
+      "materials": [
+        "传动轴电机平键"
+      ]
+    },
+    {
+      "code": "0x19110016",
+      "message": "%dock_cover_index舱盖关闭时触发防夹，未成功关闭",
+      "faq": "请检查舱盖是否夹到异物，如果确认没有夹到异物，机场仍存在此告警，请联系大疆售后。",
+      "cause": "1、舱盖关闭方向卡到异物\n2、运行机构阻力变大",
+      "solution": "1、检查周围环境，清除影响舱盖关闭方向的异物\n2、如多次出现，可手动开关舱盖感受阻力是否变大，尝试更换电机",
+      "materials": [
+        "电机组件"
+      ]
+    },
+    {
+      "code": "0x19110017",
+      "message": "%dock_cover_index舱盖开启时触发防夹，未成功开启",
+      "faq": "请检查舱盖是否夹到异物，在确认没有夹到异物或者清除异物后，如果机场仍存在此告警，请联系大疆售后。",
+      "cause": "1、舱盖开启方向卡到异物\n2、运行机构阻力变大",
+      "solution": "1、检查周围环境，清除影响舱盖开启方向的异物，如机场两侧的地面是否存在物品\n2、如多次出现，可手动开关舱盖感受阻力是否变大，尝试更换电机",
+      "materials": [
+        "电机组件"
+      ]
+    },
+    {
+      "code": "0x19110400",
+      "message": "%charging_rod_index推杆位置标定数据错误",
+      "faq": "请检查推杆是否夹到异物，或飞行器在停机坪上偏转角度过大导致推杆卡住，在确认没有以上问题或者问题解决后，如果机场仍存在此告警，请联系大疆售后。",
+      "cause": "1、舵机无法到达限位位置\n2、限位开关损坏",
+      "solution": "1、请检查推杆运行过程中是否夹到异物，或飞行器在停机坪上偏转角度过大导致推杆卡住\n2、尝试更换对应方向的推杆限位开关",
+      "materials": [
+        "停机坪舵机",
+        "停机坪行程开关"
+      ]
+    },
+    {
+      "code": "0x19110401",
+      "message": "%charging_rod_index推杆舵机堵转",
+      "faq": "请检查推杆是否夹到异物，或飞行器在停机坪上偏转角度过大导致推杆卡住，在确认没有以上问题或者问题解决后，如果机场仍存在此告警，请联系大疆售后。",
+      "cause": "1、飞机降落角度偏差过大脚架卡住推杆\n2、停机坪有异物卡住推杆\n3、左右推杆二级推进卡死\n4、导轨阻力变大\n5、舵机齿轮卡到线缆\n6、舵机损坏\n7、舵机输出力矩下降\n8、飞机脚架与停机坪摩擦力变大",
+      "solution": "1、清除停机坪异物\n2、机场下电，用手对推杆模块施加外力，查看是否可以推动，有无卡死现象。检查左右推杆的二级推进弹簧是否卡死\n3、向上抬起停机坪，检查对应方向的线缆是否有卡到作动器齿轮内。如线材存在破损需要更换破损的线材。检查舵机齿轮与齿条是否存在卡死现象，若存在可通过拆下舵机齿轮并调整舵机与齿条的啮合来解决\n4、使用APP控制推杆运动，如仍存在问题，需更换对应舵机\n5、飞机定期保养，更换磨损的脚架",
+      "materials": [
+        "停机坪舵机"
+      ]
+    },
+    {
+      "code": "0x19110402",
+      "message": "%charging_rod_index推杆舵机阻力过大",
+      "faq": "请检查推杆是否夹到异物，或飞行器在停机坪上偏转角度过大导致推杆卡住，在确认没有以上问题或者问题解决后，如果机场仍存在此告警，请联系大疆售后。",
+      "cause": "1、飞机降落角度偏差过大脚架卡住推杆\n2、停机坪有异物卡住推杆\n3、飞机脚架与停机坪摩擦力变大",
+      "solution": null,
+      "materials": [
+        "停机坪组件（不含RTK）"
+      ]
+    },
+    {
+      "code": "0x19110403",
+      "message": "%charging_rod_index推杆舵机温度过高",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、舵机损坏\n2、舵机长时间过载",
+      "solution": "先排查舵机是否存在堵转，如外力可是舵机正常运动，则可能是舵机损坏了，需进行更换",
+      "materials": [
+        "停机坪舵机"
+      ]
+    },
+    {
+      "code": "0x19110404",
+      "message": "%charging_rod_index推杆舵机通讯异常",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、舵机连接器接触不良\n2、舵机供电异常\n3、停机坪接口板损坏\n4、舵机损坏",
+      "solution": "1、检查舵机连接器是否按照到位\n2、更换舵机进行测试\n3、更换停机坪接口板进行测试",
+      "materials": [
+        "停机坪舵机",
+        "停机坪接口板组件"
+      ]
+    },
+    {
+      "code": "0x19110405",
+      "message": "%charging_rod_index推杆舵机内部错误",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "舵机损坏",
+      "solution": "更换舵机",
+      "materials": [
+        "停机坪舵机"
+      ]
+    },
+    {
+      "code": "0x19110406",
+      "message": "%charging_rod_index推杆内侧限位开关工作异常",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、舵机无法到达限位位置\n2、行程开关损坏",
+      "solution": "1、请检查推杆运行过程中是否夹到异物，或飞行器在停机坪上偏转角度过大导致推杆卡住\n2、尝试更换对应方向的推杆限位开关\"",
+      "materials": [
+        "停机坪行程开关"
+      ]
+    },
+    {
+      "code": "0x19110407",
+      "message": "%charging_rod_index推杆内侧限位开关工作异常",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、舵机无法到达限位位置\n2、行程开关损坏",
+      "solution": null,
+      "materials": [
+        "停机坪行程开关"
+      ]
+    },
+    {
+      "code": "0x19110408",
+      "message": "%charging_rod_index推杆外侧限位开关工作异常",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、舵机无法到达限位位置\n2、行程开关损坏",
+      "solution": null,
+      "materials": [
+        "停机坪行程开关"
+      ]
+    },
+    {
+      "code": "0x19110409",
+      "message": "%charging_rod_index推杆外侧限位开关工作异常",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、舵机无法到达限位位置\n2、行程开关损坏",
+      "solution": null,
+      "materials": [
+        "停机坪行程开关"
+      ]
+    },
+    {
+      "code": "0x1911040B",
+      "message": "%charging_rod_index推杆闭合超时",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "舵机在空转，可能齿轮脱落或齿轮与齿条啮合存在问题",
+      "solution": "检查舵机齿轮和齿条配合情况，进行紧固或更换",
+      "materials": [
+        "停机坪舵机",
+        "停机坪组件（不含RTK）"
+      ]
+    },
+    {
+      "code": "0x1911040C",
+      "message": "%charging_rod_index推杆展开超时",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "舵机在空转，齿轮脱落、齿轮与齿条啮合存在问题",
+      "solution": "检查舵机齿轮和齿条配合情况，进行紧固或更换",
+      "materials": [
+        "停机坪舵机",
+        "停机坪组件（不含RTK）"
+      ]
+    },
+    {
+      "code": "0x19111400",
+      "message": "机场配电柜柜门被打开",
+      "faq": "机场配电柜柜门被打开，请关闭配电柜柜门，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、柜门未关\n2、干簧管损坏\n3、配电柜接口板连接器接触不良\n4、柜门磁铁位置发生移动，干簧管检测不到",
+      "solution": "1、检查柜门状态\n2、使用磁铁\n2、更换配电柜接口板模块",
+      "materials": [
+        "配电柜接口板组件"
+      ]
+    },
+    {
+      "code": "0x19111800",
+      "message": "急停按钮被按下",
+      "faq": "机场急停按钮被按下，请向外拔出或顺时针旋转释放急停按钮，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、急停按钮被按下\n2、急停按钮损坏\n3、急停按钮的连接线材接触不良",
+      "solution": "1、向外拔出或向右旋转复位急停按钮\n2、检查急停按钮的端子接线是否存在松动\n3、急停按钮未按下时，两个触点为导通状态。在机场断电状态下，依次使用万用表蜂鸣档测量急停按钮是否导通",
+      "materials": [
+        "信号线（急停开关-主控模块输出线）",
+        "急停开关电源线（急停开关-电机电调线）",
+        "急停开关"
+      ]
+    },
+    {
+      "code": "0x19112C03",
+      "message": "机场环境温度传感器损坏",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、温度传感器损坏\n2、线缆接触不良\n3、主控模块损坏",
+      "solution": "1、在云平台或APP上查看环境温度显示的数值是否符合预期\n2、尝试更换风道右侧内的温度传感器\n3、如仍未解决，可重新插拔L-CON线缆连接器，或尝试更换主控模块",
+      "materials": [
+        "16PIN信号线（主控-左霍尔）（一分四）",
+        "环境温度传感器（空调进风口）",
+        "主控模块"
+      ]
+    },
+    {
+      "code": "0x19112C06",
+      "message": "机场左侧充电连接器温度传感器损坏",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、停机坪左侧正极充电连接器温度传感器损坏\n2、温度传感器线缆接触不良\n3、停机坪接口板损坏",
+      "solution": "1、检查温度传感器的连接器是否有接插到位\n2、可使用万用表电阻档插入连接器插头内测量电阻值，常温下应为“XXKohm”\n3、阻值无穷大或未0ohm需更换充电连接器的温度传感器\n4、如温度传感器正常，则需更换停机坪接口板",
+      "materials": [
+        "停机坪接口板组件",
+        "停机坪组件（不含RTK）"
+      ]
+    },
+    {
+      "code": "0x19112C07",
+      "message": "机场右侧充电连接器温度传感器损坏",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、停机坪右侧负极充电连接器温度传感器损坏\n2、温度传感器线缆接触不良\n3、停机坪接口板损坏",
+      "solution": "1、检查温度传感器的连接器是否有接插到位\n2、可使用万用表电阻档插入连接器插头内测量电阻值，常温下应为“XXKohm”\n3、阻值无穷大或未0ohm需更换充电连接器的温度传感器\n4、如温度传感器正常，则需更换停机坪接口板",
+      "materials": [
+        "停机坪接口板组件",
+        "停机坪组件（不含RTK）"
+      ]
+    },
+    {
+      "code": "0x19112C08",
+      "message": "停机坪接口板温度传感器损坏",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "停机坪接口板温度传感器损坏",
+      "solution": "更换停机坪接口板",
+      "materials": [
+        "停机坪接口板组件"
+      ]
+    },
+    {
+      "code": "0x19112C09",
+      "message": "停机坪接口板温度传感器损坏",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "停机坪接口板温度传感器损坏",
+      "solution": "更换停机坪接口板",
+      "materials": [
+        "停机坪接口板组件"
+      ]
+    },
+    {
+      "code": "0x19112C0A",
+      "message": "停机坪接口板温度传感器损坏",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "停机坪接口板温度传感器损坏",
+      "solution": "更换停机坪接口板",
+      "materials": [
+        "停机坪接口板组件"
+      ]
+    },
+    {
+      "code": "0x19113800",
+      "message": "机场内部电源模块工作异常",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "主控模块内部电源工作异常",
+      "solution": "尝试更换主控模块",
+      "materials": [
+        "主控模块"
+      ]
+    },
+    {
+      "code": "0x19113802",
+      "message": "机场弱电模块供电异常",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、ACDC与主控模块线缆接触不良，回路电阻大\n2、主控模块电压采样异常\n3、ACDC电源电压采样异常",
+      "solution": "1、检查线缆连接是否正常，连接器是否插入到位\n2、更换主控模块或ACDC模块",
+      "materials": [
+        "主控模块",
+        "ACDC电源模块",
+        "主控电源线（主控模块-ACDC）"
+      ]
+    },
+    {
+      "code": "0x19113803",
+      "message": "机场供电电源断开",
+      "faq": "机场供电电源断开，请给机场恢复供电。",
+      "cause": "1、无市电输入\n2、ACDC损坏\n3、ACDC与主控模块连接线缆断开",
+      "solution": "1、检查市电供电是否正常\n2、检查ACDC输出是否正常\n3、检查ACDC与主控模块的连接线缆是否正常\n4、更换ACDC或主控模块",
+      "materials": [
+        "主控模块",
+        "ACDC电源模块",
+        "主控电源线（主控模块-ACDC）"
+      ]
+    },
+    {
+      "code": "0x19110800",
+      "message": "机场蓄电池无法充电",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、蓄电池温度异常\n2、主控模块充电电路异常\n3、蓄电池异常",
+      "solution": "1、云端查看蓄电池温度是否大于40℃或低于-20℃，需等待温度处于正常范围时才能进行充电\n2、市电断电状态下检查蓄电池电压是否正常，应为22V~28V。蓄电池如果出现过放需进行更换\n3、将市电开关打开，蓄电池开关断开，使用万用表电流档红黑表笔分别接到蓄电池开关上下两端，测量是否存在电流，正常应为1.8A左右",
+      "materials": [
+        "主控模块",
+        "蓄电池",
+        "蓄电池线材（主控-蓄电池）（一分四）",
+        "蓄电池电源线（蓄电池-主控扩展线）"
+      ]
+    },
+    {
+      "code": "0x19110801",
+      "message": "机场蓄电池电量低",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、市电断电，同时蓄电池电压低于22.7V\n2、蓄电池损坏\n3、蓄电池充电电路异常\n4、蓄电池开关损坏",
+      "solution": "1、市电断电状态下检查蓄电池电压是否正常，应为22V~28V。蓄电池如果出现过放需进行更换\n2、将市电开关打开，蓄电池开关断开，使用万用表电流档红黑表笔分别接到蓄电池开关上下两端，测量是否存在电流，正常应为1.8A左右\n3、闭合蓄电池开关，使用万用表电压档分别测量开关上端对地和开关下端对地的电压值是否一致",
+      "materials": [
+        "蓄电池",
+        "蓄电池线材（主控-蓄电池）（一分四）",
+        "蓄电池电源线（蓄电池-主控扩展线）",
+        "直流电源开关（NDB2T-63 B20/1）"
+      ]
+    },
+    {
+      "code": "0x19110803",
+      "message": "机场蓄电池温度过低",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、蓄电池温度低于-20℃\n2、蓄电池测温NTC损坏\n3、主控模块异常",
+      "solution": "1、查看环境温度信息，是否过高或过低\n2、检查蓄电池NTC是否损坏，必要时需进行更换\n3、若仍存在异常，更换主控模块",
+      "materials": [
+        "主控模块",
+        "蓄电池线材（主控-蓄电池）（一分四）"
+      ]
+    },
+    {
+      "code": "0x19110804",
+      "message": "机场蓄电池开关未开启",
+      "faq": "机场蓄电池开关未开启，请开启机场蓄电池开关，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、蓄电池开关未闭合\n2、蓄电池开关辅助触头损坏损坏",
+      "solution": "1、检查蓄电池开关状态\n2、使用万用表蜂鸣档测量蓄电池开关辅助触头状态",
+      "materials": [
+        "直流电源开关（NDB2T-63 B20/1）"
+      ]
+    },
+    {
+      "code": "0x19110805",
+      "message": "机场蓄电池过度放电，已无法正常工作",
+      "faq": "机场蓄电池过度放电，已无法正常工作，请联系大疆售后。",
+      "cause": "1、蓄电池充电电路异常\n2、蓄电池过放，电压低于21.6V\n3、主控模块电压采样异常",
+      "solution": "1、检查市电供电状态，闭合市电和蓄电池开关进行蓄电池电压测量\n2、如电压一直不上升，需更换蓄电池",
+      "materials": [
+        "蓄电池",
+        "主控模块"
+      ]
+    },
+    {
+      "code": "0x19113C00",
+      "message": "防雷器后备保护器开关未开启，或防雷器损坏",
+      "faq": "请检查并确保防雷器后备保护器开关已开启，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、防雷器损坏\n2、SPD后备保护器跳闸\n3、遥信线缆松脱接触不良\n4、配电柜接口损坏\n5、主控模块损坏",
+      "solution": "1、查看防雷器窗口是否变红，使用万用表蜂鸣档测量遥信端子是否导通\n2、查看SPD后备保护器是否跳闸，保持后备保护器闭合状态，测量遥信信号是否导通\n3、更换有异常的部件，若仍存在报警，依次更换配电柜接口板或主控模块",
+      "materials": [
+        "主控模块",
+        "配电柜接口板组件",
+        "交流电源防雷器（DXH06-FBZ）",
+        "防雷器后备保护器"
+      ]
+    },
+    {
+      "code": "0x19113C01",
+      "message": "停机坪连接异常",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、线缆连接异常\n2、停机坪供电异常\n3、停机坪接口板损坏\n4、主控模块损坏",
+      "solution": "1、打开停机坪，查看停机坪的指示灯是否正常工作\n2、检查与主控模块的信号连接器是否接插到位\n3、更换停机坪接口板进行测试\n4、更换主控模块进行测试",
+      "materials": [
+        "主控模块",
+        "停机坪线材（主控-停机坪）（一分二）",
+        "停机坪接口板组件"
+      ]
+    },
+    {
+      "code": "0x19113C02",
+      "message": "雨量计连接异常",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、线缆连接异常\n2、雨量计模块供电异常\n3、雨量计模块损坏\n4、主控模块损坏",
+      "solution": "1、检查与主控模块的信号连接器是否接插到位\n2、更换雨量计模块进行测试\n3、更换主控模块进行测试",
+      "materials": [
+        "主控模块",
+        "雨量计接口板组件"
+      ]
+    },
+    {
+      "code": "0x19113C03",
+      "message": "空调连接异常",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、线缆连接异常\n2、空调模块供电异常\n3、空调模块损坏\n4、主控模块损坏",
+      "solution": "1、检查与主控模块的信号连接器是否接插到位\n2、更换空调模块进行测试\n3、更换空调模块进行测试",
+      "materials": [
+        "主控模块",
+        "空调TEC控制板",
+        "空调电源线（空调TEC控制板-ACDC）（一分二）",
+        "空调模块（不含ACDC模块）"
+      ]
+    },
+    {
+      "code": "0x19114000",
+      "message": "风速过大（≥12 m/s），无法执行飞行任务",
+      "faq": "当前风速过大（≥12 m/s），飞行器无法飞行，请等待风速减小后再执行飞行任务。",
+      "cause": "环境风速过大",
+      "solution": "等待风速降低",
+      "materials": [
+        "风速计&超广角相机组件"
+      ]
+    },
+    {
+      "code": "0x19114800",
+      "message": "雨量过大，无法执行飞行任务",
+      "faq": "当前雨量过大，飞行器无法飞行，请等待雨量减小后再执行飞行任务。",
+      "cause": "1、存在降雨\n2、雨量计损坏\n3、检查机场周围是否有异常振动",
+      "solution": "1、通过机场摄像头查看降雨情况，若与实际不符需更换雨量计\n2、检查机场周围是否有异常振动源，例如空调外机等。",
+      "materials": [
+        "雨量计接口板组件",
+        "雨量计鼓面感应组件"
+      ]
+    },
+    {
+      "code": "0x19114801",
+      "message": "机场监控摄像头供电异常",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、风速计模组内部存在短路\n2、线缆接口或线缆内部存在短路\n3、右舱盖接口板供电异常",
+      "solution": "1、更换风速计模组进行测试\n2、更换右舱盖接口板进行测试\n3、更换连接线缆",
+      "materials": [
+        "雨量计接口板组件",
+        "风速计&超广角相机组件"
+      ]
+    },
+    {
+      "code": "0x19114802",
+      "message": "DJI Cellular 模块供电异常",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、4G模块内部存在短路损坏\n2、4G模块接口板短路损坏\n3、右舱盖接口板损坏\n4、4G模块接口板与右舱盖接口板线缆损坏",
+      "solution": "1、检查4G模块的指示灯是否工作\n2、检查雨量计接口板线缆连接是否正常",
+      "materials": [
+        "雨量计接口板组件",
+        "DJI Cellular 模块"
+      ]
+    },
+    {
+      "code": "0x19114805",
+      "message": "舱内温湿度传感器连接异常",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、舱内温湿度传感器损坏\n2、连接线接触不良\n3、右舱盖接口板损坏",
+      "solution": "1、插拔温湿度传感器的连接线\n2、更换温湿度传感器板",
+      "materials": [
+        "雨量计接口板组件",
+        "右舱温湿度计组件"
+      ]
+    },
+    {
+      "code": "0x19114806",
+      "message": "雨量计连接异常",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、雨量计接口板与主控模块之间线缆连接异常\n2、雨量计接口板损坏",
+      "solution": "更换雨量计接口板再进行状态查看",
+      "materials": [
+        "右舱盖组件",
+        "雨量计接口板组件"
+      ]
+    },
+    {
+      "code": "0x19114808",
+      "message": "雨量计加热模块温度传感器连接异常",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "NTC传感器损坏",
+      "solution": "更换雨量计振动鼓面",
+      "materials": [
+        "雨量计鼓面感应组件"
+      ]
+    },
+    {
+      "code": "0x1911480A",
+      "message": "风速计加热模块温度传感器损坏",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "NTC传感器损坏",
+      "solution": "更换风速计模块",
+      "materials": [
+        "风速计&超广角相机组件"
+      ]
+    },
+    {
+      "code": "0x1911480C",
+      "message": "舱盖除冰加热温度传感器损坏",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "NTC传感器损坏",
+      "solution": "更换右舱盖组件",
+      "materials": [
+        "右舱盖组件"
+      ]
+    },
+    {
+      "code": "0x1911480E",
+      "message": "雨量计连接异常",
+      "faq": "请检查雨量计是否连接，如果已连接，机场仍上报此告警，请联系大疆售后。",
+      "cause": "右舱盖接口板和雨量计鼓面连接线异常",
+      "solution": "请插拔右舱盖接口板和雨量计鼓面连接器",
+      "materials": [
+        "雨量计接口板组件",
+        "右舱盖组件"
+      ]
+    },
+    {
+      "code": "0x1911480F",
+      "message": "雨量计短路",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "雨量计鼓面异常",
+      "solution": "请更换雨量计鼓面",
+      "materials": [
+        "雨量计鼓面感应组件"
+      ]
+    },
+    {
+      "code": "0x19114810",
+      "message": "风速计模块连接异常",
+      "faq": "请检查风速计模块是否连接，如果已连接，机场仍上报此告警，请联系大疆售后。",
+      "cause": "风速计模块没有连接",
+      "solution": "请安装风速计模组",
+      "materials": [
+        "风速计&超广角相机组件",
+        "雨量计接口板组件"
+      ]
+    },
+    {
+      "code": "0x19114816",
+      "message": "雨量较大，请谨慎飞行。",
+      "faq": null,
+      "cause": null,
+      "solution": null,
+      "materials": []
+    },
+    {
+      "code": "0x19114C00",
+      "message": "机场浸水",
+      "faq": "请尽快清理机场积水，并检查机场是否可以正常工作，如果机场存在问题，请联系大疆售后。",
+      "cause": "1、机场底部浸水\n2、水浸传感器被导电异物覆盖",
+      "solution": "1、检查浸水情况，一旦发生浸水，务必清理并检查后才可再次通电使用\n2、若机场内没有浸水，可拆下水浸传感器检查并清洗探针",
+      "materials": [
+        "水浸传感器",
+        "主控模块"
+      ]
+    },
+    {
+      "code": "0x19113401",
+      "message": "飞行器电池充电电压异常",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "ACDC输出的电压超出15~27V范围",
+      "solution": "测量ACDC输出电压是否正常，异常需更换ACDC模块",
+      "materials": [
+        "ACDC电源模块"
+      ]
+    },
+    {
+      "code": "0x19113403",
+      "message": "飞行器电池不在位，或电量极低已进入休眠模式",
+      "faq": "请确保飞行器已安装电池，在远程调试中给飞行器电池充电，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、飞机或机场固件版本低\n2、飞行器电池未安装到位\n3、电池电池低进入休眠状态",
+      "solution": "1、将机场和飞行器固件升级至最新版本\n3、远程调试，手动触发充电\n3、重新插拔电池，确认电池安装到位",
+      "materials": [
+        "停机坪组件（不含RTK）"
+      ]
+    },
+    {
+      "code": "0x19113404",
+      "message": "飞行器电池充电失败",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、飞机或机场固件版本低\n2、充电链路阻抗过大，压降变大",
+      "solution": "1、将机场和飞行器固件升级至最新版本\n2、尝试远程调试将飞行器先关机，再进行充电\n3、尝试远程重启机场和飞行器\n4、检查充电连接器是否存在异物或接触不良",
+      "materials": [
+        "停机坪组件（不含RTK）"
+      ]
+    },
+    {
+      "code": "0x19113406",
+      "message": "飞行器电池异常",
+      "faq": "请通过远程调试展开推杆 30 秒后再闭合或重启机场，如果机场仍上报此告警，请更换飞行器电池或联系大疆售后。",
+      "cause": "电池过放、过充、过流等异常保护",
+      "solution": "1、松开推杆30s再闭合\n2、重启机场和飞机\n3、上述无法解决联系售后",
+      "materials": [
+        "TB30电池"
+      ]
+    },
+    {
+      "code": "0x19113407",
+      "message": "机场供电电源模块异常，无法给飞行器电池充电",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、市电断开\n2、ACDC电源工作异常\n3、主控模块损坏（概率低）",
+      "solution": "1、检查AC供电开关下方的供电电压是否正常\n2、断电重启机场\n3、机场ACDC输出26V是否正常\n4、更换主控模块进行测试（概率低）",
+      "materials": [
+        "ACDC电源模块",
+        "主控模块"
+      ]
+    },
+    {
+      "code": "0x19113414",
+      "message": "电池温度过高（≥44℃）无法开始充电",
+      "faq": "请等待电池温度降低至44℃以下，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "电池温度过高",
+      "solution": "1、检查舱盖是否处于关闭状态\n2、检查空调是否处于制冷状态",
+      "materials": [
+        "空调模块（不含ACDC模块）"
+      ]
+    },
+    {
+      "code": "0x19110C00",
+      "message": "机场监控摄像头未安装或断连",
+      "faq": "请检查机场监控摄像头（和风速计模块一体）是否已安装，如果已安装并且插头连接牢固，机场仍存在此告警，请联系大疆售后。",
+      "cause": "1、风速计模组供电异常\n2、风速计模组损坏\n3、右舱盖接口板损坏\n4、拖链线缆损坏\n5、主控模块异常",
+      "solution": "1、检查风速计模组是否正常连接\n2、更换风速计模组",
+      "materials": [
+        "主控模块",
+        "雨量计接口板组件",
+        "风速计&超广角相机组件"
+      ]
+    },
+    {
+      "code": "0x12040000",
+      "message": "机场RTK设备断连",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、RTK板卡供电异常\n2、RTK板卡损坏\n3、RTK板卡与停机坪接口板线缆接触不良\n4、停机坪接口板损坏",
+      "solution": "1、尝试断电重启机场\n2、确认RTK板卡供电是否正常，检查RTK模块的三颗指示灯是否点亮（正常搜星后为两颗绿灯常亮，一颗红灯闪烁）\n3、确认RTK板卡与停机坪接口板线缆是否连接正常，重新插拔RTK模块线缆\n4、确认停机坪接口板是否损坏\n5、上述无法解决联系售后",
+      "materials": [
+        "停机坪接口板组件",
+        "RTK连接线（RTK-停机坪接口板）",
+        "RTK组件"
+      ]
+    },
+    {
+      "code": "0x12040001",
+      "message": "机场位置被移动",
+      "faq": "请将机场移动回部署位置，或到机场部署现场，使用USB数据线将遥控器连接至机场，重新标定机场位置。",
+      "cause": "1、机场被移动至新位置\n2、当前电离层非常活跃\n3、RTK天线被严重遮挡\n4、当前环境中存在针对GNSS的信号干扰或欺骗",
+      "solution": "1、确认机场是否移动到新位置，移动到新位置需要重新部署\n2、确认RTK天线是否被遮挡\n3、确认当前电离层是否活跃\n4、确认周围环境是否存在GNSS信号干扰或欺骗，可通过手机GNSS分析工具进行判断\n5、尝试断电重启机场\n6、上述无法解决联系售后",
+      "materials": [
+        "主控模块"
+      ]
+    },
+    {
+      "code": "0x12040002",
+      "message": "机场RTK工作异常",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、RTK天线突然被遮挡而无法搜星\n2、环境中存在针对GNSS信号的强干扰或欺骗\n3、RTK板卡损坏",
+      "solution": "1、确认机场RTK天线是否被遮挡\n2、确认周围环境是否存在GNSS信号干扰或欺骗\n3、尝试断电重启机场\n4、上述无法解决拉取机场日志联系售后分析",
+      "materials": [
+        "RTK组件"
+      ]
+    },
+    {
+      "code": "0x12040003",
+      "message": "机场RTK标定位置距离机场位置过远",
+      "faq": "请到机场部署现场，使用USB数据线将遥控器连接至机场，重新标定机场位置。",
+      "cause": "1、网络RTK标定错误或者手动输入标定坐标异常\n2、RTK天线被遮挡\n3、环境中存在针对GNSS的干扰或欺骗",
+      "solution": "1、确认手动输入坐标是否正常\n2、确认RTK天线是否被遮挡\n3、确认周围环境是否存在GNSS信号干扰或欺骗\n4、尝试断电重启机场\n5、上述无法解决联系售后",
+      "materials": [
+        "RTK组件"
+      ]
+    },
+    {
+      "code": "0x12040004",
+      "message": "机场RTK初始化收敛失败",
+      "faq": "请确认机场部署环境开阔后重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、机场搜星环境差，机场天线被遮挡导致RTK搜星少或者无搜星\n2、机场附近存在GNSS信号干扰，导致RTK自收敛精度差\n3、RTK板卡异常",
+      "solution": "1、确认RTK天线是否被遮挡\n2、确认周围环境是否存在GNSS信号干扰或欺骗\n3、尝试断电重启机场\n4、上述无法解决联系售后",
+      "materials": [
+        "RTK组件"
+      ]
+    },
+    {
+      "code": "0x19111D01",
+      "message": "舱内飞行器未对频，已对频飞行器在舱外",
+      "faq": "请检查舱内的飞行器是否放错，如果要使用舱内的飞行器，请将飞行器和机场对频。",
+      "cause": "可能是拿错飞机，搞混了。机场上放了一架未对频的飞机，与机场对频的飞机没有放在机场上",
+      "solution": "把已对频的飞机放回机场，或把机场上的飞机与机场对频",
+      "materials": [
+        "主控模块"
+      ]
+    },
+    {
+      "code": "0x19113D00",
+      "message": "空调制冷片损坏",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、TEC控制板损坏\n2、TEC制冷片损坏",
+      "solution": "1、更换空调控制板进行测试\n2、更换空调模组进行测试",
+      "materials": [
+        "空调模块（不含ACDC模块）"
+      ]
+    },
+    {
+      "code": "0x19113D01",
+      "message": "空调制冷片损坏",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、TEC无工作电流\n2、TEC制冷片供电线损坏\n3、TEC制冷片损坏",
+      "solution": "1、重新拔插TEC制冷片供电线\n2、更换空调主控板\n3、更换T空调模组",
+      "materials": [
+        "空调模块（不含ACDC模块）"
+      ]
+    },
+    {
+      "code": "0x19113D02",
+      "message": "空调制冷片热端面温度过高",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "TEC空调热端面温度高于80℃",
+      "solution": "1、外循环风扇异常，转速低\n2、TEC制冷片异常，需更换空调模组",
+      "materials": [
+        "空调模块（不含ACDC模块）"
+      ]
+    },
+    {
+      "code": "0x19113D03",
+      "message": "空调加热器损坏",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、空调加热PTC损坏\n2、空调TEC控制板损坏\n3、连接器接触不良",
+      "solution": "1、重新插拔加热器连接器\n2、使用外用表测量PTC加热器的电阻是否正常\n3、更换TEC控制板",
+      "materials": [
+        "空调TEC控制板",
+        "空调模块（不含ACDC模块）"
+      ]
+    },
+    {
+      "code": "0x19113D04",
+      "message": "空调加热器损坏",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、无加热电流\n2、连接接触不良\n3、PTC加热器损坏",
+      "solution": "1、无加热电流\n2、连接接触不良\n3、PTC加热器损坏",
+      "materials": [
+        "空调模块（不含ACDC模块）"
+      ]
+    },
+    {
+      "code": "0x19113D05",
+      "message": "空调内循环风扇损坏",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、内循环风扇供电电源异常\n2、内循环风扇堵转\n3、内循环风扇损坏",
+      "solution": "1、万用表测量内循环风扇供电电源是否为24V\n2、检查是否内循环风扇堵转\n3、检查是否内循环风扇损坏",
+      "materials": [
+        "空调风扇（内循环）"
+      ]
+    },
+    {
+      "code": "0x19113D06",
+      "message": "空调外循环风扇损坏",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、外循环风扇供电电源异常\n2、外循环风扇堵转\n3、外循环风扇损坏",
+      "solution": "1、万用表测量测量外循环风扇供电电源24V\n2、检查是否外循环风扇堵转\n3、检查是否外循环风扇损坏\n4、检查外循环风道和滤网是否堵塞",
+      "materials": [
+        "空调外循环风扇组件"
+      ]
+    },
+    {
+      "code": "0x19113D07",
+      "message": "空调外循环出风口温度传感器损坏",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "NTC损坏",
+      "solution": "更换外循环出风口NTC温度传感器",
+      "materials": [
+        "空调模块（不含ACDC模块）"
+      ]
+    },
+    {
+      "code": "0x19113D08",
+      "message": "空调内循环进风口温度传感器损坏",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "NTC损坏",
+      "solution": "更换NTC温度传感器",
+      "materials": [
+        "环境温度传感器（空调进风口）"
+      ]
+    },
+    {
+      "code": "0x19113D09",
+      "message": "空调内循环出风口右侧温度传感器损坏",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "NTC损坏",
+      "solution": "更换NTC温度传感器",
+      "materials": [
+        "空调模块（不含ACDC模块）"
+      ]
+    },
+    {
+      "code": "0x19113D0A",
+      "message": "空调内循环出风口左侧温度传感器损坏",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "NTC损坏",
+      "solution": "更换NTC温度传感器",
+      "materials": [
+        "空调模块（不含ACDC模块）"
+      ]
+    },
+    {
+      "code": "0x19113D0B",
+      "message": "空调制冷片温度传感器损坏",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "NTC损坏",
+      "solution": "更换NTC温度传感器",
+      "materials": [
+        "空调模块（不含ACDC模块）"
+      ]
+    },
+    {
+      "code": "0x19113D0E",
+      "message": "空调内循环进风口堵塞",
+      "faq": "请确保空调内循环进风口无异物堵塞，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "内循环进风口堵塞",
+      "solution": "检查空调内循环两个进风口是否堵塞",
+      "materials": [
+        "空调风扇（内循环）"
+      ]
+    },
+    {
+      "code": "0x19113D0F",
+      "message": "空调内循环出风口堵塞",
+      "faq": "请确保空调内循环出风口无异物堵塞，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "内循环出风口堵塞",
+      "solution": "检查空调内循环两个出风口是否堵塞",
+      "materials": [
+        "空调风扇（内循环）"
+      ]
+    },
+    {
+      "code": "0x19113D10",
+      "message": "空调外循环出风口与进风口温差过大（≥20℃）",
+      "faq": "请确保空调外循环风道无异物堵塞，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "1、外循环进风口或出风口堵塞\n2、外循环风道堵塞\n3、外循环风扇工作异常",
+      "solution": "1、检查空调外循环进风口和出风口是否堵塞\n2、检查空调外循环风扇是否正常运行\n（测试时需确保空调制冷模式已开启）",
+      "materials": [
+        "空调外循环风扇组件"
+      ]
+    },
+    {
+      "code": "0x19113D11",
+      "message": "空调制冷片供电异常",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "TEC控制板工作异常",
+      "solution": "更换TEC控制板",
+      "materials": [
+        "空调模块（不含ACDC模块）"
+      ]
+    },
+    {
+      "code": "0x19113D12",
+      "message": "空调加热器供电异常",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "TEC控制板工作异常",
+      "solution": "更换TEC控制板",
+      "materials": [
+        "空调模块（不含ACDC模块）"
+      ]
+    },
+    {
+      "code": "0x19113D15",
+      "message": "空调供电异常",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "TEC控制板工作异常",
+      "solution": "1、更换TEC控制板\n2、更换空调模组\n3、更换ACDC模块",
+      "materials": [
+        "空调模块（不含ACDC模块）",
+        "ACDC电源模块"
+      ]
+    },
+    {
+      "code": "0x19113D16",
+      "message": "空调外循环进风口堵塞",
+      "faq": "请确保空调外循环进风口无异物堵塞，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "空调外循环进风口堵塞",
+      "solution": "1、将百叶窗取下，使用刷子蘸取清洗液清理防尘网\n2、使用气吹或高压空气清理空调外循环风道",
+      "materials": [
+        "空调外循环风扇组件"
+      ]
+    },
+    {
+      "code": "0x16100016",
+      "message": "无法起飞:飞行器未激活，请重启App进行激活",
+      "faq": "无法起飞:飞行器未激活，请重启App进行激活",
+      "cause": "飞行器主板更换",
+      "solution": "激活飞行器",
+      "materials": [
+        "激活飞行器"
+      ]
+    },
+    {
+      "code": "0x19115000",
+      "message": "机场异常重启",
+      "faq": "请重启机场，如果机场仍上报此告警，请联系大疆售后。",
+      "cause": "主控模块内部板间通讯异常",
+      "solution": "1、尝试重启解决\n2、若仍存在报警，需更换主控模块",
+      "materials": [
+        "主控模块"
+      ]
+    }
+  ],
+  "commonIssues": [
+    {
+      "question": "2代Dock室内无法模拟飞行",
+      "cause": "RTK阻飞，2代机库不支持在没有GPS信号的情况下进行模拟飞行",
+      "solution": "室外模拟"
+    },
+    {
+      "question": "无人机上线后不上报osd信息，但是下发其他操作指令及任务正常",
+      "cause": "sys/product/{gateway_sn}/status 主题未进行回复",
+      "solution": "https://developer.dji.com/doc/cloud-api-tutorial/cn/api-reference/dock-to-cloud/mqtt/dock/dock2/device.html\n需要回复机场下发的拓扑信息：\n1、update_topo消息不会以一定频率推送。 \n2、后台返回的响应数据需要保持tid和bid与机场的请求一致。\n3、云端如果没有回复这个请求，机场会一直向云端发送上线请求。\n4、机场和无人机版本都是需要最新的\n5、您需要订阅 **设备拓扑更新** **Topic:** sys/product/{gateway_sn}/status **Direction:** up **Method:** update_topo 收到机场下发的这个报文后2秒内进行result:0的回复。"
+    },
+    {
+      "question": "2代Dock下发任务报错316031",
+      "cause": "返航模式设置失败",
+      "solution": "2代机库最新固件要求下发任务指令需设置返航模式（https://developer.dji.com/doc/cloud-api-tutorial/cn/api-reference/dock-to-cloud/mqtt/dock/dock2/wayline.html#%E4%B8%8B%E5%8F%91%E4%BB%BB%E5%8A%A1）\nrth_mode必须设置。1代机库暂不支持设置（1代机库不会读取该字段）。"
+    },
+    {
+      "question": "2代Dock航线飞行需指定精度模式",
+      "cause": "下发任务时使用wayline_precision_type进行指定",
+      "solution": "默认是RTK精度（1代机库不会读取该字段）"
+    },
+    {
+      "question": "机场媒体文件无法上传",
+      "cause": null,
+      "solution": "https://sdk-forum.dji.net/hc/zh-cn/articles/25498021619481-%E6%9C%BA%E5%9C%BA%E5%AA%92%E4%BD%93%E6%96%87%E4%BB%B6%E6%97%A0%E6%B3%95%E4%B8%8A%E4%BC%A0"
+    },
+    {
+      "question": "机场执行航线任务报错",
+      "cause": null,
+      "solution": "https://sdk-forum.dji.net/hc/zh-cn/articles/25542281389721-%E6%9C%BA%E5%9C%BA%E6%89%A7%E8%A1%8C%E8%88%AA%E7%BA%BF%E4%BB%BB%E5%8A%A1%E6%8A%A5%E9%94%99"
+    },
+    {
+      "question": "机场无法上云",
+      "cause": null,
+      "solution": "https://sdk-forum.dji.net/hc/zh-cn/articles/25454091186201-%E6%9C%BA%E5%9C%BA%E6%97%A0%E6%B3%95%E4%B8%8A%E4%BA%91"
+    },
+    {
+      "question": "KMZ 文件的生成方式",
+      "cause": null,
+      "solution": "https://sdk-forum.dji.net/hc/zh-cn/articles/12254235478681-KMZ-%E6%96%87%E4%BB%B6%E7%9A%84%E7%94%9F%E6%88%90%E6%96%B9%E5%BC%8F"
+    },
+    {
+      "question": "mapping2d建图航拍、mapping3d倾斜摄影的航线文件怎么生成？",
+      "cause": null,
+      "solution": "https://sdk-forum.dji.net/hc/zh-cn/articles/22414594398617-mapping2d%E5%BB%BA%E5%9B%BE%E8%88%AA%E6%8B%8D-mapping3d%E5%80%BE%E6%96%9C%E6%91%84%E5%BD%B1%E7%9A%84%E8%88%AA%E7%BA%BF%E6%96%87%E4%BB%B6%E6%80%8E%E4%B9%88%E7%94%9F%E6%88%90"
+    },
+    {
+      "question": "怎么开发航线任务？航线文件格式标准是什么？",
+      "cause": null,
+      "solution": "https://sdk-forum.dji.net/hc/zh-cn/articles/5975557266841-%E6%80%8E%E4%B9%88%E5%BC%80%E5%8F%91%E8%88%AA%E7%BA%BF%E4%BB%BB%E5%8A%A1-%E8%88%AA%E7%BA%BF%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E6%A0%87%E5%87%86%E6%98%AF%E4%BB%80%E4%B9%88\n\n1、kmz文件示例：https://cloud.boerma.net/s/znfV"
+    },
+    {
+      "question": "机场航线任务时序图补充",
+      "cause": null,
+      "solution": "https://sdk-forum.dji.net/hc/zh-cn/articles/31356678263833-%E6%9C%BA%E5%9C%BA%E8%88%AA%E7%BA%BF%E4%BB%BB%E5%8A%A1%E6%97%B6%E5%BA%8F%E5%9B%BE%E8%A1%A5%E5%85%85"
+    },
+    {
+      "question": "mqtt服务器重启，机场会重新连接吗？",
+      "cause": null,
+      "solution": "会，机场内部有重试的逻辑，会请求云端。"
+    },
+    {
+      "question": "媒体文件后缀V和S",
+      "cause": null,
+      "solution": "W广角\nZ是变焦\nT是红外\n以上三个很清晰\nS是截屏图，也就是图传看到的实际图像，所以S后缀的媒体文件可以是以上任意类型。 \nV是可见光。在部分机型的遥控器界面中，保存的媒体文件类型会是可见光这个选项。\n正常情况广角和变焦是两个独立工作的相机，可以同时保存这两种格式。\nV是由一个独立相机虚拟出来wide和zoom两个相机，V下的wide和zoom无法同时工作，只能保存一路图像，所以就用相同的后缀V(visible)。"
+    },
+    {
+      "question": "机场无人机充电策略是什么？",
+      "cause": null,
+      "solution": "根据机场设置的电池保养(存储)模式（battery_store_mode）不同，充电策略也不同。\n1、电池保养(存储)模式（battery_store_mode）为：1，计划模式。无人机的总电量不会充满，电量会保持在55%~60%\n2、电池保养(存储)模式（battery_store_mode）为：2，待命模式。无人机电量保持在90%~95%。"
+    },
+    {
+      "question": "如何让机场重新上线",
+      "cause": null,
+      "solution": "1.在MQTT管理界面断开MQTT连接，然后重新连接，机场会重新上线\n2.远程调试重启机场"
+    },
+    {
+      "question": "回复机场消息时的tid与bid",
+      "cause": null,
+      "solution": "机场上报消息时需要回复，优先使用上报消息中的tid及bid。"
+    },
+    {
+      "question": "机场和飞机的媒体文件会自动删除吗？",
+      "cause": null,
+      "solution": "如果媒体文件成功上传到云端，机场就会将媒体文件进行删除。"
+    },
+    {
+      "question": "视频会被分割成多个视频文件吗？",
+      "cause": null,
+      "solution": "目前相机限制单个视频最大大小为3.5G，超过3.5G后，视频会切割为多份文件。"
+    },
+    {
+      "question": "DJI机场支持kml航线吗？",
+      "cause": null,
+      "solution": "目前dji只有pilot 2支持kml航线，其他msdk、psdk、上云API均不支持kml航线"
+    },
+    {
+      "question": "机场NTP",
+      "cause": null,
+      "solution": "1、机场内部保存了一个NTP服务列表，基本都是公网的NTP服务，用户自定义下发的NTP服务会在列表尾部。机场每2秒同步一次时间，遍历列表中的NTP服务，直到时间同步成功\n2、NTP服务默认端口123，不可修改"
+    },
+    {
+      "question": "航点航线转弯模式",
+      "cause": null,
+      "solution": "https://sdk-forum.dji.net/hc/zh-cn/articles/25149550448665-%E8%88%AA%E7%BA%BF%E7%9A%84%E8%88%AA%E7%82%B9%E8%BD%AC%E5%BC%AF%E6%A8%A1%E5%BC%8F"
+    },
+    {
+      "question": "协调转弯，不过点，提前转弯",
+      "cause": null,
+      "solution": "https://sdk-forum.dji.net/hc/zh-cn/articles/25050875808409-%E5%8D%8F%E8%B0%83%E8%BD%AC%E5%BC%AF-%E4%B8%8D%E8%BF%87%E7%82%B9-%E6%8F%90%E5%89%8D%E8%BD%AC%E5%BC%AF"
+    },
+    {
+      "question": "指令飞行POI执行过程是怎么样的",
+      "cause": null,
+      "solution": "1、云端通过poi_mode_enter指令进入POI环绕模式，并设置POI环绕的目标点。\n2、云端通过poi_circle_speed_set指令设置POI环绕速度，无人机以设置的速度环绕目标点。\n3、机场在执行POI过程中，通过poi_status_notify上报环绕状态的信息，通知云端执行过程中状态。\n4、云端通过poi_mode_exit指令退出POI环绕模式\n\n\n注意事项：\n\n云端没有通过poi_circle_speed_set设置环绕速度，无人机不会进行环绕飞行。\n环绕飞行过程中无法通过负载控制指令，控制无人机负载俯仰。\n环绕飞行过程中可以进行拍照及录像。"
+    },
+    {
+      "question": "直播问题分析总结 -- 花屏&绿屏",
+      "cause": null,
+      "solution": "https://blog.csdn.net/ssllkkyyaa/article/details/109729964"
+    },
+    {
+      "question": "机库无人机自动充电相关问题",
+      "cause": null,
+      "solution": "https://sdk-forum.dji.net/hc/zh-cn/community/posts/35089794974233-%E5%A4%A7%E7%96%86%E6%9C%BA%E5%BA%931-2%E4%BB%A3%E4%B8%8B%E5%8F%91%E6%9D%A1%E4%BB%B6%E4%BB%BB%E5%8A%A1-%E4%BC%9A%E8%87%AA%E5%8A%A8%E5%BC%80%E5%A7%8B%E5%85%85%E7%94%B5%E5%90%97"
+    },
+    {
+      "question": "为什么第三方平台使用机场执行一键起飞或航线任务时，出现等待时间过长的问题？",
+      "cause": null,
+      "solution": "https://developer.dji.com/doc/cloud-api-tutorial/cn/faq.html"
+    }
+  ]
+}

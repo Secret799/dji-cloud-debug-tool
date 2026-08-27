@@ -53,6 +53,30 @@ describe('CommandHistory request and response details', () => {
     expect(markup).toContain('<dt>耗时</dt><dd>45 ms</dd>')
     expect(markup).toContain('<dt>结果码</dt><dd>0</dd>')
   })
+
+  it('shows workbook guidance when a command reply has a non-zero result', () => {
+    const request = {
+      id: 'request-error', profileId: 'profile', direction: 'out', topic: 'thing/product/DOCK-1/services',
+      payload: JSON.stringify({ tid: 'tid-error', method: 'flighttask_prepare', data: {} }),
+      qos: 1, retain: false, timestamp: 100, size: 100,
+    } satisfies MqttMessageRecord
+    const response = {
+      id: 'response-error', profileId: 'profile', direction: 'in', topic: 'thing/product/DOCK-1/services_reply',
+      payload: JSON.stringify({ tid: 'tid-error', data: { result: 316031 } }),
+      qos: 1, retain: false, timestamp: 145, size: 100,
+    } satisfies MqttMessageRecord
+    const transaction = {
+      tid: 'tid-error', method: 'flighttask_prepare', gatewaySn: 'DOCK-1',
+      startedAt: 100, finishedAt: 145, status: 'failed', result: 316031, request, response,
+    } satisfies CommandTransaction
+
+    const markup = renderToStaticMarkup(<CommandHistory transactions={[transaction]} />)
+
+    expect(markup).toContain('错误码 316031 排障建议')
+    expect(markup).toContain('设置返航模式失败')
+    expect(markup).toContain('2代机库下发任务需指定返航模式')
+    expect(markup).toContain('机场日志、飞机日志')
+  })
 })
 
 describe('Overview DJI field presentation', () => {

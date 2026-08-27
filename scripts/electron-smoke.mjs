@@ -1049,6 +1049,37 @@ try {
     { timeout: 5_000 },
   )
 
+  await window.getByRole('button', { name: '错误码管理' }).click()
+  await window.locator('.error-code-manager').waitFor({ state: 'visible' })
+  if (await window.locator('.error-code-row').count() !== 551) {
+    errors.push('error-codes: cloud error rows were not loaded')
+  }
+  const errorSearch = window.locator('.error-code-search input')
+  await errorSearch.fill('316031')
+  await window.locator('.error-code-row').filter({ hasText: '316031' }).waitFor({ state: 'visible' })
+  const cloudErrorDetail = await window.locator('.error-code-detail').innerText()
+  if (!cloudErrorDetail.includes('设置返航模式失败') || !cloudErrorDetail.includes('2代机库下发任务需指定返航模式')) {
+    errors.push(`error-codes: 316031 guidance was incomplete (${JSON.stringify(cloudErrorDetail)})`)
+  }
+  await window.getByRole('button', { name: /机场 HMS/ }).click()
+  await errorSearch.fill('420544514')
+  await window.locator('.error-code-row').filter({ hasText: '0x19110002' }).waitFor({ state: 'visible' })
+  const hmsErrorDetail = await window.locator('.error-code-detail').innerText()
+  if (!hmsErrorDetail.includes('舱盖位置误差过大') || !hmsErrorDetail.includes('检查电机与驱动器之间的霍尔信号线')) {
+    errors.push(`error-codes: decimal HMS lookup was incomplete (${JSON.stringify(hmsErrorDetail)})`)
+  }
+  await inspectLayout('error-code-manager', [
+    'body',
+    '.app-shell',
+    '.workspace-content',
+    '.error-code-manager',
+    '.error-code-toolbar',
+    '.error-code-layout',
+    '.error-code-list',
+    '.error-code-detail',
+  ])
+  await window.screenshot({ path: `${screenshotBase}-error-codes.png` })
+
   await window.getByRole('button', { name: '遥测项管理' }).click()
   await window.locator('.telemetry-manager').waitFor({ state: 'visible' })
   await window.locator('.telemetry-field-editor-form').waitFor({ state: 'visible' })

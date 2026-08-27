@@ -75,6 +75,7 @@ import {
   prettyPayload,
   telemetryValue,
 } from '../lib/dji'
+import { lookupServiceError } from '../lib/dji-error-codes'
 import { CommandCenter } from './CommandCenter'
 import { MqttConsole } from './MqttConsole'
 import { RemoteLogCenter } from './RemoteLogCenter'
@@ -204,6 +205,9 @@ export function CommandHistory({ transactions }: { transactions: CommandTransact
               ? '等待返回'
               : `${transaction.finishedAt - transaction.startedAt} ms`
             const shortTid = transaction.tid.length > 16 ? `${transaction.tid.slice(0, 16)}...` : transaction.tid
+            const errorGuidance = transaction.result !== undefined && transaction.result !== 0
+              ? lookupServiceError(transaction.result)
+              : undefined
             return (
               <details className="command-history-item" key={`${transaction.gatewaySn}:${transaction.tid}`}>
                 <summary className="command-history-summary">
@@ -227,6 +231,17 @@ export function CommandHistory({ transactions }: { transactions: CommandTransact
                     <div><dt>结果码</dt><dd>{transaction.result ?? '--'}</dd></div>
                     <div><dt>发送时间</dt><dd>{new Date(transaction.startedAt).toLocaleString()}</dd></div>
                   </dl>
+                  {errorGuidance && (
+                    <section className="command-error-guidance">
+                      <header><Wrench size={15} /><strong>错误码 {transaction.result} 排障建议</strong>{errorGuidance.hmsCode && <code>{errorGuidance.hmsCode}</code>}</header>
+                      <div>
+                        <span><small>错误说明</small><p>{errorGuidance.message ?? '错误码库暂未收录该错误的详细说明。'}</p></span>
+                        {errorGuidance.cause && <span><small>可能原因</small><p>{errorGuidance.cause}</p></span>}
+                        <span className="resolution"><small>处理措施</small><p>{errorGuidance.solution ?? '暂无明确处理措施，请结合返回报文并收集设备日志进一步定位。'}</p></span>
+                        {errorGuidance.logs && <span><small>建议日志</small><p>{errorGuidance.logs}</p></span>}
+                      </div>
+                    </section>
+                  )}
                   <div className="command-message-pair">
                     <section className="command-message request">
                       <header><span><ArrowUpRight size={14} />发送信息</span><time>{new Date(transaction.request.timestamp).toLocaleTimeString()}</time></header>

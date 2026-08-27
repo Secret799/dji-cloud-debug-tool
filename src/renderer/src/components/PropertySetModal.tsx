@@ -9,6 +9,7 @@ import {
   djiPropertyReplyResult,
   parseDjiPropertyValue,
 } from '../lib/dji-property-set'
+import { formatServiceError } from '../lib/dji-error-codes'
 import { Tooltip } from './Tooltip'
 
 export interface PropertySetTarget {
@@ -154,7 +155,7 @@ export function PropertySetModal({ target, gatewaySn, records, onClose, onPublis
   const resultCopy = replyResult === 0
     ? '设备已确认设置成功'
     : replyResult !== undefined
-      ? `设备返回失败，结果码 ${replyResult}`
+      ? formatServiceError(replyResult)
       : pending
         ? '已发送，等待 property/set_reply'
         : undefined
