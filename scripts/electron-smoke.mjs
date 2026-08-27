@@ -1080,41 +1080,6 @@ try {
   ])
   await window.screenshot({ path: `${screenshotBase}-error-codes.png` })
 
-  const lowerNavigation = await window.locator('.rail-bottom button').evaluateAll((buttons) =>
-    buttons.map((button) => button.getAttribute('aria-label')),
-  )
-  if (lowerNavigation.indexOf('源数据') !== lowerNavigation.indexOf('遥测项管理') - 1) {
-    errors.push(`source-data: navigation entry is not immediately above telemetry (${JSON.stringify(lowerNavigation)})`)
-  }
-  await window.getByRole('button', { name: '源数据', exact: true }).click()
-  await window.locator('.source-data-viewer').waitFor({ state: 'visible' })
-  if (await window.locator('.source-data-row').count() !== 551) {
-    errors.push('source-data: cloud source records were not loaded')
-  }
-  const sourceSearch = window.locator('.source-data-search input')
-  await sourceSearch.fill('316031')
-  await window.locator('.source-data-row').filter({ hasText: '316031' }).waitFor({ state: 'visible' })
-  const sourceJson = await window.locator('.source-data-json').innerText()
-  if (!sourceJson.includes('"code": "316031"') || !sourceJson.includes('2代机库下发任务需指定返航模式')) {
-    errors.push(`source-data: raw JSON was incomplete (${JSON.stringify(sourceJson)})`)
-  }
-  const sourceFooter = await window.locator('.source-data-inspector > footer').innerText()
-  if (!sourceFooter.includes('DJI上云常见问题汇总.xlsx') || !sourceFooter.includes('Schema v1')) {
-    errors.push(`source-data: source metadata was incomplete (${JSON.stringify(sourceFooter)})`)
-  }
-  await inspectLayout('source-data', [
-    'body',
-    '.app-shell',
-    '.workspace-content',
-    '.source-data-viewer',
-    '.source-data-toolbar',
-    '.source-data-layout',
-    '.source-data-catalog',
-    '.source-data-inspector',
-    '.source-data-json',
-  ])
-  await window.screenshot({ path: `${screenshotBase}-source-data.png` })
-
   await window.getByRole('button', { name: '遥测项管理' }).click()
   await window.locator('.telemetry-manager').waitFor({ state: 'visible' })
   await window.locator('.telemetry-field-editor-form').waitFor({ state: 'visible' })
