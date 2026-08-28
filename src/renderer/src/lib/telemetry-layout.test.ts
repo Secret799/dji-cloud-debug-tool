@@ -5,6 +5,7 @@ import {
   createDefaultTelemetryLayout,
   normalizeTelemetryFieldKey,
   reconcileTelemetryLayout,
+  resolveTelemetryFieldMetadata,
 } from './telemetry-layout'
 
 describe('telemetry layout configuration', () => {
@@ -32,6 +33,106 @@ describe('telemetry layout configuration', () => {
     expect(key).toBe('custom_metrics.signal_value')
     expect(reconciled.devices.aircraft.fields.filter((field) => field.key === key)).toHaveLength(1)
     expect(reconcileTelemetryLayout(reconciled, telemetry)).toBe(reconciled)
+  })
+
+  it('includes every SuperDock field in the dock catalog exactly once', () => {
+    const fields = createDefaultTelemetryLayout().devices.dock.fields
+    const paths = [
+      'air_transfer_enable',
+      'cloud_transfer_enable',
+      'soft_emergency_stop_state',
+      'drone_rtcm_info',
+      'drone_rtcm_info.mount_point',
+      'drone_rtcm_info.port',
+      'drone_rtcm_info.host',
+      'drone_rtcm_info.rtcm_device_type',
+      'drone_rtcm_info.source_type',
+      'dongle_infos.sim_phone_area_code',
+      'dongle_infos.sim_phone_number',
+      'dongle_infos.sim_remaining_time',
+      'dongle_infos.sim_last_authenticated_time',
+      'dongle_infos.sim_is_authentication_available',
+      'dongle_infos.sim_link_workmode',
+    ]
+
+    paths.forEach((path) => {
+      expect(fields.filter((field) => field.key === path), path).toHaveLength(1)
+    })
+    expect(fields.find((field) => field.key === 'air_transfer_enable')?.label).toBe('空中回传')
+    expect(fields.find((field) => field.key === 'cloud_transfer_enable')?.label).toBe('空中回传（机场到云端）')
+  })
+
+  it('identifies SuperDock, DJI, custom and default metadata sources', () => {
+    expect(resolveTelemetryFieldMetadata('dock', 'cloud_transfer_enable').source).toBe('superdock')
+    expect(resolveTelemetryFieldMetadata('dock', 'air_transfer_enable')).toMatchObject({
+      source: 'dji-superdock',
+      metadata: { label: '空中回传' },
+    })
+    expect(resolveTelemetryFieldMetadata('dock', 'cover_state').source).toBe('dji-dock2')
+    expect(resolveTelemetryFieldMetadata('dock', 'silent_mode').source).toBe('dji-dock2-dock3')
+    expect(resolveTelemetryFieldMetadata('aircraft', 'rth_altitude').source).toBe('dji-aircraft')
+    expect(resolveTelemetryFieldMetadata('pilot', 'unknown_field').source).toBe('default')
+    expect(resolveTelemetryFieldMetadata('pilot', 'custom_level', {
+      key: 'custom_level',
+      label: '自定义等级',
+      description: '',
+      visible: true,
+      propertySetting: {
+        enabled: true,
+        path: 'custom_control.level',
+        type: 'int',
+        constraint: '{"min":0,"max":10}',
+      },
+    })).toMatchObject({ source: 'custom', metadata: { path: 'custom_control.level', accessMode: 'rw' } })
+  })
+
+  it('upgrades a legacy layout without replacing user configuration', () => {
+    const legacy = createDefaultTelemetryLayout()
+    const superDockOnlyKeys = new Set([
+      'cloud_transfer_enable',
+      'soft_emergency_stop_state',
+      'drone_rtcm_info',
+      'drone_rtcm_info.mount_point',
+      'drone_rtcm_info.port',
+      'drone_rtcm_info.host',
+      'drone_rtcm_info.rtcm_device_type',
+      'drone_rtcm_info.source_type',
+      'dongle_infos.sim_phone_area_code',
+      'dongle_infos.sim_phone_number',
+      'dongle_infos.sim_remaining_time',
+      'dongle_infos.sim_last_authenticated_time',
+      'dongle_infos.sim_is_authentication_available',
+      'dongle_infos.sim_link_workmode',
+    ])
+    legacy.devices.dock.fields = legacy.devices.dock.fields.filter((field) => !superDockOnlyKeys.has(field.key))
+    legacy.devices.dock.tabs.forEach((tab) => tab.sections.forEach((section) => {
+      section.fieldKeys = section.fieldKeys.filter((key) => !superDockOnlyKeys.has(key))
+    }))
+    const customField = {
+      key: 'legacy_custom',
+      label: '旧版自定义名称',
+      description: '保留用户描述',
+      visible: false,
+      propertySetting: {
+        enabled: true,
+        path: 'custom_control.legacy',
+        type: 'int' as const,
+        constraint: '{"min":0}',
+      },
+    }
+    legacy.devices.dock.fields.push(customField)
+    legacy.devices.dock.tabs[0].name = '用户页签'
+    legacy.devices.dock.tabs[0].sections[0].fieldKeys.push(customField.key)
+
+    const reconciled = reconcileTelemetryLayout(legacy, [])
+
+    expect(reconciled.devices.dock.fields.find((field) => field.key === customField.key)).toEqual(customField)
+    expect(reconciled.devices.dock.tabs[0].name).toBe('用户页签')
+    expect(reconciled.devices.dock.tabs[0].sections[0].fieldKeys).toContain(customField.key)
+    superDockOnlyKeys.forEach((key) => {
+      expect(reconciled.devices.dock.fields.filter((field) => field.key === key), key).toHaveLength(1)
+    })
+    expect(reconcileTelemetryLayout(reconciled, [])).toBe(reconciled)
   })
 
   it('rejects duplicate field assignments during import', () => {

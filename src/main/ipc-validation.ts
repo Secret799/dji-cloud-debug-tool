@@ -33,6 +33,7 @@ const MAX_DEVICES = 1_000
 const MAX_ARCHIVE_CAMERAS = 64
 const MAX_ARCHIVE_VIDEOS = 64
 const MAX_SUBSCRIPTIONS = 5_000
+const MAX_DEVICE_PRODUCT_TYPE = 4_294_967_295
 const MAX_WHEP_SDP_BYTES = 256 * 1024
 const MAX_WEBDAV_BACKUP_BYTES = 16 * 1024 * 1024
 const ALLOWED_RENDERER_STORAGE_KEYS = new Set([
@@ -160,7 +161,7 @@ const validateDeviceArchive = (value: unknown, profileId: string): DeviceArchive
     const rawIdentity = requireRecord(archive.identity, '设备产品标识')
     identity = {
       domain: requireString(rawIdentity.domain, '产品领域', { maxBytes: 64 }).trim(),
-      productType: requireInteger(rawIdentity.productType, '产品类型', 0, 65_535),
+      productType: requireInteger(rawIdentity.productType, '产品类型', 0, MAX_DEVICE_PRODUCT_TYPE),
       productSubType: requireInteger(rawIdentity.productSubType, '产品子类型', 0, 65_535),
       channelIndex: rawIdentity.channelIndex === undefined
         ? undefined
@@ -479,16 +480,43 @@ const validateDevice = (value: unknown): DjiDevice => {
   if (device.type !== 'dock' && device.type !== 'aircraft' && device.type !== 'pilot') {
     throw new IpcValidationError('设备类型无效')
   }
+  if (device.provider !== undefined && device.provider !== 'dji' && device.provider !== 'superdock') {
+    throw new IpcValidationError('设备厂商无效')
+  }
+  if (device.type !== 'dock' && device.provider === 'superdock') {
+    throw new IpcValidationError('SuperDock 厂商仅适用于机场设备')
+  }
   if (
     device.dockModel !== undefined
     && device.dockModel !== 'dock2'
     && device.dockModel !== 'dock3'
+    && device.dockModel !== 's22m300'
+    && device.dockModel !== 's2201'
+    && device.dockModel !== 's2301'
+    && device.dockModel !== 's24m350'
+    && device.dockModel !== 's24m350s'
+    && device.dockModel !== 's24m3'
+    && device.dockModel !== 's24m4'
+    && device.dockModel !== 's25m4'
+    && device.dockModel !== 's25m400'
+    && device.dockModel !== 's25m400s'
     && device.dockModel !== 'other'
   ) {
     throw new IpcValidationError('机场型号无效')
   }
   if (device.type !== 'dock' && device.dockModel !== undefined) {
     throw new IpcValidationError('非机场设备不能设置机场型号')
+  }
+  const superDockModels = new Set([
+    's22m300', 's2201', 's2301', 's24m350', 's24m350s',
+    's24m3', 's24m4', 's25m4', 's25m400', 's25m400s',
+  ])
+  if (device.provider === 'superdock' && device.dockModel !== undefined && device.dockModel !== 'other'
+    && !superDockModels.has(String(device.dockModel))) {
+    throw new IpcValidationError('SuperDock 厂商与机场型号不匹配')
+  }
+  if (device.provider === 'dji' && superDockModels.has(String(device.dockModel))) {
+    throw new IpcValidationError('DJI 厂商与机场型号不匹配')
   }
   requireOptionalBoolean(device.enabled, '设备启用状态')
   if (device.parentSn !== undefined) requireString(device.parentSn, '父设备 SN')
@@ -501,7 +529,7 @@ const validateSubscription = (value: unknown): TopicSubscription => {
   validateTopic(subscription.topic, '订阅 Topic')
   validateQos(subscription.qos)
   requireBoolean(subscription.enabled, '订阅启用状态')
-  if (subscription.source !== 'dji' && subscription.source !== 'custom') {
+  if (subscription.source !== 'dji' && subscription.source !== 'superdock' && subscription.source !== 'custom') {
     throw new IpcValidationError('订阅来源无效')
   }
   return subscription as unknown as TopicSubscription

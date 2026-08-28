@@ -1,5 +1,6 @@
 import type {
   ConnectionProfile,
+  DeviceProvider,
   DjiDeviceIdentity,
   DeviceType,
   DjiDevice,
@@ -7,6 +8,17 @@ import type {
   MqttQos,
   TopicSubscription,
 } from '../../../shared/contracts'
+import {
+  SUPERDOCK_COMMANDS,
+  SUPERDOCK_ONLY_COMMAND_METHODS,
+  SUPERDOCK_MODELS,
+  SUPERDOCK_UNSUPPORTED_COMMAND_METHODS,
+  defaultDockModel,
+  deviceProvider,
+  providerFromIdentity,
+  superDockSupportsCommand,
+  superDockProductName,
+} from './superdock'
 
 export interface TopicTemplate {
   id: string
@@ -33,6 +45,7 @@ export interface DeviceTelemetry {
   sn: string
   gatewaySn?: string
   type: DeviceType
+  provider?: DeviceProvider
   name: string
   online: boolean
   lastSeenAt: number
@@ -67,11 +80,23 @@ export const DJI_PRODUCT_NAMES: Readonly<Record<string, string>> = {
   '3-3-0': 'DJI Dock 3',
 }
 
+export const SUPERDOCK_PRODUCT_NAMES: Readonly<Record<string, string>> = Object.freeze(Object.fromEntries(
+  SUPERDOCK_MODELS.map((model) => [`3-${model.productType}-0`, model.label]),
+))
+
+export const PRODUCT_NAMES: Readonly<Record<string, string>> = Object.freeze({
+  ...DJI_PRODUCT_NAMES,
+  ...SUPERDOCK_PRODUCT_NAMES,
+})
+
 export const djiProductKey = (identity: DjiDeviceIdentity): string =>
   `${identity.domain}-${identity.productType}-${identity.productSubType}`
 
 export const djiProductName = (identity: DjiDeviceIdentity | undefined): string | undefined =>
   identity ? DJI_PRODUCT_NAMES[djiProductKey(identity)] : undefined
+
+export const productName = (identity: DjiDeviceIdentity | undefined): string | undefined =>
+  superDockProductName(identity) ?? djiProductName(identity)
 
 export interface CommandTransaction {
   tid: string
@@ -675,6 +700,25 @@ export const DJI_COMMANDS: CommandTemplate[] = [
   },
 ]
 
+export const ALL_COMMANDS: readonly CommandTemplate[] = Object.freeze([
+  ...DJI_COMMANDS,
+  ...SUPERDOCK_COMMANDS,
+])
+
+export const commandTemplatesForProvider = (provider: DeviceProvider): readonly CommandTemplate[] =>
+  provider === 'superdock'
+    ? ALL_COMMANDS.filter(superDockSupportsCommand)
+    : DJI_COMMANDS
+
+export const isCommandUnsupportedForProvider = (provider: DeviceProvider, method: string): boolean =>
+  (provider === 'superdock'
+    ? SUPERDOCK_UNSUPPORTED_COMMAND_METHODS.has(method)
+    : SUPERDOCK_ONLY_COMMAND_METHODS.has(method))
+  || (
+    ALL_COMMANDS.some((command) => command.method === method)
+    && !commandTemplatesForProvider(provider).some((command) => command.method === method)
+  )
+
 export const FIELD_LABELS: Record<string, { label: string; unit?: string }> = {
   latitude: { label: '纬度', unit: '°' },
   longitude: { label: '经度', unit: '°' },
@@ -731,13 +775,14 @@ export const createProfile = (): ConnectionProfile => {
   }
 }
 
-export const createDevice = (type: DeviceType = 'dock'): DjiDevice => ({
+export const createDevice = (type: DeviceType = 'dock', provider: DeviceProvider = 'dji'): DjiDevice => ({
   id: crypto.randomUUID(),
   name: type === 'dock' ? '新机场' : type === 'aircraft' ? '新飞机' : '新 Pilot',
   sn: '',
   type,
+  provider: type === 'dock' ? provider : 'dji',
   enabled: true,
-  dockModel: type === 'dock' ? 'dock2' : undefined,
+  dockModel: type === 'dock' ? defaultDockModel(provider) : undefined,
 })
 
 export const subscriptionsForDevice = (device: DjiDevice): TopicSubscription[] =>
@@ -746,15 +791,25 @@ export const subscriptionsForDevice = (device: DjiDevice): TopicSubscription[] =
     topic: template.topic.replace('{sn}', device.sn.trim()),
     qos: template.qos,
     enabled: true,
-    source: 'dji',
+    source: deviceProvider(device),
   }))
 
-export const buildServicePayload = (method: string, data: Record<string, unknown>): string =>
+export interface ServicePayloadOptions {
+  tid?: string
+  bid?: string
+  timestamp?: number
+}
+
+export const buildServicePayload = (
+  method: string,
+  data: Record<string, unknown>,
+  options: ServicePayloadOptions = {},
+): string =>
   JSON.stringify(
     {
-      tid: crypto.randomUUID(),
-      bid: crypto.randomUUID(),
-      timestamp: Date.now(),
+      tid: options.tid ?? crypto.randomUUID(),
+      bid: options.bid ?? crypto.randomUUID(),
+      timestamp: options.timestamp ?? Date.now(),
       method,
       data,
     },
@@ -779,9 +834,12 @@ const deviceIdentityFromData = (data: Record<string, unknown>): DjiDeviceIdentit
   if (!domain || productType === undefined || productSubType === undefined) return undefined
 
   const channelIndex = typeof data.index === 'string' && data.index.trim() ? data.index.trim() : undefined
-  const thingVersion = typeof data.thing_version === 'string' && data.thing_version.trim()
-    ? data.thing_version.trim()
-    : undefined
+  const rawThingVersion = data.thing_version ?? data.version
+  const thingVersion = typeof rawThingVersion === 'string' && rawThingVersion.trim()
+    ? rawThingVersion.trim()
+    : typeof rawThingVersion === 'number' && Number.isFinite(rawThingVersion)
+      ? String(rawThingVersion)
+      : undefined
   return { domain, productType, productSubType, channelIndex, thingVersion }
 }
 
@@ -1010,6 +1068,7 @@ export const withLiveAircraftRelationships = (
       name: item.name || '已发现飞机',
       sn: item.sn,
       type: 'aircraft',
+      provider: 'dji',
       enabled: true,
       parentSn: item.gatewaySn,
     })
@@ -1053,6 +1112,11 @@ export const mergeTelemetry = (
   const type: DeviceType = configured?.type
     ?? deviceTypeFromIdentity(gatewayIdentity)
     ?? (message.topic.startsWith('sys/') ? 'dock' : existing?.type ?? 'aircraft')
+  const provider = configured
+    ? deviceProvider(configured)
+    : gatewayIdentity
+      ? providerFromIdentity(gatewayIdentity)
+      : existing?.provider ?? providerFromIdentity(existing?.identity)
   const sanitizedData = message.topic.endsWith('/status') ? publicStatusData(data, isTopologyUpdate) : data
   const deviceData = type === 'dock' ? withoutDockRelayedAircraftData(sanitizedData) : sanitizedData
   const baseOsd = type === 'dock' ? withoutDockRelayedAircraftData(existing?.osd ?? {}) : existing?.osd ?? {}
@@ -1062,6 +1126,7 @@ export const mergeTelemetry = (
     profileId: profile.id,
     sn,
     type,
+    provider,
     name: configured?.name ?? existing?.name ?? (type === 'dock' ? '已发现机场' : '已发现设备'),
     gatewaySn: type === 'aircraft' && payloadGatewaySn && payloadGatewaySn !== sn
       ? payloadGatewaySn
@@ -1093,12 +1158,13 @@ export const mergeTelemetry = (
       const childConfig = profile.devices.find((device) => device.sn === childSn)
       const childData = publicStatusData(item, true)
       const childIdentity = deviceIdentityFromData(item)
-      const discoveredName = djiProductName(childIdentity)
+      const discoveredName = productName(childIdentity)
       discovered[childKey] = {
         profileId: profile.id,
         sn: childSn,
         gatewaySn: sn,
         type: childConfig?.type ?? deviceTypeFromIdentity(childIdentity) ?? 'aircraft',
+        provider: childConfig ? deviceProvider(childConfig) : providerFromIdentity(childIdentity),
         name: childConfig?.name
           ?? (childExisting?.name && childExisting.name !== '已发现飞机' ? childExisting.name : discoveredName)
           ?? childExisting?.name
@@ -1133,6 +1199,7 @@ export const mergeTelemetry = (
         sn: childSn,
         gatewaySn: sn,
         type: 'aircraft',
+        provider: childConfig ? deviceProvider(childConfig) : childExisting?.provider ?? 'dji',
         name: childConfig?.name ?? childExisting?.name ?? '已发现飞机',
         online: true,
         lastSeenAt: message.timestamp,
@@ -1158,6 +1225,7 @@ export const mergeTelemetry = (
           sn: relatedAircraftSn,
           gatewaySn: sn,
           type: 'aircraft',
+          provider: childConfig ? deviceProvider(childConfig) : childExisting?.provider ?? 'dji',
           name: childConfig?.name ?? childExisting?.name ?? '已发现飞机',
           online: true,
           lastSeenAt: message.timestamp,

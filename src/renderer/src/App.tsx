@@ -87,6 +87,7 @@ import {
   objectStorageConfigToProfile,
 } from './lib/object-storage'
 import { notifyWebDavChanged } from './lib/webdav-sync'
+import { defaultDockModel, deviceProvider } from './lib/superdock'
 
 type WorkspaceView = 'overview' | 'media' | 'dji-config' | 'oss' | 'versions' | 'settings'
 
@@ -540,6 +541,7 @@ export default function App() {
         name: discoveredName || '已发现飞机',
         sn,
         type: 'aircraft',
+        provider: 'dji',
         enabled: true,
         parentSn: gatewaySn,
       }
@@ -937,7 +939,8 @@ export default function App() {
       ...device,
       name: device.name.trim(),
       sn: device.sn.trim(),
-      dockModel: device.type === 'dock' ? device.dockModel ?? 'dock2' : undefined,
+      provider: device.type === 'dock' ? deviceProvider(device) : 'dji',
+      dockModel: device.type === 'dock' ? device.dockModel ?? defaultDockModel(deviceProvider(device)) : undefined,
       parentSn: device.type === 'aircraft' ? device.parentSn : undefined,
     }
     try {
@@ -957,10 +960,15 @@ export default function App() {
         }
 
         let subscriptions = current.subscriptions
-        if (!existing || existing.sn !== normalizedDevice.sn || existing.type !== normalizedDevice.type) {
+        if (
+          !existing
+          || existing.sn !== normalizedDevice.sn
+          || existing.type !== normalizedDevice.type
+          || deviceProvider(existing) !== deviceProvider(normalizedDevice)
+        ) {
           if (existing) {
             subscriptions = subscriptions.filter(
-              (subscription) => !(subscription.source === 'dji' && topicBelongsToDevice(subscription.topic, existing.sn)),
+              (subscription) => !(subscription.source !== 'custom' && topicBelongsToDevice(subscription.topic, existing.sn)),
             )
           }
           const existingTopics = new Set(subscriptions.map((item) => item.topic))
@@ -985,6 +993,7 @@ export default function App() {
               ...next[deviceKey],
               name: normalizedDevice.name,
               type: normalizedDevice.type,
+              provider: deviceProvider(normalizedDevice),
               gatewaySn: normalizedDevice.parentSn,
             }
           }
@@ -1081,7 +1090,7 @@ export default function App() {
           ...current,
           devices: current.devices.filter((item) => !removedSns.has(item.sn)),
           subscriptions: current.subscriptions.filter(
-            (subscription) => !(subscription.source === 'dji'
+            (subscription) => !(subscription.source !== 'custom'
               && [...removedSns].some((sn) => topicBelongsToDevice(subscription.topic, sn))),
           ),
         }
@@ -1230,7 +1239,7 @@ export default function App() {
         const current = currentProfile(profileId)
         const currentSubscription = current.subscriptions.find((item) => item.id === subscription.id)
         if (!currentSubscription) throw new Error('订阅已不存在')
-        if (currentSubscription.source === 'dji') throw new Error('系统内置 Topic 不可删除，可以将其禁用')
+        if (currentSubscription.source !== 'custom') throw new Error('系统内置 Topic 不可删除，可以将其禁用')
         if (statusesRef.current[profileId] === 'connected' && isSubscriptionActive(current, currentSubscription)) {
           const result = await window.djiApi.mqtt.unsubscribe(profileId, currentSubscription.topic)
           if (!result.ok) throw new Error(result.error ?? '取消订阅失败')

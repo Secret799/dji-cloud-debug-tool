@@ -3,7 +3,21 @@ export type MqttVersion = '3.1.1' | '5.0'
 export type MqttQos = 0 | 1 | 2
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'offline' | 'error'
 export type DeviceType = 'dock' | 'aircraft' | 'pilot'
-export type DockModel = 'dock2' | 'dock3' | 'other'
+export type DeviceProvider = 'dji' | 'superdock'
+export type DockModel =
+  | 'dock2'
+  | 'dock3'
+  | 's22m300'
+  | 's2201'
+  | 's2301'
+  | 's24m350'
+  | 's24m350s'
+  | 's24m3'
+  | 's24m4'
+  | 's25m4'
+  | 's25m400'
+  | 's25m400s'
+  | 'other'
 
 export type TelemetryTabKind = 'operation' | 'device' | 'maintenance' | 'other' | 'custom'
 export type TelemetrySectionKind =
@@ -82,6 +96,7 @@ export interface DjiDevice {
   name: string
   sn: string
   type: DeviceType
+  provider?: DeviceProvider
   enabled?: boolean
   dockModel?: DockModel
   parentSn?: string
@@ -129,7 +144,7 @@ export interface TopicSubscription {
   topic: string
   qos: MqttQos
   enabled: boolean
-  source: 'dji' | 'custom'
+  source: DeviceProvider | 'custom'
 }
 
 export interface ConnectionProfile {

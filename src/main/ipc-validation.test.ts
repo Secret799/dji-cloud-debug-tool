@@ -154,6 +154,41 @@ describe('IPC validation', () => {
     expect(() => validateConnectionProfile(invalid)).toThrow('非机场设备')
   })
 
+  it('accepts SuperDock devices and rejects inconsistent provider metadata', () => {
+    const valid = createProfile()
+    valid.devices = [{
+      id: 'superdock',
+      name: 'SuperDock S24M4',
+      sn: 'SB-001',
+      type: 'dock',
+      provider: 'superdock',
+      dockModel: 's24m4',
+    }]
+    valid.subscriptions = [{
+      id: 'superdock-osd',
+      topic: 'thing/product/SB-001/osd',
+      qos: 0,
+      enabled: true,
+      source: 'superdock',
+    }]
+    expect(validateConnectionProfile(valid).devices[0]).toMatchObject({
+      provider: 'superdock',
+      dockModel: 's24m4',
+    })
+
+    const aircraft = createProfile()
+    aircraft.devices = [{
+      id: 'aircraft', name: 'Aircraft', sn: 'AIR-1', type: 'aircraft', provider: 'superdock',
+    }]
+    expect(() => validateConnectionProfile(aircraft)).toThrow('SuperDock 厂商仅适用于机场')
+
+    const mismatched = createProfile()
+    mismatched.devices = [{
+      id: 'dock', name: 'Dock 2', sn: 'DOCK-1', type: 'dock', provider: 'superdock', dockModel: 'dock2',
+    }]
+    expect(() => validateConnectionProfile(mismatched)).toThrow('厂商与机场型号不匹配')
+  })
+
   it('accepts a disabled device and rejects non-boolean device state', () => {
     const valid = createProfile()
     valid.devices = [{ id: 'dock', name: 'Dock', sn: 'DOCK-1', type: 'dock', enabled: false }]
@@ -179,6 +214,20 @@ describe('IPC validation', () => {
     expect(validated[0]).not.toHaveProperty('online')
     expect(validated[0].cameras[0].videos[0]).not.toHaveProperty('status')
     expect(() => validateDeviceArchives('other-profile', [archive])).toThrow('不属于当前连接')
+  })
+
+  it('accepts SuperDock product types in persisted device archives', () => {
+    const [archive] = validateDeviceArchives('profile-1', [{
+      profileId: 'profile-1',
+      sn: 'SUPERDOCK-1',
+      type: 'dock',
+      name: 'SuperDock S24M4',
+      identity: { domain: '3', productType: 88103, productSubType: 0 },
+      cameras: [],
+      updatedAt: 100,
+    }])
+
+    expect(archive.identity).toEqual({ domain: '3', productType: 88103, productSubType: 0 })
   })
 
   it('accepts remote SRS ports and rejects unknown media server kinds', () => {

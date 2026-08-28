@@ -29,14 +29,12 @@ import {
   djiPushModeLabel,
 } from '../lib/dji-field-metadata'
 import { DJI_AIRCRAFT_PROPERTY_DOC_DATE } from '../lib/dji-aircraft-field-metadata'
-import {
-  DJI_DOCK3_PROPERTY_DOC_DATE,
-  getDjiDock3FieldMetadata,
-} from '../lib/dji-dock3-field-metadata'
+import { DJI_DOCK3_PROPERTY_DOC_DATE } from '../lib/dji-dock3-field-metadata'
+import { SUPERDOCK_PROPERTY_DOC_DATE } from '../lib/superdock'
 import {
   createDefaultTelemetryLayout,
-  telemetryCustomPropertyMetadata,
-  telemetryOfficialFieldMetadata,
+  resolveTelemetryFieldMetadata,
+  type TelemetryMetadataSource,
   updateTelemetryLayoutTimestamp,
 } from '../lib/telemetry-layout'
 
@@ -73,6 +71,20 @@ const move = <T,>(items: T[], index: number, direction: -1 | 1): T[] => {
 
 const createId = (prefix: string): string => `${prefix}-${crypto.randomUUID()}`
 
+export const telemetryMetadataSourceLabel = (source: TelemetryMetadataSource): string => {
+  if (source === 'superdock') return `SuperDock 机场设备属性 · ${SUPERDOCK_PROPERTY_DOC_DATE}`
+  if (source === 'dji-superdock') {
+    return `DJI / SuperDock 同名字段（当前展示 DJI 默认定义，设备页按厂商解释） · ${DJI_DOCK2_PROPERTY_DOC_DATE} / ${DJI_DOCK3_PROPERTY_DOC_DATE} / ${SUPERDOCK_PROPERTY_DOC_DATE}`
+  }
+  if (source === 'dji-dock2-dock3') {
+    return `DJI Dock 2 / Dock 3 设备属性 · ${DJI_DOCK2_PROPERTY_DOC_DATE} / ${DJI_DOCK3_PROPERTY_DOC_DATE}`
+  }
+  if (source === 'dji-dock2') return `DJI Dock 2 设备属性 · ${DJI_DOCK2_PROPERTY_DOC_DATE}`
+  if (source === 'dji-aircraft') return `DJI 飞行器设备属性（通用字段） · ${DJI_AIRCRAFT_PROPERTY_DOC_DATE}`
+  if (source === 'custom') return '遥测项管理 · 自定义属性设置'
+  return '未关联官方物模型元数据'
+}
+
 export function TelemetryManager({ config, onChange, onNotify }: TelemetryManagerProps) {
   const [deviceType, setDeviceType] = useState<DeviceType>('aircraft')
   const [selectedTabId, setSelectedTabId] = useState('')
@@ -94,35 +106,27 @@ export function TelemetryManager({ config, onChange, onNotify }: TelemetryManage
   const query = search.trim().toLocaleLowerCase()
   const filteredFields = sectionFields.filter((field) => {
     if (!query) return true
-    const metadata = telemetryOfficialFieldMetadata(deviceType, field.key)
-      ?? telemetryCustomPropertyMetadata(field)
+    const { metadata } = resolveTelemetryFieldMetadata(deviceType, field.key, field)
     return `${field.label} ${field.key} ${field.description} ${djiAccessModeLabel(metadata?.accessMode) ?? ''} ${metadata?.type ?? ''}`
       .toLocaleLowerCase()
       .includes(query)
   })
   const selectedField = fieldsByKey.get(selectedFieldKey) ?? sectionFields[0]
-  const selectedOfficialMetadata = selectedField
-    ? telemetryOfficialFieldMetadata(deviceType, selectedField.key)
+  const selectedMetadataResolution = selectedField
+    ? resolveTelemetryFieldMetadata(deviceType, selectedField.key, selectedField)
+    : { source: 'default' as const }
+  const selectedMetadata = selectedMetadataResolution.metadata
+  const selectedOfficialMetadata = selectedMetadataResolution.source !== 'custom'
+    && selectedMetadataResolution.source !== 'default'
+    ? selectedMetadata
     : undefined
-  const selectedCustomMetadata = selectedOfficialMetadata
-    ? undefined
-    : telemetryCustomPropertyMetadata(selectedField)
-  const selectedMetadata = selectedOfficialMetadata ?? selectedCustomMetadata
   const selectedPropertySetting = selectedField?.propertySetting ?? {
     enabled: false,
     path: selectedField?.key ?? '',
     type: 'text' as const,
     constraint: '',
   }
-  const metadataSource = selectedOfficialMetadata
-    ? deviceType === 'dock'
-      ? getDjiDock3FieldMetadata(selectedField?.key ?? '')
-        ? `DJI Dock 2 / Dock 3 设备属性 · ${DJI_DOCK2_PROPERTY_DOC_DATE} / ${DJI_DOCK3_PROPERTY_DOC_DATE}`
-        : `DJI Dock 2 设备属性 · ${DJI_DOCK2_PROPERTY_DOC_DATE}`
-      : `DJI 飞行器设备属性（通用字段） · ${DJI_AIRCRAFT_PROPERTY_DOC_DATE}`
-    : selectedCustomMetadata
-      ? '遥测项管理 · 自定义属性设置'
-      : '未关联官方物模型元数据'
+  const metadataSource = telemetryMetadataSourceLabel(selectedMetadataResolution.source)
 
   useEffect(() => {
     setSelectedTabId(layout.tabs[0]?.id ?? '')
@@ -365,8 +369,7 @@ export function TelemetryManager({ config, onChange, onNotify }: TelemetryManage
           <div className="telemetry-field-config-list">
             {filteredFields.map((field) => {
               const index = selectedSection?.fieldKeys.indexOf(field.key) ?? -1
-              const metadata = telemetryOfficialFieldMetadata(deviceType, field.key)
-                ?? telemetryCustomPropertyMetadata(field)
+              const { metadata } = resolveTelemetryFieldMetadata(deviceType, field.key, field)
               return (
                 <div className={`telemetry-field-config-row ${selectedField?.key === field.key ? 'selected' : ''}`} key={field.key}>
                   <button className="telemetry-field-config-main" onClick={() => setSelectedFieldKey(field.key)}>
@@ -481,9 +484,9 @@ export function TelemetryManager({ config, onChange, onNotify }: TelemetryManage
                               placeholder={'{"min":0,"max":100,"step":1}'}
                             />
                           </label>
-                          <div className="telemetry-property-source"><span>元数据来源</span><strong>{metadataSource}</strong></div>
                         </div>
                       )}
+                      <div className="telemetry-property-source"><span>元数据来源</span><strong>{metadataSource}</strong></div>
                     </>
                   )}
                 </section>

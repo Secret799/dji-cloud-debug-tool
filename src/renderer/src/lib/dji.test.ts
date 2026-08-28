@@ -1,19 +1,24 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ConnectionProfile, MqttMessageRecord } from '../../../shared/contracts'
 import type { DeviceTelemetry } from './dji'
+import { deviceProvider, superDockSupportsCommand } from './superdock'
 import {
   buildServicePayload,
+  commandTemplatesForProvider,
   commandTransactions,
   discoveredAircraftForProfile,
   DJI_COMMANDS,
   DJI_PRODUCT_NAMES,
+  SUPERDOCK_PRODUCT_NAMES,
   extractTopicSn,
   groupDeviceActivities,
   isPayloadActivity,
+  isCommandUnsupportedForProvider,
   isSubscriptionActive,
   mergeTelemetry,
   parseDeviceActivity,
   parseServiceReply,
+  productName,
   refreshServicePayload,
   retainRecentMessages,
   serviceMethodFromPayload,
@@ -60,11 +65,96 @@ describe('DJI protocol helpers', () => {
     expect(pilotTopics).not.toContain('sys/product/PILOT-001/status')
   })
 
+  it('marks built-in SuperDock topics with their provider', () => {
+    const subscriptions = subscriptionsForDevice({
+      id: 'superdock',
+      name: 'S24M4',
+      sn: 'SB-001',
+      type: 'dock',
+      provider: 'superdock',
+      dockModel: 's24m4',
+    })
+
+    expect(subscriptions).toHaveLength(8)
+    expect(subscriptions.every((subscription) => subscription.source === 'superdock')).toBe(true)
+    expect(subscriptions.map((subscription) => subscription.topic)).toContain('sys/product/SB-001/status')
+  })
+
+  it('prefers an explicit provider while still migrating legacy SuperDock models', () => {
+    expect(deviceProvider({ type: 'dock', provider: 'dji', dockModel: 's24m4' })).toBe('dji')
+    expect(deviceProvider({ type: 'dock', provider: 'superdock', dockModel: 'dock2' })).toBe('superdock')
+    expect(deviceProvider({ type: 'dock', dockModel: 's24m4' })).toBe('superdock')
+    expect(deviceProvider({ type: 'aircraft', provider: 'superdock', dockModel: 's24m4' })).toBe('dji')
+  })
+
   it('uses the current official product enumeration', () => {
     expect(DJI_PRODUCT_NAMES['3-3-0']).toBe('DJI Dock 3')
     expect(DJI_PRODUCT_NAMES['0-100-0']).toBe('DJI Matrice 4D')
     expect(DJI_PRODUCT_NAMES['0-103-0']).toBe('DJI Matrice 400')
     expect(DJI_PRODUCT_NAMES['0-89-0']).toBe('DJI Matrice 350 RTK')
+    expect(SUPERDOCK_PRODUCT_NAMES['3-88103-0']).toBe('SuperDock S24M4')
+    expect(productName({ domain: '3', productType: 88105, productSubType: 0 })).toBe('SuperDock S25M400')
+  })
+
+  it('recognizes a SuperDock gateway and its legacy topology version field', () => {
+    const profile = { id: 'profile', devices: [] } as unknown as ConnectionProfile
+    const result = mergeTelemetry({}, profile, {
+      id: 'topology',
+      profileId: 'profile',
+      direction: 'in',
+      topic: 'sys/product/SB-001/status',
+      payload: JSON.stringify({
+        method: 'update_topo',
+        data: { domain: '3', type: 88103, sub_type: 0, version: '1.0.0', sub_devices: [] },
+      }),
+      qos: 1,
+      retain: false,
+      timestamp: 100,
+      size: 1,
+    })
+
+    expect(result['profile:SB-001']).toMatchObject({
+      type: 'dock',
+      provider: 'superdock',
+      identity: { domain: '3', productType: 88103, productSubType: 0, thingVersion: '1.0.0' },
+    })
+  })
+
+  it('keeps a legacy cached SuperDock identity on the next telemetry update', () => {
+    const profile = { id: 'profile', devices: [] } as unknown as ConnectionProfile
+    const cached = {
+      'profile:SB-001': {
+        profileId: 'profile',
+        sn: 'SB-001',
+        type: 'dock',
+        name: 'SuperDock S24M4',
+        online: false,
+        lastSeenAt: 50,
+        lastTopic: 'telemetry-cache',
+        identity: { domain: '3', productType: 88103, productSubType: 0 },
+        osd: {},
+        state: {},
+        status: {},
+      },
+    } satisfies Record<string, DeviceTelemetry>
+
+    const result = mergeTelemetry(cached, profile, {
+      id: 'osd',
+      profileId: 'profile',
+      direction: 'in',
+      topic: 'thing/product/SB-001/osd',
+      payload: JSON.stringify({ data: { temperature: 22 } }),
+      qos: 0,
+      retain: false,
+      timestamp: 100,
+      size: 1,
+    })
+
+    expect(result['profile:SB-001']).toMatchObject({
+      provider: 'superdock',
+      identity: { domain: '3', productType: 88103, productSubType: 0 },
+      osd: { temperature: 22 },
+    })
   })
 
   it('pauses device subscriptions when the device or its parent gateway is disabled', () => {
@@ -136,6 +226,51 @@ describe('DJI protocol helpers', () => {
     expect(payload.tid).toBeTruthy()
     expect(payload.bid).toBeTruthy()
     vi.restoreAllMocks()
+  })
+
+  it('uses provider-specific command templates and blocks only known incompatible methods', () => {
+    const superDockMethods = commandTemplatesForProvider('superdock').map((command) => command.method)
+    const djiMethods = commandTemplatesForProvider('dji').map((command) => command.method)
+
+    expect(superDockMethods).toEqual(expect.arrayContaining([
+      'putter_open',
+      'putter_close',
+      'lte_verification',
+      'lte_auth',
+      'rtk_calibration',
+      'live_set_quality',
+    ]))
+    expect(superDockMethods).not.toEqual(expect.arrayContaining([
+      'cover_force_close',
+      'supplement_light_open',
+      'device_format',
+      'esim_activate',
+    ]))
+    expect(djiMethods).not.toEqual(expect.arrayContaining(['putter_open', 'lte_auth']))
+
+    expect(isCommandUnsupportedForProvider('superdock', 'cover_force_close')).toBe(true)
+    expect(isCommandUnsupportedForProvider('superdock', 'ota_create')).toBe(true)
+    expect(isCommandUnsupportedForProvider('dji', 'putter_open')).toBe(true)
+    expect(isCommandUnsupportedForProvider('superdock', 'vendor_custom_command')).toBe(false)
+    expect(isCommandUnsupportedForProvider('dji', 'vendor_custom_command')).toBe(false)
+    expect(superDockSupportsCommand({ category: 'payload', method: 'future_registered_command' })).toBe(false)
+  })
+
+  it('reuses an explicit business id across the two SuperDock LTE requests', () => {
+    const bid = 'lte-business-id'
+    const verification = JSON.parse(buildServicePayload('lte_verification', {
+      phone_area_code: '86',
+      phone_number: '13300000000',
+    }, { bid })) as Record<string, unknown>
+    const authentication = JSON.parse(buildServicePayload('lte_auth', {
+      phone_area_code: '86',
+      phone_number: '13300000000',
+      verification_code: '123456',
+    }, { bid })) as Record<string, unknown>
+
+    expect(verification.bid).toBe(bid)
+    expect(authentication.bid).toBe(bid)
+    expect(authentication.tid).not.toBe(verification.tid)
   })
 
   it('refreshes service transaction fields without losing edited command data', () => {

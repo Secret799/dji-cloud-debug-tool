@@ -66,4 +66,22 @@ describe('telemetry cache', () => {
     expect(cached['profile:DOCK'].osd).not.toHaveProperty('live_status')
     expect(cached['profile:DOCK'].osd).toHaveProperty('live_capacity')
   })
+
+  it('round-trips the SuperDock provider while accepting legacy entries without one', () => {
+    const superDock = telemetry('profile', 'SB-001', 200)
+    superDock.provider = 'superdock'
+    superDock.identity = { domain: '3', productType: 88103, productSubType: 0 }
+
+    const restored = parseTelemetryCache(JSON.parse(serializeTelemetryCache({ superDock })) as unknown)
+    expect(restored['profile:SB-001']).toMatchObject({
+      provider: 'superdock',
+      identity: { domain: '3', productType: 88103, productSubType: 0 },
+    })
+
+    const legacy = JSON.parse(serializeTelemetryCache({ legacy: telemetry('profile', 'DOCK-1', 100) })) as {
+      devices: Array<Record<string, unknown>>
+    }
+    delete legacy.devices[0].provider
+    expect(parseTelemetryCache(legacy)['profile:DOCK-1']?.provider).toBeUndefined()
+  })
 })

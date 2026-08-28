@@ -16,7 +16,9 @@ import {
   type DjiFieldMetadata,
   type DjiFieldRow,
 } from './dji-field-metadata'
+import { getDjiDock3FieldMetadata } from './dji-dock3-field-metadata'
 import { FIELD_LABELS, type DeviceTelemetry } from './dji'
+import { SUPERDOCK_FIELDS, getSuperDockFieldOverride } from './superdock-field-metadata'
 
 const STORAGE_KEY = 'dji-cloud-studio.telemetry-layout.v1'
 
@@ -82,15 +84,49 @@ const relayedAircraftMetadata = (key: string): DjiFieldMetadata | undefined => {
   return undefined
 }
 
+export type TelemetryMetadataSource =
+  | 'superdock'
+  | 'dji-superdock'
+  | 'dji-dock2'
+  | 'dji-dock2-dock3'
+  | 'dji-aircraft'
+  | 'custom'
+  | 'default'
+
+export interface TelemetryFieldMetadataResolution {
+  metadata?: DjiFieldMetadata
+  source: TelemetryMetadataSource
+}
+
+const telemetryOfficialFieldMetadataResolution = (
+  deviceType: DeviceType,
+  path: string,
+): TelemetryFieldMetadataResolution => {
+  const key = normalizeTelemetryFieldKey(path)
+  if (deviceType === 'dock') {
+    const superDockMetadata = getSuperDockFieldOverride(key)
+    const djiMetadata = getDjiFieldMetadata(key)
+    if (djiMetadata) {
+      return {
+        metadata: djiMetadata,
+        source: superDockMetadata
+          ? 'dji-superdock'
+          : getDjiDock3FieldMetadata(key) ? 'dji-dock2-dock3' : 'dji-dock2',
+      }
+    }
+    if (superDockMetadata) return { metadata: superDockMetadata, source: 'superdock' }
+  }
+  if (deviceType === 'aircraft') {
+    const metadata = relayedAircraftMetadata(key) ?? getDjiAircraftFieldMetadata(key)
+    if (metadata) return { metadata, source: 'dji-aircraft' }
+  }
+  return { source: 'default' }
+}
+
 export const telemetryOfficialFieldMetadata = (
   deviceType: DeviceType,
   path: string,
-): DjiFieldMetadata | undefined => {
-  const key = normalizeTelemetryFieldKey(path)
-  if (deviceType === 'dock') return getDjiFieldMetadata(key)
-  if (deviceType === 'aircraft') return relayedAircraftMetadata(key) ?? getDjiAircraftFieldMetadata(key)
-  return undefined
-}
+): DjiFieldMetadata | undefined => telemetryOfficialFieldMetadataResolution(deviceType, path).metadata
 
 export const telemetryCustomPropertyMetadata = (
   field: TelemetryLayoutField | undefined,
@@ -107,6 +143,18 @@ export const telemetryCustomPropertyMetadata = (
     '',
   ] satisfies DjiFieldRow
   return buildDjiFieldMetadata([row])[0]
+}
+
+export const resolveTelemetryFieldMetadata = (
+  deviceType: DeviceType,
+  path: string,
+  field?: TelemetryLayoutField,
+): TelemetryFieldMetadataResolution => {
+  const official = telemetryOfficialFieldMetadataResolution(deviceType, path)
+  if (official.metadata) return official
+
+  const custom = telemetryCustomPropertyMetadata(field)
+  return custom ? { metadata: custom, source: 'custom' } : { source: 'default' }
 }
 
 export const telemetryBaseField = (
@@ -155,7 +203,12 @@ const defaultTabs = (deviceType: DeviceType): TelemetryLayoutTab[] => [
 ]
 
 const catalogPaths = (deviceType: DeviceType): string[] => {
-  if (deviceType === 'dock') return DJI_DOCK2_FIELDS.map((field) => field.path)
+  if (deviceType === 'dock') {
+    return [...new Set([
+      ...DJI_DOCK2_FIELDS.map((field) => field.path),
+      ...SUPERDOCK_FIELDS.map((field) => field.path),
+    ])]
+  }
   if (deviceType === 'aircraft') {
     return [
       ...DJI_AIRCRAFT_FIELDS.map((field) => field.path),
@@ -243,6 +296,17 @@ export const reconcileTelemetryLayout = (
     ['aircraft', new Set(config.devices.aircraft.fields.map((field) => field.key))],
     ['pilot', new Set(config.devices.pilot.fields.map((field) => field.key))],
   ])
+  ;(['dock', 'aircraft', 'pilot'] as const).forEach((deviceType) => {
+    const known = knownByType.get(deviceType) as Set<string>
+    catalogPaths(deviceType).forEach((path) => {
+      const key = normalizeTelemetryFieldKey(path)
+      if (!key || known.has(key)) return
+      known.add(key)
+      const values = missing.get(deviceType) ?? []
+      values.push(key)
+      missing.set(deviceType, values)
+    })
+  })
   telemetry.forEach((device) => {
     const known = knownByType.get(device.type) as Set<string>
     const keys = collectTelemetryKeys({ ...device.osd, ...device.state })

@@ -25,7 +25,8 @@ import {
 import type { ConnectionProfile, ConnectionStatus, MediaServerProfile, MqttQos, OperationResult } from '../../../shared/contracts'
 import {
   buildServicePayload,
-  DJI_COMMANDS,
+  commandTemplatesForProvider,
+  isCommandUnsupportedForProvider,
   mergeNestedRecords,
   parseServicePayload,
   refreshServicePayload,
@@ -33,8 +34,14 @@ import {
   telemetryValue,
   type CommandTemplate,
   type DeviceTelemetry,
+  type ServicePayloadOptions,
   type ServiceCaller,
 } from '../lib/dji'
+import {
+  deviceProvider,
+  isValidSuperDockLtePhone,
+  isValidSuperDockLteVerificationCode,
+} from '../lib/superdock'
 import { CameraCenter } from './CameraCenter'
 
 interface CommandCenterProps {
@@ -65,13 +72,21 @@ const numericState = (value: unknown): number | undefined => {
   return Number.isFinite(number) ? number : undefined
 }
 
-const commandById = (id: string | undefined): CommandTemplate | undefined =>
-  id ? DJI_COMMANDS.find((command) => command.id === id) : undefined
-
 const recordArray = (value: unknown): Record<string, unknown>[] =>
   Array.isArray(value)
     ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object' && !Array.isArray(item))
     : []
+
+export const superDockLteAuthenticationStatus = (
+  authenticationAvailable: boolean | undefined,
+  verificationPending: boolean,
+): string => authenticationAvailable === true
+  ? '校验成功'
+  : verificationPending
+    ? '验证码已发送'
+    : authenticationAvailable === false
+      ? '未认证'
+      : '等待认证状态'
 
 const AIR_CONDITIONER_STATE_LABELS: Record<number, string> = {
   0: '空闲模式',
@@ -129,18 +144,37 @@ export function CommandCenter({
   showCategoryBar = true,
   mediaServers = [],
 }: CommandCenterProps) {
+  const gatewayDevices = useMemo(
+    () => profile.devices.filter((device) => device.type === 'dock' || device.type === 'pilot'),
+    [profile.devices],
+  )
+  const selectedDevice = profile.devices.find((device) => device.sn === selectedDeviceSn)
+  const contextualGatewaySn = selectedDevice?.type === 'dock' || selectedDevice?.type === 'pilot'
+    ? selectedDevice.sn
+    : selectedDevice?.parentSn && gatewayDevices.some((device) => device.sn === selectedDevice.parentSn)
+      ? selectedDevice.parentSn
+      : gatewayDevices.length === 1
+        ? gatewayDevices[0].sn
+        : ''
+  const [gatewaySn, setGatewaySn] = useState(contextualGatewaySn || gatewayDevices[0]?.sn || '')
+  const contextualGateway = gatewayDevices.find((device) => device.sn === gatewaySn) ?? gatewayDevices[0]
+  const provider = deviceProvider(contextualGateway)
+  const isSuperDock = provider === 'superdock'
+  const providerCommands = useMemo(() => commandTemplatesForProvider(provider), [provider])
+  const commandById = (id: string | undefined): CommandTemplate | undefined =>
+    id ? providerCommands.find((command) => command.id === id) : undefined
   const availableCategories = useMemo(
     () => categories.filter((item) => !allowedCategories || allowedCategories.includes(item.id)),
     [allowedCategories],
   )
   const [category, setCategory] = useState<CommandTemplate['category']>(availableCategories[0]?.id ?? 'debug')
   const commands = useMemo(
-    () => DJI_COMMANDS.filter((command) => (
+    () => providerCommands.filter((command) => (
       command.category === category
       && (category !== 'flight' || (command.id !== 'flight-authority-grab' && command.id !== 'flight-authority-release'))
       && (category !== 'debug' || (command.id !== 'debug-open' && command.id !== 'debug-close'))
     )),
-    [category],
+    [category, providerCommands],
   )
   const [selectedCommandId, setSelectedCommandId] = useState(commands[0]?.id ?? '')
   const selectedCommand = commands.find((command) => command.id === selectedCommandId) ?? commands[0]
@@ -155,25 +189,17 @@ export function CommandCenter({
   const [calibrationLongitude, setCalibrationLongitude] = useState('')
   const [calibrationLatitude, setCalibrationLatitude] = useState('')
   const [calibrationHeight, setCalibrationHeight] = useState('')
+  const [ltePhoneAreaCode, setLtePhoneAreaCode] = useState<string>()
+  const [ltePhoneNumber, setLtePhoneNumber] = useState<string>()
+  const [lteVerificationCode, setLteVerificationCode] = useState('')
+  const [lteBid, setLteBid] = useState('')
 
   const commandData = (command: CommandTemplate): Record<string, unknown> =>
-    defaultPsdkIndex !== undefined && (command.category === 'psdk' || command.category === 'speaker')
+    isSuperDock && command.method === 'rtk_calibration'
+      ? {}
+      : defaultPsdkIndex !== undefined && (command.category === 'psdk' || command.category === 'speaker')
       ? { ...command.data, psdk_index: defaultPsdkIndex }
       : command.data
-
-  const gatewayDevices = useMemo(
-    () => profile.devices.filter((device) => device.type === 'dock' || device.type === 'pilot'),
-    [profile.devices],
-  )
-  const selectedDevice = profile.devices.find((device) => device.sn === selectedDeviceSn)
-  const contextualGatewaySn = selectedDevice?.type === 'dock' || selectedDevice?.type === 'pilot'
-    ? selectedDevice.sn
-    : selectedDevice?.parentSn && gatewayDevices.some((device) => device.sn === selectedDevice.parentSn)
-      ? selectedDevice.parentSn
-      : gatewayDevices.length === 1
-        ? gatewayDevices[0].sn
-        : ''
-  const [gatewaySn, setGatewaySn] = useState(contextualGatewaySn || gatewayDevices[0]?.sn || '')
   const needsGatewaySelection = !contextualGatewaySn && gatewayDevices.length > 1
   const gatewayTelemetry = telemetry.find((device) => device.sn === gatewaySn)
   const configuredAircraft = profile.devices.find((device) => device.type === 'aircraft' && device.parentSn === gatewaySn)
@@ -199,6 +225,7 @@ export function CommandCenter({
   )
   const modeCode = numericState(telemetryValue(gatewayTelemetrySource, 'mode_code'))
   const coverState = numericState(telemetryValue(gatewayTelemetrySource, 'cover_state'))
+  const putterState = numericState(telemetryValue(gatewayTelemetrySource, 'putter_state'))
   const chargeState = numericState(
     telemetryValue(aircraftTelemetrySource, 'drone_charge_state.state')
     ?? telemetryValue(gatewayTelemetrySource, 'drone_charge_state.state'),
@@ -312,6 +339,53 @@ export function CommandCenter({
     collect(aircraftDongles.length ? aircraftDongles : nestedAircraftDongles, 'drone', '飞行器 Dongle')
     return [...byImei.values()]
   }, [aircraftTelemetrySource, gatewayTelemetrySource])
+  const superDockDongleInfo = useMemo(() => {
+    const candidates = [
+      ...recordArray(telemetryValue(aircraftTelemetrySource, 'dongle_infos')),
+      ...recordArray(telemetryValue(gatewayTelemetrySource, 'sub_device.dongle_infos')),
+      ...recordArray(telemetryValue(gatewayTelemetrySource, 'dongle_infos')),
+    ]
+    return candidates.find((item) => (
+      'sim_phone_area_code' in item
+      || 'sim_phone_number' in item
+      || 'sim_is_authentication_available' in item
+    ))
+  }, [aircraftTelemetrySource, gatewayTelemetrySource])
+  const reportedLtePhoneAreaCode = typeof superDockDongleInfo?.sim_phone_area_code === 'string'
+    ? superDockDongleInfo.sim_phone_area_code.trim()
+    : ''
+  const reportedLtePhoneNumber = typeof superDockDongleInfo?.sim_phone_number === 'string'
+    ? superDockDongleInfo.sim_phone_number.trim()
+    : ''
+  const ltePhoneAreaCodeValue = (ltePhoneAreaCode ?? reportedLtePhoneAreaCode) || '86'
+  const ltePhoneNumberValue = ltePhoneNumber ?? reportedLtePhoneNumber
+  const ltePhoneValid = isValidSuperDockLtePhone(ltePhoneAreaCodeValue, ltePhoneNumberValue)
+  const lteVerificationCodeValid = isValidSuperDockLteVerificationCode(lteVerificationCode)
+  const lteRemainingTime = numericState(superDockDongleInfo?.sim_remaining_time)
+  const lteAuthenticationAvailable = typeof superDockDongleInfo?.sim_is_authentication_available === 'boolean'
+    ? superDockDongleInfo.sim_is_authentication_available
+    : numericState(superDockDongleInfo?.sim_is_authentication_available) === 1
+      ? true
+      : numericState(superDockDongleInfo?.sim_is_authentication_available) === 0
+        ? false
+        : undefined
+  const lteLinkWorkmode = typeof superDockDongleInfo?.sim_link_workmode === 'boolean'
+    ? superDockDongleInfo.sim_link_workmode
+    : numericState(superDockDongleInfo?.sim_link_workmode) === 1
+      ? true
+      : numericState(superDockDongleInfo?.sim_link_workmode) === 0
+        ? false
+        : undefined
+  const putterStateLabel = putterState === undefined ? '状态未知' : `状态值 ${putterState}`
+  const lteAuthenticationStatus = superDockLteAuthenticationStatus(
+    lteAuthenticationAvailable,
+    Boolean(lteBid),
+  )
+  const lteStatusLabel = [
+    lteAuthenticationStatus,
+    lteLinkWorkmode === true ? '4G 增强已开启' : lteLinkWorkmode === false ? '4G 增强未开启' : '',
+    lteRemainingTime === undefined ? '' : `剩余时长 ${lteRemainingTime}s`,
+  ].filter(Boolean).join(' · ')
   const flightAuthorityStateLabel = drcState === 2
     ? '已获取控制权'
     : drcState === 1
@@ -321,7 +395,7 @@ export function CommandCenter({
         : '状态未知'
   const flightAuthorityCommand = commandById(flightAuthorityActive ? 'flight-authority-release' : 'flight-authority-grab')
   const payloadMethod = serviceMethodFromPayload(payload)
-  const payloadCommand = DJI_COMMANDS.find((command) => command.method === payloadMethod)
+  const payloadCommand = providerCommands.find((command) => command.method === payloadMethod)
   const payloadDanger = Boolean(payloadCommand?.danger)
   const selectedMediaServer = mediaServers.find((server) => server.id === selectedMediaServerId)
     ?? mediaServers.find((server) => server.isDefault)
@@ -340,6 +414,13 @@ export function CommandCenter({
   }, [gatewaySn])
 
   useEffect(() => {
+    setLtePhoneAreaCode(undefined)
+    setLtePhoneNumber(undefined)
+    setLteVerificationCode('')
+    setLteBid('')
+  }, [gatewaySn, provider])
+
+  useEffect(() => {
     const firstCategory = availableCategories[0]?.id
     if (firstCategory && !availableCategories.some((item) => item.id === category)) setCategory(firstCategory)
   }, [availableCategories, category])
@@ -351,7 +432,7 @@ export function CommandCenter({
 
   useEffect(() => {
     if (selectedCommand) setPayload(buildServicePayload(selectedCommand.method, commandData(selectedCommand)))
-  }, [selectedCommand?.id, defaultPsdkIndex])
+  }, [selectedCommand?.id, defaultPsdkIndex, isSuperDock])
 
   const chooseCommand = (command: CommandTemplate): void => {
     setSelectedCommandId(command.id)
@@ -373,7 +454,11 @@ export function CommandCenter({
       onNotify?.('请求体 method 不能为空', 'error')
       return
     }
-    const actualCommand = DJI_COMMANDS.find((command) => command.method === method)
+    if (isCommandUnsupportedForProvider(provider, method)) {
+      onNotify?.(`当前 ${isSuperDock ? 'SuperDock' : 'DJI'} 设备不支持指令 ${method}`, 'error')
+      return
+    }
+    const actualCommand = providerCommands.find((command) => command.method === method)
     if (actualCommand?.requiresDebug && !remoteDebugActive) {
       onNotify?.('请先进入远程调试模式', 'error')
       return
@@ -403,41 +488,52 @@ export function CommandCenter({
   const sendQuickCommand = async (
     command: CommandTemplate | undefined,
     dataOverride?: Record<string, unknown>,
-  ): Promise<void> => {
+    payloadOptions?: ServicePayloadOptions,
+  ): Promise<boolean> => {
     if (!command) {
       onNotify?.('等待设备上报当前状态后再操作', 'error')
-      return
+      return false
     }
     if (!gatewaySn) {
       onNotify?.('请先选择网关设备', 'error')
-      return
+      return false
+    }
+    if (isCommandUnsupportedForProvider(provider, command.method)) {
+      onNotify?.(`当前 ${isSuperDock ? 'SuperDock' : 'DJI'} 设备不支持指令 ${command.method}`, 'error')
+      return false
     }
     if (command.requiresDebug && !remoteDebugActive) {
       onNotify?.('请先进入远程调试模式', 'error')
-      return
+      return false
     }
     if (command.requiresFlightAuthority && !flightAuthorityActive) {
       onNotify?.('请先获取飞行控制权', 'error')
-      return
+      return false
     }
-    if (command.danger && !window.confirm(`确认执行“${command.label}”？请确保现场环境安全。`)) return
+    if (command.danger && !window.confirm(`确认执行“${command.label}”？请确保现场环境安全。`)) return false
 
     setQuickSendingCommandId(command.id)
     try {
       const commandPayload = buildServicePayload(command.method, {
         ...commandData(command),
         ...dataOverride,
-      })
+      }, payloadOptions)
       const response = await onPublish(`thing/product/${gatewaySn}/services`, commandPayload, 1, false)
       onNotify?.(response.ok ? `${command.label}指令已发送，等待设备状态更新` : response.error ?? '发送失败', response.ok ? 'success' : 'error')
+      return response.ok
     } catch (error) {
       onNotify?.(error instanceof Error ? error.message : String(error), 'error')
+      return false
     } finally {
       setQuickSendingCommandId('')
     }
   }
 
   const sendCalibration = (): void => {
+    if (isSuperDock) {
+      void sendQuickCommand(commandById('rtk-calibration'))
+      return
+    }
     const longitude = Number(calibrationLongitude)
     const latitude = Number(calibrationLatitude)
     const height = Number(calibrationHeight)
@@ -453,6 +549,45 @@ export function CommandCenter({
         data: { longitude, latitude, height },
       }],
     })
+  }
+
+  const sendLteVerification = async (): Promise<void> => {
+    const phoneAreaCode = ltePhoneAreaCodeValue.trim()
+    const phoneNumber = ltePhoneNumberValue.trim()
+    if (!isValidSuperDockLtePhone(phoneAreaCode, phoneNumber)) {
+      onNotify?.('请填写有效的国际区号和完整手机号码，不能使用脱敏号码', 'error')
+      return
+    }
+    const bid = crypto.randomUUID()
+    setLteVerificationCode('')
+    setLteBid('')
+    const sent = await sendQuickCommand(commandById('lte-verification'), {
+      phone_area_code: phoneAreaCode,
+      phone_number: phoneNumber,
+    }, { bid })
+    if (sent) setLteBid(bid)
+  }
+
+  const sendLteAuthentication = async (): Promise<void> => {
+    const phoneAreaCode = ltePhoneAreaCodeValue.trim()
+    const phoneNumber = ltePhoneNumberValue.trim()
+    const verificationCode = lteVerificationCode.trim()
+    if (
+      !isValidSuperDockLtePhone(phoneAreaCode, phoneNumber)
+      || !isValidSuperDockLteVerificationCode(verificationCode)
+    ) {
+      onNotify?.('请填写有效的国际区号、完整手机号码和 4 至 8 位数字验证码', 'error')
+      return
+    }
+    if (!lteBid) {
+      onNotify?.('请先发送验证码，再提交认证', 'error')
+      return
+    }
+    await sendQuickCommand(commandById('lte-auth'), {
+      phone_area_code: phoneAreaCode,
+      phone_number: phoneNumber,
+      verification_code: verificationCode,
+    }, { bid: lteBid })
   }
 
   const quickCommandDisabled = (command: CommandTemplate | undefined): boolean =>
@@ -529,6 +664,7 @@ export function CommandCenter({
           profile={profile}
           telemetry={telemetry}
           gatewaySn={gatewaySn}
+          provider={provider}
           status={status}
           busy={busy}
           mediaServers={mediaServers}
@@ -607,7 +743,28 @@ export function CommandCenter({
               </button>
               </DebugOperationCard>
 
-              <DebugOperationCard icon={<Lightbulb size={18} />} label="机场补光灯" status={supplementLightStateLabel} locked={!remoteDebugActive}>
+              {isSuperDock && (
+                <DebugOperationCard icon={<Dock size={18} />} label="机场推杆" status={putterStateLabel} locked={!remoteDebugActive}>
+                  <div className="debug-maintenance-actions">
+                    <button
+                      className="button secondary"
+                      disabled={quickCommandDisabled(commandById('putter-open'))}
+                      onClick={() => void sendQuickCommand(commandById('putter-open'))}
+                    >
+                      {quickSendingCommandId === 'putter-open' ? '发送中' : '展开推杆'}
+                    </button>
+                    <button
+                      className="button secondary"
+                      disabled={quickCommandDisabled(commandById('putter-close'))}
+                      onClick={() => void sendQuickCommand(commandById('putter-close'))}
+                    >
+                      {quickSendingCommandId === 'putter-close' ? '发送中' : '闭合推杆'}
+                    </button>
+                  </div>
+                </DebugOperationCard>
+              )}
+
+              {!isSuperDock && <DebugOperationCard icon={<Lightbulb size={18} />} label="机场补光灯" status={supplementLightStateLabel} locked={!remoteDebugActive}>
                 <button
                   className="button secondary"
                   disabled={quickCommandDisabled(supplementLightCommand)}
@@ -615,11 +772,11 @@ export function CommandCenter({
                 >
                   {quickSendingCommandId === supplementLightCommand?.id ? '发送中' : supplementLightCommand?.label ?? '等待状态上报'}
                 </button>
-              </DebugOperationCard>
+              </DebugOperationCard>}
             </div>
           </section>
 
-          <section className="debug-operation-section">
+          {!isSuperDock && <section className="debug-operation-section">
             <header className="debug-section-title">
               <div><Snowflake size={16} /><h3>环境与电池</h3></div>
               <span>按当前状态操作</span>
@@ -703,12 +860,12 @@ export function CommandCenter({
                 </div>
               </DebugOperationCard>
             </div>
-          </section>
+          </section>}
 
           <section className="debug-operation-section">
             <header className="debug-section-title">
-              <div><Wifi size={16} /><h3>通信与 eSIM</h3></div>
-              <span>{dongles.length ? `${dongles.length} 个 Dongle` : '等待设备信息'}</span>
+              <div><Wifi size={16} /><h3>{isSuperDock ? '通信与 LTE' : '通信与 eSIM'}</h3></div>
+              <span>{isSuperDock ? lteAuthenticationStatus : dongles.length ? `${dongles.length} 个 Dongle` : '等待设备信息'}</span>
             </header>
             <div className="debug-operation-grid">
               <DebugOperationCard icon={<Wifi size={18} />} label="增强图传" status={linkWorkmodeLabel} locked={!remoteDebugActive}>
@@ -727,7 +884,7 @@ export function CommandCenter({
                 </button>
               </DebugOperationCard>
 
-              {dongles.map((dongle) => {
+              {!isSuperDock && dongles.map((dongle) => {
                 const simSlotLabel = dongle.simSlot === 1 ? '实体 SIM' : dongle.simSlot === 2 ? 'eSIM' : '卡槽未知'
                 const activateLabel = dongle.activateState === 2 ? '已激活' : dongle.activateState === 1 ? '未激活' : '激活状态未知'
                 const operatorLabel = dongle.operator ? OPERATOR_LABELS[dongle.operator] ?? `运营商 ${dongle.operator}` : '运营商未知'
@@ -805,9 +962,62 @@ export function CommandCenter({
                 )
               })}
 
-              {!dongles.length && (
+              {!isSuperDock && !dongles.length && (
                 <DebugOperationCard icon={<Radio size={18} />} label="eSIM / SIM" status="等待 Dongle 状态上报" locked className="wide">
                   <button className="button secondary" disabled>等待设备信息</button>
+                </DebugOperationCard>
+              )}
+
+              {isSuperDock && (
+                <DebugOperationCard icon={<Radio size={18} />} label="4G 在线认证" status={lteStatusLabel} locked={false} className="configuration wide">
+                  <div className="debug-calibration-form">
+                    <label>
+                      <span>手机号区号</span>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        maxLength={3}
+                        value={ltePhoneAreaCodeValue}
+                        disabled={Boolean(quickSendingCommandId)}
+                        onChange={(event) => { setLtePhoneAreaCode(event.target.value); setLteBid('') }}
+                      />
+                    </label>
+                    <label>
+                      <span>手机号码</span>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        maxLength={14}
+                        value={ltePhoneNumberValue}
+                        disabled={Boolean(quickSendingCommandId)}
+                        onChange={(event) => { setLtePhoneNumber(event.target.value); setLteBid('') }}
+                      />
+                    </label>
+                    <label>
+                      <span>验证码</span>
+                      <input
+                        inputMode="numeric"
+                        maxLength={8}
+                        value={lteVerificationCode}
+                        disabled={!lteBid || Boolean(quickSendingCommandId)}
+                        onChange={(event) => setLteVerificationCode(event.target.value)}
+                      />
+                    </label>
+                    <button
+                      className="button secondary"
+                      disabled={quickCommandDisabled(commandById('lte-verification')) || !ltePhoneValid}
+                      onClick={() => void sendLteVerification()}
+                    >
+                      {quickSendingCommandId === 'lte-verification' ? '发送中' : '发送验证码'}
+                    </button>
+                    <button
+                      className="button primary"
+                      disabled={quickCommandDisabled(commandById('lte-auth')) || !lteBid || !ltePhoneValid || !lteVerificationCodeValid}
+                      onClick={() => void sendLteAuthentication()}
+                    >
+                      {quickSendingCommandId === 'lte-auth' ? '认证中' : '提交认证'}
+                    </button>
+                  </div>
                 </DebugOperationCard>
               )}
             </div>
@@ -828,17 +1038,17 @@ export function CommandCenter({
                   >
                     {quickSendingCommandId === 'device-reboot' ? '发送中' : '重启机场'}
                   </button>
-                  <button
+                  {!isSuperDock && <button
                     className="button secondary"
                     disabled={quickCommandDisabled(commandById('cover-force-close'))}
                     onClick={() => void sendQuickCommand(commandById('cover-force-close'))}
                   >
                     {quickSendingCommandId === 'cover-force-close' ? '发送中' : '强制关闭舱盖'}
-                  </button>
+                  </button>}
                 </div>
               </DebugOperationCard>
 
-              <DebugOperationCard icon={<Database size={18} />} label="数据格式化" status={remoteDebugActive ? '可操作' : '已锁定'} locked={!remoteDebugActive} className="maintenance">
+              {!isSuperDock && <DebugOperationCard icon={<Database size={18} />} label="数据格式化" status={remoteDebugActive ? '可操作' : '已锁定'} locked={!remoteDebugActive} className="maintenance">
                 <div className="debug-maintenance-actions">
                   <button
                     className="button danger-button"
@@ -855,24 +1065,28 @@ export function CommandCenter({
                     {quickSendingCommandId === 'drone-format' ? '发送中' : '格式化飞行器'}
                   </button>
                 </div>
-              </DebugOperationCard>
+              </DebugOperationCard>}
 
-              <DebugOperationCard icon={<MapPin size={18} />} label="RTK 一键标定" status={calibrationSn || '等待设备信息'} locked={!remoteDebugActive} className="configuration wide calibration">
+              <DebugOperationCard icon={<MapPin size={18} />} label="RTK 一键标定" status={isSuperDock ? '固定云端 RTK 链路' : calibrationSn || '等待设备信息'} locked={!remoteDebugActive} className="configuration wide calibration">
                 <div className="debug-calibration-form">
-                  <label><span>设备 SN</span><input value={calibrationSn} disabled={!remoteDebugActive} onChange={(event) => setCalibrationSn(event.target.value)} /></label>
-                  <label>
-                    <span>模块</span>
-                    <span className="debug-select-control">
-                      <select value={calibrationModule} disabled={!remoteDebugActive} onChange={(event) => setCalibrationModule(event.target.value)}>
-                        <option value="3">机场</option>
-                        <option value="6">中继</option>
-                      </select>
-                      <ChevronDown size={14} aria-hidden="true" />
-                    </span>
-                  </label>
-                  <label><span>经度</span><input inputMode="decimal" value={calibrationLongitude} disabled={!remoteDebugActive} onChange={(event) => setCalibrationLongitude(event.target.value)} /></label>
-                  <label><span>纬度</span><input inputMode="decimal" value={calibrationLatitude} disabled={!remoteDebugActive} onChange={(event) => setCalibrationLatitude(event.target.value)} /></label>
-                  <label><span>高度</span><input inputMode="decimal" value={calibrationHeight} disabled={!remoteDebugActive} onChange={(event) => setCalibrationHeight(event.target.value)} /></label>
+                  {!isSuperDock && (
+                    <>
+                      <label><span>设备 SN</span><input value={calibrationSn} disabled={!remoteDebugActive} onChange={(event) => setCalibrationSn(event.target.value)} /></label>
+                      <label>
+                        <span>模块</span>
+                        <span className="debug-select-control">
+                          <select value={calibrationModule} disabled={!remoteDebugActive} onChange={(event) => setCalibrationModule(event.target.value)}>
+                            <option value="3">机场</option>
+                            <option value="6">中继</option>
+                          </select>
+                          <ChevronDown size={14} aria-hidden="true" />
+                        </span>
+                      </label>
+                      <label><span>经度</span><input inputMode="decimal" value={calibrationLongitude} disabled={!remoteDebugActive} onChange={(event) => setCalibrationLongitude(event.target.value)} /></label>
+                      <label><span>纬度</span><input inputMode="decimal" value={calibrationLatitude} disabled={!remoteDebugActive} onChange={(event) => setCalibrationLatitude(event.target.value)} /></label>
+                      <label><span>高度</span><input inputMode="decimal" value={calibrationHeight} disabled={!remoteDebugActive} onChange={(event) => setCalibrationHeight(event.target.value)} /></label>
+                    </>
+                  )}
                   <button
                     className="button primary"
                     disabled={quickCommandDisabled(commandById('rtk-calibration'))}

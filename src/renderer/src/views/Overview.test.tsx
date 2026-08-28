@@ -297,6 +297,238 @@ describe('Overview DJI field presentation', () => {
     expect(markup).toContain('aria-label="自定义水平速度字段详情"')
   })
 
+  it('uses the configured SuperDock provider ahead of an unknown runtime product type', () => {
+    const profile = {
+      id: 'profile',
+      name: 'SuperDock',
+      devices: [{
+        id: 'dock',
+        name: '草莓机场',
+        sn: 'SUPERDOCK-1',
+        type: 'dock',
+        provider: 'superdock',
+        dockModel: 's24m4',
+      }],
+    } as ConnectionProfile
+    const telemetryLayout = createDefaultTelemetryLayout()
+    const telemetry = [{
+      profileId: 'profile',
+      sn: 'SUPERDOCK-1',
+      type: 'dock',
+      provider: 'dji',
+      name: '草莓机场',
+      online: true,
+      lastSeenAt: Date.now(),
+      lastTopic: 'thing/product/SUPERDOCK-1/state',
+      identity: { domain: '3', productType: 88999, productSubType: 0 },
+      status: {},
+      state: { air_transfer_enable: true },
+      osd: {},
+    }] satisfies DeviceTelemetry[]
+
+    const markup = renderToStaticMarkup(
+      <Overview
+        profile={profile}
+        status="connected"
+        telemetry={telemetry}
+        selectedDeviceSn="SUPERDOCK-1"
+        records={[]}
+        transactions={[]}
+        telemetryLayout={telemetryLayout}
+        onPublish={async () => ({ ok: true })}
+      />,
+    )
+
+    expect(markup).toContain('<span>设备厂商</span><strong>草莓创新 SuperDock</strong>')
+    expect(markup).toContain('<span>设备型号</span><strong title="3-88999-0">SuperDock S24M4</strong>')
+    expect(markup).toContain('aria-label="空中回传（无人机到机场）字段详情"')
+    expect(markup).toContain('aria-label="设置空中回传（无人机到机场）"')
+    const deviceTabs = markup.match(/<nav class="device-tabs"[\s\S]*?<\/nav>/)?.[0] ?? ''
+    expect(deviceTabs).toContain('<span>控制中心</span>')
+    expect(deviceTabs).not.toContain('<span>远程日志</span>')
+    expect(deviceTabs).not.toContain('<span>固件升级</span>')
+  })
+
+  it('inherits SuperDock workspace restrictions through a configured parent gateway', () => {
+    const profile = {
+      id: 'profile',
+      name: 'SuperDock aircraft',
+      devices: [
+        {
+          id: 'dock', name: '草莓机场', sn: 'SUPERDOCK-1', type: 'dock',
+          provider: 'superdock', dockModel: 's24m4',
+        },
+        {
+          id: 'aircraft', name: 'DJI 飞行器', sn: 'AIR-1', type: 'aircraft',
+          parentSn: 'SUPERDOCK-1',
+        },
+      ],
+    } as ConnectionProfile
+    const telemetry = [{
+      profileId: 'profile',
+      sn: 'AIR-1',
+      type: 'aircraft',
+      name: 'DJI 飞行器',
+      online: true,
+      lastSeenAt: Date.now(),
+      lastTopic: 'thing/product/AIR-1/osd',
+      identity: { domain: '0', productType: 91, productSubType: 1 },
+      status: {},
+      state: {},
+      osd: { horizontal_speed: 6.5 },
+    }] satisfies DeviceTelemetry[]
+
+    const markup = renderToStaticMarkup(
+      <Overview
+        profile={profile}
+        status="connected"
+        telemetry={telemetry}
+        selectedDeviceSn="AIR-1"
+        records={[]}
+        transactions={[]}
+      />,
+    )
+
+    expect(markup).toContain('<span>设备厂商</span><strong>DJI</strong>')
+    expect(markup).toContain('<span>设备型号</span><strong title="0-91-1">DJI Matrice 3TD</strong>')
+    expect(markup).toContain('aria-label="水平速度字段详情"')
+    const deviceTabs = markup.match(/<nav class="device-tabs"[\s\S]*?<\/nav>/)?.[0] ?? ''
+    expect(deviceTabs).not.toContain('<span>固件升级</span>')
+  })
+
+  it('inherits SuperDock workspace restrictions through a runtime gateway', () => {
+    const profile = { id: 'profile', name: 'Discovered aircraft', devices: [] } as unknown as ConnectionProfile
+    const telemetry = [
+      {
+        profileId: 'profile',
+        sn: 'AIR-1',
+        gatewaySn: 'SUPERDOCK-1',
+        type: 'aircraft',
+        provider: 'dji',
+        name: 'DJI 飞行器',
+        online: true,
+        lastSeenAt: Date.now(),
+        lastTopic: 'thing/product/AIR-1/osd',
+        identity: { domain: '0', productType: 91, productSubType: 1 },
+        status: {},
+        state: {},
+        osd: { horizontal_speed: 6.5 },
+      },
+      {
+        profileId: 'profile',
+        sn: 'SUPERDOCK-1',
+        type: 'dock',
+        provider: 'superdock',
+        name: '运行时草莓机场',
+        online: true,
+        lastSeenAt: Date.now(),
+        lastTopic: 'sys/product/SUPERDOCK-1/status',
+        status: {},
+        state: {},
+        osd: {},
+      },
+    ] satisfies DeviceTelemetry[]
+
+    const markup = renderToStaticMarkup(
+      <Overview
+        profile={profile}
+        status="connected"
+        telemetry={telemetry}
+        selectedDeviceSn="AIR-1"
+        records={[]}
+        transactions={[]}
+      />,
+    )
+
+    expect(markup).toContain('<span>设备厂商</span><strong>DJI</strong>')
+    expect(markup).toContain('aria-label="水平速度字段详情"')
+    const deviceTabs = markup.match(/<nav class="device-tabs"[\s\S]*?<\/nav>/)?.[0] ?? ''
+    expect(deviceTabs).not.toContain('<span>固件升级</span>')
+  })
+
+  it('keeps a genuinely customized field label over SuperDock metadata', () => {
+    const profile = {
+      id: 'profile',
+      name: 'SuperDock',
+      devices: [{
+        id: 'dock', name: '草莓机场', sn: 'SUPERDOCK-1', type: 'dock',
+        provider: 'superdock', dockModel: 's24m4',
+      }],
+    } as ConnectionProfile
+    const telemetryLayout = createDefaultTelemetryLayout()
+    const field = telemetryLayout.devices.dock.fields.find((item) => item.key === 'air_transfer_enable')
+    if (!field) throw new Error('Missing air transfer field')
+    field.label = '现场回传开关'
+    field.description = '用户维护的回传控制说明'
+    expect(telemetryFieldMatchesSearch(
+      'air_transfer_enable',
+      '现场回传',
+      'dock',
+      false,
+      field,
+      false,
+      true,
+    )).toBe(true)
+
+    const markup = renderToStaticMarkup(
+      <Overview
+        profile={profile}
+        telemetry={[{
+          profileId: 'profile', sn: 'SUPERDOCK-1', type: 'dock', provider: 'superdock', name: '草莓机场',
+          online: true, lastSeenAt: Date.now(), lastTopic: 'thing/product/SUPERDOCK-1/state',
+          status: {}, state: { air_transfer_enable: true }, osd: {},
+        }]}
+        selectedDeviceSn="SUPERDOCK-1"
+        records={[]}
+        transactions={[]}
+        telemetryLayout={telemetryLayout}
+      />,
+    )
+
+    expect(markup).toContain('现场回传开关')
+    expect(markup).toContain('aria-label="现场回传开关字段详情"')
+    expect(markup).not.toContain('aria-label="空中回传（无人机到机场）字段详情"')
+  })
+
+  it('falls back from runtime provider to topology provider when no device is configured', () => {
+    const profile = { id: 'profile', name: 'Discovery', devices: [] } as unknown as ConnectionProfile
+    const runtimeProviderMarkup = renderToStaticMarkup(
+      <Overview
+        profile={profile}
+        telemetry={[{
+          profileId: 'profile', sn: 'RUNTIME-1', type: 'dock', provider: 'superdock', name: '运行时机场',
+          online: true, lastSeenAt: Date.now(), lastTopic: 'sys/product/RUNTIME-1/status',
+          identity: { domain: '3', productType: 2, productSubType: 0 },
+          status: {}, state: {}, osd: {},
+        }]}
+        selectedDeviceSn="RUNTIME-1"
+        records={[]}
+        transactions={[]}
+      />,
+    )
+    const topologyProviderMarkup = renderToStaticMarkup(
+      <Overview
+        profile={profile}
+        telemetry={[{
+          profileId: 'profile', sn: 'TOPOLOGY-1', type: 'dock', name: '拓扑机场',
+          online: true, lastSeenAt: Date.now(), lastTopic: 'sys/product/TOPOLOGY-1/status',
+          identity: { domain: '3', productType: 88099, productSubType: 0 },
+          status: {}, state: {}, osd: {},
+        }]}
+        selectedDeviceSn="TOPOLOGY-1"
+        records={[]}
+        transactions={[]}
+      />,
+    )
+
+    expect(runtimeProviderMarkup).toContain('<span>设备厂商</span><strong>草莓创新 SuperDock</strong>')
+    expect(runtimeProviderMarkup).toContain('<span>设备型号</span><strong title="3-2-0">SuperDock 机场</strong>')
+    expect(runtimeProviderMarkup).not.toContain('<span>控制中心</span>')
+    expect(runtimeProviderMarkup).not.toContain('class="persistent-command-center"')
+    expect(topologyProviderMarkup).toContain('<span>设备厂商</span><strong>草莓创新 SuperDock</strong>')
+    expect(topologyProviderMarkup).toContain('SuperDock S2301')
+  })
+
   it('uses device-type-specific status copy in the summary', () => {
     const profile = {
       id: 'profile',

@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { createDefaultTelemetryLayout } from '../lib/telemetry-layout'
-import { TelemetryManager } from './TelemetryManager'
+import { TelemetryManager, telemetryMetadataSourceLabel } from './TelemetryManager'
 
 const renderManager = (config: ReturnType<typeof createDefaultTelemetryLayout>): string =>
   renderToStaticMarkup(
@@ -9,6 +9,17 @@ const renderManager = (config: ReturnType<typeof createDefaultTelemetryLayout>):
   )
 
 describe('TelemetryManager property metadata', () => {
+  it('labels each metadata provider and fallback source', () => {
+    expect(telemetryMetadataSourceLabel('superdock')).toContain('SuperDock 机场设备属性')
+    expect(telemetryMetadataSourceLabel('dji-superdock')).toContain('DJI / SuperDock 同名字段')
+    expect(telemetryMetadataSourceLabel('dji-superdock')).toContain('当前展示 DJI 默认定义')
+    expect(telemetryMetadataSourceLabel('dji-dock2')).toContain('DJI Dock 2 设备属性')
+    expect(telemetryMetadataSourceLabel('dji-dock2-dock3')).toContain('DJI Dock 2 / Dock 3 设备属性')
+    expect(telemetryMetadataSourceLabel('dji-aircraft')).toContain('DJI 飞行器设备属性')
+    expect(telemetryMetadataSourceLabel('custom')).toBe('遥测项管理 · 自定义属性设置')
+    expect(telemetryMetadataSourceLabel('default')).toBe('未关联官方物模型元数据')
+  })
+
   it('shows official permissions, type, constraints and source as managed metadata', () => {
     const config = createDefaultTelemetryLayout()
     const firstSection = config.devices.aircraft.tabs[0].sections[0]

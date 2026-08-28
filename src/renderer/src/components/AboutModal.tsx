@@ -42,7 +42,7 @@ export function AboutModal({ onClose }: AboutModalProps) {
           </div>
 
           <p className="about-description">
-            一款面向 macOS 和 Windows 的大疆上云 API 与 MQTT 调试工具，提供多连接管理、设备遥测、DJI 指令调试和媒体流预览能力。
+            一款面向 macOS 和 Windows 的机场上云 API 与 MQTT 调试工具，支持 DJI 与草莓 SuperDock，提供多连接管理、设备遥测、指令调试和媒体流预览能力。
           </p>
 
           <dl className="about-details">
@@ -61,12 +61,12 @@ export function AboutModal({ onClose }: AboutModalProps) {
           <AppUpdatePanel />
 
           <p className="about-notice">
-            本项目不是 DJI 官方产品。连接真实设备前，请先在隔离环境中验证 Topic、参数和权限。
+            本项目不是 DJI 或草莓创新的官方产品。连接真实设备前，请先在隔离环境中验证 Topic、参数和权限。
           </p>
         </div>
 
         <footer className="modal-footer about-footer">
-          <span>为 DJI Cloud API 调试工作流而设计</span>
+          <span>为 DJI Cloud API 兼容机场的调试工作流而设计</span>
           <button className="button primary" onClick={onClose}>关闭</button>
         </footer>
       </section>

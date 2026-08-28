@@ -1,8 +1,8 @@
 # DJI Cloud Studio
 
-DJI Cloud Studio 是一款面向 macOS 和 Windows 的 DJI 上云 API、MQTT、设备控制与媒体流调试工具。
+DJI Cloud Studio 是一款面向 macOS 和 Windows 的机场上云 API、MQTT、设备控制与媒体流调试工具，支持 DJI 机场与草莓创新 SuperDock。
 
-> 本项目不是 DJI 官方产品。飞行、机场、负载和固件升级指令会直接发送到配置的 Broker。连接真实设备前，请先在隔离环境验证 Topic、Payload、设备 SN 和账号权限。
+> 本项目不是 DJI 或草莓创新的官方产品。飞行、机场、负载和固件升级指令会直接发送到配置的 Broker。连接真实设备前，请先在隔离环境验证 Topic、Payload、设备 SN 和账号权限。
 
 ## 功能清单
 
@@ -15,13 +15,13 @@ DJI Cloud Studio 是一款面向 macOS 和 Windows 的 DJI 上云 API、MQTT、�
 - 支持按设备管理订阅、自定义 Topic、消息发布、Retain 与 NDJSON 导出。
 - 消息列表可按方向、Topic 和关键字筛选，并检查 JSON Payload。
 
-### DJI 设备与遥测
+### DJI / SuperDock 设备与遥测
 
-- 管理机场、飞行器和 Pilot 设备，添加设备时自动生成常用 DJI Topic。
+- 管理机场、飞行器和 Pilot 设备，添加设备时按 DJI 或 SuperDock 厂商自动生成常用 Topic。
 - 处理 `update_topo` 网关拓扑和 `sub_device` 子设备发现。
-- 根据 `domain/type/sub_type` 识别 Dock 1/2/3、飞行器和遥控器型号。
+- 根据 `domain/type/sub_type` 识别 Dock 1/2/3、SuperDock S22/S23/S24/S25 系列、飞行器和遥控器型号。
 - 合并 OSD 和 state 增量上报，保留设备最新遥测快照。
-- 展示 Dock 2 官方字段名称、枚举、单位、约束、读写权限和上报模式。
+- 展示 DJI Dock 2/3 与 SuperDock 官方字段名称、枚举、单位、约束、读写权限和上报模式。
 - 可在遥测页通过 `property/set` 修改可写属性，并关联 `property/set_reply` 结果。
 - 遥测项管理支持调整设备页签、字段顺序、字段说明和自定义属性设置规则。
 
@@ -31,6 +31,16 @@ DJI Cloud Studio 是一款面向 macOS 和 Windows 的 DJI 上云 API、MQTT、�
 - 发送前可编辑 JSON Payload，危险指令需要二次确认。
 - `services` 与 `services_reply` 按 `tid` 自动关联，展示成功、失败和超时状态。
 - 设备断开时自动禁用发布和控制操作。
+
+### SuperDock 兼容范围
+
+- 支持 `88097` 至 `88106` 的 S22/S23/S24/S25 系列型号，并复用其兼容的 DJI Cloud API Topic 与消息封装。
+- 支持 Topic、拓扑、OSD/state 遥测、属性设置、兼容的远程调试命令，以及 SuperDock 的推杆控制、无参数 RTK 标定和两步 4G 在线认证。
+- 直播推流按官方兼容矩阵限制为 RTMP 或 WHIP；SuperDock 机场相机直播中不发送清晰度切换指令。
+- SuperDock 官方明确不支持远程日志、固件升级、强制关舱、补光灯、声光报警、电池保养/模式、空调、eSIM/SIM 切换与格式化，因此界面会隐藏或阻止这些入口。
+- 命令页与兼容矩阵冲突时以[兼容矩阵](https://docs.sb.im/api-integration/developers/compatibility-comparison)为准；仍可在原始 MQTT 控制台手动验证自定义 Payload。
+
+参考文档：[Topic 定义](https://docs.sb.im/api-integration/api-reference/topic-definition)、[设备型号](https://docs.sb.im/api-integration/cloud-api/device-types)、[机场属性](https://docs.sb.im/api-integration/api-reference/superdock-hangar/properties)、[远程调试](https://docs.sb.im/api-integration/api-reference/superdock-hangar/cmd)、[4G 在线认证](https://docs.sb.im/api-integration/api-reference/superdock-hangar/lte_auth)。
 
 ### 固件、日志与对象存储
 
@@ -135,8 +145,8 @@ npm run dev
 ### 2. 添加设备与订阅
 
 1. 在左侧设备区添加机场、飞行器或 Pilot。
-2. 填写设备 SN，并选择对应的设备类型。
-3. 确认自动生成的 DJI Topic，也可添加自定义 Topic。
+2. 填写设备 SN；机场设备还需选择 DJI 或草莓机场以及具体型号。
+3. 确认自动生成的厂商 Topic，也可添加自定义 Topic。
 4. 启用设备后，订阅会在连接成功或重连后自动恢复。
 
 ### 3. 检查和发布 MQTT 消息
@@ -153,7 +163,7 @@ npm run dev
 3. 对可写属性点击设置操作，根据类型和约束填写新值。
 4. 发送后等待 `property/set_reply` 并检查结果。
 
-### 5. 发送 DJI 控制指令
+### 5. 发送设备控制指令
 
 1. 打开设备工作台的控制页签。
 2. 选择机场、飞行、负载、喊话器或直播指令。

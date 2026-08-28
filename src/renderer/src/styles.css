@@ -10401,6 +10401,16 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .debug-operation-card.configuration {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .debug-calibration-form {
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .command-message-pair {
     grid-template-columns: 1fr;
   }

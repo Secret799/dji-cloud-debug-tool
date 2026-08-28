@@ -2,7 +2,13 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { ConnectionProfile, MediaServerProfile } from '../../../shared/contracts'
 import { DJI_COMMANDS, type DeviceTelemetry } from '../lib/dji'
-import { CommandCenter } from './CommandCenter'
+import { buildMediaEndpoints } from '../lib/media'
+import {
+  isValidSuperDockLtePhone,
+  isValidSuperDockLteVerificationCode,
+} from '../lib/superdock'
+import { isCameraLiveQualityLocked, selectCameraPushEndpoint } from './CameraCenter'
+import { CommandCenter, superDockLteAuthenticationStatus } from './CommandCenter'
 
 const renderCommandCenter = (
   profile: ConnectionProfile,
@@ -35,6 +41,38 @@ const renderFlightCenter = (
       allowedCategories={['flight']}
     />,
   )
+
+describe('SuperDock live compatibility', () => {
+  const mediaServer = {
+    id: 'easy-media',
+    name: 'EasyMedia',
+    kind: 'remote-easymedia',
+    host: 'media.example.com',
+    apiProtocol: 'https',
+    apiPort: 443,
+    httpProtocol: 'https',
+    httpPort: 443,
+    rtmpPort: 1935,
+    rtspPort: 0,
+    webrtcPort: 8000,
+    secret: '',
+    createdAt: 1,
+    updatedAt: 1,
+  } satisfies MediaServerProfile
+  const endpoints = buildMediaEndpoints(mediaServer, 'live', 'superdock-camera')
+
+  it('selects WHIP rather than a raw WebRTC endpoint', () => {
+    expect(selectCameraPushEndpoint('superdock', mediaServer.kind, endpoints, 'webrtc')).toBe(endpoints.whip)
+    expect(selectCameraPushEndpoint('superdock', mediaServer.kind, endpoints, 'rtmp')).toBe(endpoints.rtmp)
+  })
+
+  it('locks live quality only for the SuperDock airport camera', () => {
+    expect(isCameraLiveQualityLocked('superdock', 'dock', true)).toBe(true)
+    expect(isCameraLiveQualityLocked('superdock', 'aircraft', true)).toBe(false)
+    expect(isCameraLiveQualityLocked('superdock', 'dock', false)).toBe(false)
+    expect(isCameraLiveQualityLocked('dji', 'dock', true)).toBe(false)
+  })
+})
 
 describe('CommandCenter gateway context', () => {
   it('uses the selected gateway device without asking the user to select it again', () => {
@@ -84,6 +122,82 @@ describe('CommandCenter gateway context', () => {
 })
 
 describe('CommandCenter remote debugging category', () => {
+  it('uses the parameterless SuperDock RTK workflow', () => {
+    const profile = {
+      id: 'profile',
+      devices: [
+        {
+          id: 'superdock',
+          name: 'SuperDock S24M4',
+          sn: 'SB-001',
+          type: 'dock',
+          provider: 'superdock',
+          dockModel: 's24m4',
+        },
+        { id: 'aircraft', name: '库内飞机', sn: 'AIR-001', type: 'aircraft', parentSn: 'SB-001' },
+      ],
+    } as ConnectionProfile
+    const telemetry = [
+      {
+        profileId: 'profile', sn: 'SB-001', type: 'dock', provider: 'superdock', name: 'SuperDock S24M4', online: true,
+        lastSeenAt: Date.now(), lastTopic: 'thing/product/SB-001/osd', status: {}, state: {},
+        osd: { mode_code: 2, putter_state: 0, wireless_link: { link_workmode: 1 } },
+      },
+      {
+        profileId: 'profile', sn: 'AIR-001', gatewaySn: 'SB-001', type: 'aircraft', name: '库内飞机', online: true,
+        lastSeenAt: Date.now(), lastTopic: 'thing/product/AIR-001/state', status: {}, osd: {},
+        state: { dongle_infos: [{
+          sim_phone_area_code: '86',
+          sim_phone_number: '13300000000',
+          sim_remaining_time: 120,
+          sim_is_authentication_available: false,
+          sim_link_workmode: true,
+        }] },
+      },
+    ] satisfies DeviceTelemetry[]
+
+    const markup = renderCommandCenter(profile, 'SB-001', telemetry)
+
+    expect(markup).toContain('固定云端 RTK 链路')
+    expect(markup).not.toContain('<span>经度</span>')
+    expect(markup).not.toContain('<span>纬度</span>')
+    expect(markup).toContain('thing/product/SB-001/services')
+    expect(markup).toContain('<span>机场推杆</span><strong>状态值 0</strong>')
+    expect(markup).toContain('>展开推杆</button>')
+    expect(markup).toContain('>闭合推杆</button>')
+    expect(markup).toContain('通信与 LTE')
+    expect(markup).toContain('4G 在线认证')
+    expect(markup).toContain('未认证 · 4G 增强已开启 · 剩余时长 120s')
+    expect(markup).toContain('value="13300000000"')
+    expect(markup).toContain('>发送验证码</button>')
+    expect(markup).toContain('>提交认证</button>')
+    expect(markup).toContain('增强图传')
+    expect(markup).toContain('重启机场')
+    expect(markup).not.toContain('机场补光灯')
+    expect(markup).not.toContain('环境与电池')
+    expect(markup).not.toContain('通信与 eSIM')
+    expect(markup).not.toContain('强制关闭舱盖')
+    expect(markup).not.toContain('数据格式化')
+  })
+
+  it('rejects masked or clearly invalid SuperDock LTE credentials', () => {
+    expect(isValidSuperDockLtePhone('86', '13300000000')).toBe(true)
+    expect(isValidSuperDockLtePhone('1', '2025550123')).toBe(true)
+    expect(isValidSuperDockLtePhone('086', '13300000000')).toBe(false)
+    expect(isValidSuperDockLtePhone('86', '132*******1')).toBe(false)
+    expect(isValidSuperDockLtePhone('86', '123')).toBe(false)
+    expect(isValidSuperDockLteVerificationCode('123456')).toBe(true)
+    expect(isValidSuperDockLteVerificationCode('123')).toBe(false)
+    expect(isValidSuperDockLteVerificationCode('12*456')).toBe(false)
+  })
+
+  it('prefers the device LTE authentication result over a pending verification code', () => {
+    expect(superDockLteAuthenticationStatus(true, true)).toBe('校验成功')
+    expect(superDockLteAuthenticationStatus(false, false)).toBe('未认证')
+    expect(superDockLteAuthenticationStatus(false, true)).toBe('验证码已发送')
+    expect(superDockLteAuthenticationStatus(undefined, false)).toBe('等待认证状态')
+  })
+
   it('lists remote debugging separately from the other control categories', () => {
     const profile = {
       id: 'profile',

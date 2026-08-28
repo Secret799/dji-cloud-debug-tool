@@ -1,10 +1,11 @@
-import type { DeviceType, DjiDeviceIdentity } from '../../../shared/contracts'
+import type { DeviceProvider, DeviceType, DjiDeviceIdentity } from '../../../shared/contracts'
 import type { DeviceTelemetry } from './dji'
 
 const STORAGE_KEY = 'dji-cloud-studio.telemetry-cache.v1'
 const MAX_CACHE_DEVICES = 1_000
 const MAX_CACHE_BYTES = 8 * 1024 * 1024
 const DEVICE_TYPES = new Set<DeviceType>(['dock', 'aircraft', 'pilot'])
+const DEVICE_PROVIDERS = new Set<DeviceProvider>(['dji', 'superdock'])
 
 interface TelemetryCacheDocument {
   version: 1
@@ -50,6 +51,9 @@ const parseDevice = (value: unknown): DeviceTelemetry | undefined => {
     || !isRecord(value.status)
   ) return undefined
   if (value.gatewaySn !== undefined && typeof value.gatewaySn !== 'string') return undefined
+  if (value.provider !== undefined && (typeof value.provider !== 'string' || !DEVICE_PROVIDERS.has(value.provider as DeviceProvider))) {
+    return undefined
+  }
 
   const identity = value.identity === undefined ? undefined : parseIdentity(value.identity)
   if (value.identity !== undefined && !identity) return undefined
@@ -58,6 +62,7 @@ const parseDevice = (value: unknown): DeviceTelemetry | undefined => {
     sn: value.sn,
     gatewaySn: value.gatewaySn,
     type: value.type as DeviceType,
+    provider: value.provider as DeviceProvider | undefined,
     name: value.name,
     online: false,
     lastSeenAt: value.lastSeenAt,

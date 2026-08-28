@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Check, Trash2, X } from 'lucide-react'
-import type { DeviceType, DjiDevice } from '../../../shared/contracts'
+import type { DeviceProvider, DeviceType, DjiDevice, DockModel } from '../../../shared/contracts'
+import { SUPERDOCK_MODELS, defaultDockModel, deviceProvider } from '../lib/superdock'
 import { Tooltip } from './Tooltip'
 
 interface DeviceModalProps {
@@ -31,9 +32,18 @@ export function DeviceModal({ device, isNew, gatewayDevices, onClose, onSave, on
     setDraft((current) => (current ? {
       ...current,
       type,
-      dockModel: type === 'dock' ? current.dockModel ?? 'dock2' : undefined,
+      provider: type === 'dock' ? deviceProvider(current) : 'dji',
+      dockModel: type === 'dock' ? current.dockModel ?? defaultDockModel(deviceProvider(current)) : undefined,
       parentSn: type === 'aircraft' ? current.parentSn : undefined,
     } : current))
+  }
+
+  const setProvider = (provider: DeviceProvider): void => {
+    setDraft((current) => current ? {
+      ...current,
+      provider,
+      dockModel: defaultDockModel(provider),
+    } : current)
   }
 
   const submit = async (): Promise<void> => {
@@ -46,7 +56,8 @@ export function DeviceModal({ device, isNew, gatewayDevices, onClose, onSave, on
       ...draft,
       name: draft.name.trim(),
       sn: draft.sn.trim(),
-      dockModel: draft.type === 'dock' ? draft.dockModel ?? 'dock2' : undefined,
+      provider: draft.type === 'dock' ? deviceProvider(draft) : 'dji',
+      dockModel: draft.type === 'dock' ? draft.dockModel ?? defaultDockModel(deviceProvider(draft)) : undefined,
     })
   }
 
@@ -55,7 +66,7 @@ export function DeviceModal({ device, isNew, gatewayDevices, onClose, onSave, on
       <section className="modal device-modal" role="dialog" aria-modal="true" aria-label="设备设置">
         <header className="modal-header">
           <div>
-            <span className="eyebrow">DJI DEVICE</span>
+            <span className="eyebrow">CLOUD API DEVICE</span>
             <h2>{isNew ? '添加设备' : '设备设置'}</h2>
           </div>
           <Tooltip label="关闭">
@@ -85,17 +96,48 @@ export function DeviceModal({ device, isNew, gatewayDevices, onClose, onSave, on
             </div>
           </label>
           {draft.type === 'dock' && (
-            <label className="field">
-              <span>机场型号</span>
-              <select
-                value={draft.dockModel ?? 'dock2'}
-                onChange={(event) => update('dockModel', event.target.value as NonNullable<DjiDevice['dockModel']>)}
-              >
-                <option value="dock2">DJI Dock 2</option>
-                <option value="dock3">DJI Dock 3</option>
-                <option value="other">其他机场型号</option>
-              </select>
-            </label>
+            <>
+              <label className="field">
+                <span>机场厂商</span>
+                <div className="segmented">
+                  {([
+                    ['dji', 'DJI'],
+                    ['superdock', '草莓机场'],
+                  ] as [DeviceProvider, string][]).map(([provider, label]) => (
+                    <button
+                      type="button"
+                      key={provider}
+                      className={deviceProvider(draft) === provider ? 'active' : ''}
+                      onClick={() => setProvider(provider)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </label>
+              <label className="field">
+                <span>机场型号</span>
+                <select
+                  value={draft.dockModel ?? defaultDockModel(deviceProvider(draft))}
+                  onChange={(event) => update('dockModel', event.target.value as DockModel)}
+                >
+                  {deviceProvider(draft) === 'superdock' ? (
+                    <>
+                      {SUPERDOCK_MODELS.map((model) => (
+                        <option key={model.key} value={model.key}>{model.label}</option>
+                      ))}
+                      <option value="other">SuperDock 其他型号</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="dock2">DJI Dock 2</option>
+                      <option value="dock3">DJI Dock 3</option>
+                      <option value="other">DJI 其他机场型号</option>
+                    </>
+                  )}
+                </select>
+              </label>
+            </>
           )}
           <label className="field">
             <span>设备名称</span>

@@ -18,6 +18,7 @@ import {
 import type {
   ConnectionProfile,
   ConnectionStatus,
+  DeviceProvider,
   MediaServerProfile,
   MqttQos,
   OperationResult,
@@ -32,6 +33,7 @@ import {
   collectCameraSources,
   normalizeLiveResultCode,
   videoTypeLabel,
+  type CameraSource,
   type CameraVideoStream,
 } from '../lib/camera'
 import {
@@ -45,6 +47,7 @@ import {
   buildMediaEndpoints,
   selectMediaPlaybackEndpoint,
   type MediaPlaybackProtocol,
+  type StreamEndpoints,
 } from '../lib/media'
 import { formatJsonText } from '../lib/json'
 
@@ -52,6 +55,7 @@ interface CameraCenterProps {
   profile: ConnectionProfile
   telemetry: DeviceTelemetry[]
   gatewaySn: string
+  provider: DeviceProvider
   status: ConnectionStatus
   busy: boolean
   mediaServers: MediaServerProfile[]
@@ -72,6 +76,23 @@ interface ActivePlayback {
 
 type PushProtocol = 'rtmp' | 'webrtc'
 type SeiDetailFormat = 'text' | 'json' | 'hex' | 'base64'
+
+export const selectCameraPushEndpoint = (
+  provider: DeviceProvider,
+  serverKind: MediaServerProfile['kind'],
+  endpoints: StreamEndpoints,
+  pushProtocol: PushProtocol,
+): string | undefined => {
+  if (pushProtocol === 'rtmp') return endpoints.rtmp
+  if (provider === 'superdock') return endpoints.whip
+  return serverKind === 'remote-easymedia' ? endpoints.whip : endpoints.webrtc
+}
+
+export const isCameraLiveQualityLocked = (
+  provider: DeviceProvider,
+  sourceType: CameraSource['sourceType'],
+  live: boolean,
+): boolean => provider === 'superdock' && sourceType === 'dock' && live
 
 const qualityOptions = [
   { value: 0, label: '自适应' },
@@ -147,6 +168,7 @@ export function CameraCenter({
   profile,
   telemetry,
   gatewaySn,
+  provider,
   status,
   busy,
   mediaServers,
@@ -156,6 +178,9 @@ export function CameraCenter({
   onService,
   onNotify,
 }: CameraCenterProps) {
+  const isSuperDock = provider === 'superdock'
+  const providerLabel = isSuperDock ? 'SuperDock' : 'DJI'
+  const realtimePushLabel = isSuperDock ? 'WHIP' : 'WebRTC'
   const cameras = useMemo(() => {
     return collectCameraSources(profile, telemetry).filter((camera) => camera.gatewaySn === gatewaySn)
   }, [gatewaySn, profile, telemetry])
@@ -172,10 +197,10 @@ export function CameraCenter({
     () => mediaServers.filter((server) => pushProtocol === 'webrtc'
       ? (() => {
           const endpoints = buildMediaEndpoints(server, 'live', 'probe')
-          return Boolean((server.kind === 'remote-easymedia' ? endpoints.whip : endpoints.webrtc) && endpoints.whep)
+          return Boolean(selectCameraPushEndpoint(provider, server.kind, endpoints, pushProtocol) && endpoints.whep)
         })()
       : server.rtmpPort > 0),
-    [mediaServers, pushProtocol],
+    [mediaServers, provider, pushProtocol],
   )
   const selectedServer = compatibleMediaServers.find((server) => server.id === selectedMediaServerId) ?? compatibleMediaServers[0]
   const [quality, setQuality] = useState(2)
@@ -496,7 +521,7 @@ export function CameraCenter({
         ? buildMediaEndpoints({ ...selectedServer, host: '127.0.0.1' }, 'live', cameraStreamName(video))
         : endpoints
       const pushUrl = webRtc
-        ? selectedServer.kind === 'remote-easymedia' ? endpoints.whip : endpoints.webrtc
+        ? selectCameraPushEndpoint(provider, selectedServer.kind, endpoints, pushProtocol)
         : endpoints.rtmp
       const playbackEndpoint = selectMediaPlaybackEndpoint(endpoints, pushProtocol)
       const streamUrl = webRtc ? endpoints.whep : endpoints.rtmp
@@ -511,7 +536,7 @@ export function CameraCenter({
         : []
     })
     if (!prepared.length) {
-      onNotify?.(`当前媒体服务不支持 DJI ${webRtc ? 'WebRTC' : 'RTMP'} 推流与播放`, 'error')
+      onNotify?.(`当前媒体服务不支持 ${providerLabel} ${webRtc ? realtimePushLabel : 'RTMP'} 推流与播放`, 'error')
       return
     }
 
@@ -595,12 +620,12 @@ export function CameraCenter({
         : endpoints
       const webRtc = pushProtocol === 'webrtc'
       const pushUrl = webRtc
-        ? selectedServer.kind === 'remote-easymedia' ? endpoints.whip : endpoints.webrtc
+        ? selectCameraPushEndpoint(provider, selectedServer.kind, endpoints, pushProtocol)
         : endpoints.rtmp
       const playbackEndpoint = selectMediaPlaybackEndpoint(endpoints, pushProtocol)
       const streamUrl = webRtc ? endpoints.whep : endpoints.rtmp
       if (!pushUrl || !playbackEndpoint || !streamUrl) {
-        onNotify?.(`当前媒体服务不支持 DJI ${webRtc ? 'WebRTC' : 'RTMP'} 推流与播放`, 'error')
+        onNotify?.(`当前媒体服务不支持 ${providerLabel} ${webRtc ? realtimePushLabel : 'RTMP'} 推流与播放`, 'error')
         return
       }
       const response = await startDeviceStream(video, pushUrl, webRtc)
@@ -625,7 +650,7 @@ export function CameraCenter({
           seiSessionId,
         },
       }))
-      onNotify?.(`设备已确认开始 ${webRtc ? 'WebRTC' : 'RTMP'} 推流，正在连接画面`, 'success')
+      onNotify?.(`设备已确认开始 ${webRtc ? realtimePushLabel : 'RTMP'} 推流，正在连接画面`, 'success')
     } catch (error) {
       onNotify?.(error instanceof Error ? error.message : String(error), 'error')
     } finally {
@@ -718,6 +743,11 @@ export function CameraCenter({
       return
     }
 
+    if (isSuperDock && source?.camera.sourceType === 'dock') {
+      onNotify?.('SuperDock 机场相机直播中不支持切换清晰度', 'error')
+      return
+    }
+
     const sendingId = `quality:${video.id}`
     setSending(sendingId)
     try {
@@ -801,7 +831,7 @@ export function CameraCenter({
             <label className="field">
               <span>流媒体服务器</span>
               <select value={selectedServer?.id ?? ''} onChange={(event) => onSelectMediaServer(event.target.value)} disabled={!compatibleMediaServers.length || hasActivePlaybacks}>
-                {!compatibleMediaServers.length && <option value="">暂无支持 DJI {pushProtocol === 'webrtc' ? 'WebRTC' : 'RTMP'} 的服务</option>}
+                {!compatibleMediaServers.length && <option value="">暂无支持 {providerLabel} {pushProtocol === 'webrtc' ? realtimePushLabel : 'RTMP'} 的服务</option>}
                 {compatibleMediaServers.map((server) => <option key={server.id} value={server.id}>{server.name} · {server.host}</option>)}
               </select>
             </label>
@@ -809,7 +839,7 @@ export function CameraCenter({
               <span>推流协议</span>
               <select value={pushProtocol} onChange={(event) => setPushProtocol(event.target.value as PushProtocol)} disabled={hasActivePlaybacks}>
                 <option value="rtmp">RTMP</option>
-                <option value="webrtc">WebRTC</option>
+                <option value="webrtc">{realtimePushLabel}</option>
               </select>
             </label>
             <label className="field compact-select">
@@ -843,6 +873,7 @@ export function CameraCenter({
               const supportedTypes = videoLensTypes(video)
               const selectedQuality = qualityForVideo(video)
               const live = Boolean(playback) || (status === 'connected' && camera.online && video.status === 1)
+              const liveQualityLocked = isCameraLiveQualityLocked(provider, camera.sourceType, live)
               const selected = selectedCamera?.id === camera.id && selectedVideo?.id === video.id
               const processing = sending === `play:${video.id}` || sending === `stop:${video.id}`
               return (
@@ -940,7 +971,7 @@ export function CameraCenter({
                           className="camera-monitor-select camera-quality-select"
                           aria-label={`${video.videoIndex} 切换清晰度`}
                           value={selectedQuality}
-                          disabled={busy || Boolean(sending) || (live && status !== 'connected')}
+                          disabled={liveQualityLocked || busy || Boolean(sending) || (live && status !== 'connected')}
                           onChange={(event) => void switchVideoQuality(video, Number(event.target.value))}
                         >
                           {qualityOptions.map((option) => (

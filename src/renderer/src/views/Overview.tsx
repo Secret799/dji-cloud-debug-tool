@@ -66,13 +66,13 @@ import {
 } from '../lib/dji-dock3-field-metadata'
 import {
   FIELD_LABELS,
-  DJI_PRODUCT_NAMES,
+  PRODUCT_NAMES,
   type CommandTransaction,
   type DeviceActivity,
   type DeviceTelemetry,
   type ServiceCaller,
   djiProductKey,
-  djiProductName,
+  productName,
   formatValue,
   isPayloadActivity,
   mergeNestedRecords,
@@ -81,6 +81,13 @@ import {
   prettyPayload,
   telemetryValue,
 } from '../lib/dji'
+import { getSuperDockFieldMetadata } from '../lib/superdock-field-metadata'
+import {
+  SUPERDOCK_PROPERTY_DOC_DATE,
+  deviceProvider,
+  dockModelName,
+  providerFromIdentity,
+} from '../lib/superdock'
 import { findHmsErrorCode, lookupServiceError } from '../lib/dji-error-codes'
 import {
   HMS_LIST_LIMIT,
@@ -665,6 +672,40 @@ interface TelemetryFieldPresentation {
   propertyPath: string
 }
 
+interface TelemetryLayoutOverrides {
+  label?: string
+  description?: string
+}
+
+const telemetryLayoutOverrides = (
+  path: string,
+  layoutField: TelemetryLayoutField | undefined,
+  baselineMetadata: DjiFieldMetadata | undefined,
+  contextualLabel?: string,
+): TelemetryLayoutOverrides => {
+  if (!layoutField) return {}
+
+  const normalizedPath = normalizeTelemetryFieldKey(path)
+  const leaf = normalizedPath.split('.').at(-1) ?? normalizedPath
+  const defaultLabels = new Set([
+    normalizedPath,
+    leaf,
+    layoutField.key,
+    contextualLabel,
+    baselineMetadata?.label,
+    FIELD_LABELS[normalizedPath]?.label,
+    FIELD_LABELS[leaf]?.label,
+  ].map((value) => value?.trim()).filter((value): value is string => Boolean(value)))
+  const label = layoutField.label.trim()
+  const description = layoutField.description.trim()
+  const baselineDescription = baselineMetadata?.description?.trim() ?? ''
+
+  return {
+    label: label && !defaultLabels.has(label) ? layoutField.label : undefined,
+    description: description && description !== baselineDescription ? layoutField.description : undefined,
+  }
+}
+
 const telemetryFieldPresentation = (
   path: string,
   deviceType?: DeviceType,
@@ -672,6 +713,7 @@ const telemetryFieldPresentation = (
   context = telemetryArrayContext(path),
   layoutField?: TelemetryLayoutField,
   usesDock3Metadata = false,
+  usesSuperDockMetadata = false,
 ): TelemetryFieldPresentation => {
   const leaf = path.split('.').at(-1) ?? path
   const relayedAircraftField = deviceType === 'aircraft'
@@ -681,11 +723,13 @@ const telemetryFieldPresentation = (
   const metadataPath = relayedAircraftIdentityField ? `sub_device.${path}` : path
   const dockMetadata = relayedAircraftField || relayedAircraftIdentityField
     ? getDjiFieldMetadata(metadataPath)
-    : usesDock3Metadata
-      ? getDjiDock3FieldMetadata(metadataPath)
-      : usesDock2Metadata
-        ? getDjiFieldMetadata(metadataPath)
-        : undefined
+    : usesSuperDockMetadata
+      ? getSuperDockFieldMetadata(metadataPath)
+      : usesDock3Metadata
+        ? getDjiDock3FieldMetadata(metadataPath)
+        : usesDock2Metadata
+          ? getDjiFieldMetadata(metadataPath)
+          : undefined
   const aircraftMetadata = deviceType === 'aircraft' && !relayedAircraftField && !relayedAircraftIdentityField
     ? getDjiAircraftFieldMetadata(path)
     : undefined
@@ -695,23 +739,36 @@ const telemetryFieldPresentation = (
   const officialMetadata = dockMetadata ?? aircraftMetadata ?? configuredMetadata
   const metadataSourceLabel = configuredMetadata
     ? '遥测项管理 · 自定义属性设置'
-    : usesDock3Metadata && dockMetadata
-      ? `DJI Dock 3 设备属性 · ${DJI_DOCK3_PROPERTY_DOC_DATE}`
-      : dockMetadata || usesDock2Metadata
-        ? `DJI Dock 2 设备属性 · ${DJI_DOCK2_PROPERTY_DOC_DATE}`
-        : `DJI 飞行器设备属性（通用字段） · ${DJI_AIRCRAFT_PROPERTY_DOC_DATE}`
+    : usesSuperDockMetadata && dockMetadata
+      ? `SuperDock 机场设备属性 · ${SUPERDOCK_PROPERTY_DOC_DATE}`
+      : usesDock3Metadata && dockMetadata
+        ? `DJI Dock 3 设备属性 · ${DJI_DOCK3_PROPERTY_DOC_DATE}`
+        : dockMetadata || usesDock2Metadata
+          ? `DJI Dock 2 设备属性 · ${DJI_DOCK2_PROPERTY_DOC_DATE}`
+          : `DJI 飞行器设备属性（通用字段） · ${DJI_AIRCRAFT_PROPERTY_DOC_DATE}`
   const fallbackMetadata = FIELD_LABELS[path] ?? FIELD_LABELS[leaf]
   const contextualLabel = relayedAircraftIdentityField
     ? aircraftIdentityLabels[path]
     : deviceType === 'aircraft' && path.startsWith('maintain_status.')
       ? aircraftMaintenanceLabels[leaf]
       : undefined
+  const baselineMetadata = relayedAircraftField || relayedAircraftIdentityField || deviceType === 'dock'
+    ? getDjiFieldMetadata(metadataPath)
+    : deviceType === 'aircraft'
+      ? getDjiAircraftFieldMetadata(path)
+      : undefined
+  const layoutOverrides = telemetryLayoutOverrides(
+    path,
+    layoutField,
+    baselineMetadata,
+    contextualLabel,
+  )
   const arrayItemIndex = context?.primitiveItem ? Number(leaf) : undefined
   return {
     label: arrayItemIndex !== undefined
       ? `[${arrayItemIndex}]`
-      : layoutField?.label || contextualLabel || officialMetadata?.label || fallbackMetadata?.label || leaf,
-    description: layoutField?.description || officialMetadata?.description,
+      : layoutOverrides.label || contextualLabel || officialMetadata?.label || fallbackMetadata?.label || leaf,
+    description: layoutOverrides.description || officialMetadata?.description,
     unit: officialMetadata?.unit ?? fallbackMetadata?.unit,
     officialMetadata,
     metadataSourceLabel,
@@ -726,6 +783,7 @@ export const telemetryFieldMatchesSearch = (
   usesDock2Metadata = false,
   layoutField?: TelemetryLayoutField,
   usesDock3Metadata = false,
+  usesSuperDockMetadata = false,
 ): boolean => {
   const terms = search.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)
   if (!terms.length) return true
@@ -740,6 +798,7 @@ export const telemetryFieldMatchesSearch = (
       telemetryArrayContext(candidate),
       candidate === path ? layoutField : undefined,
       usesDock3Metadata,
+      usesSuperDockMetadata,
     ).label)
   const searchableText = `${labels.join(' ')} ${layoutField?.description ?? ''} ${path}`.toLocaleLowerCase()
   return terms.every((term) => searchableText.includes(term))
@@ -961,7 +1020,7 @@ export function HmsPayloadDetails({ payload }: { payload: string }) {
             const guidance = findHmsErrorCode(alarm.normalizedCode ?? alarm.code)
             const displayCode = alarm.normalizedCode ?? alarm.code
             const deviceName = alarm.deviceType
-              ? DJI_PRODUCT_NAMES[alarm.deviceType] ?? '未收录设备'
+              ? PRODUCT_NAMES[alarm.deviceType] ?? '未收录设备'
               : '未上报'
             const severityClass = alarm.level === 2
               ? 'warning'
@@ -1237,11 +1296,25 @@ export function Overview({
   const configured = profile.devices.find((device) => device.sn === deviceSn)
   const deviceType = configured?.type ?? selected?.type
   const topologyProductKey = selected?.identity ? djiProductKey(selected.identity) : undefined
+  const selectedProvider = configured
+    ? deviceProvider(configured)
+    : selected?.provider ?? providerFromIdentity(selected?.identity)
+  const usesSuperDockGatewayCapabilities = selectedProvider === 'superdock'
+    || [configured?.parentSn, selected?.gatewaySn].some((gatewaySn) => {
+      if (!gatewaySn) return false
+      const configuredGateway = profile.devices.find((device) => device.sn === gatewaySn)
+      if (configuredGateway) return deviceProvider(configuredGateway) === 'superdock'
+      const runtimeGateway = telemetry.find((device) => device.sn === gatewaySn)
+      return (runtimeGateway?.provider ?? providerFromIdentity(runtimeGateway?.identity)) === 'superdock'
+    })
+  const usesSuperDockMetadata = deviceType === 'dock' && selectedProvider === 'superdock'
   const usesDock2Metadata = deviceType === 'dock'
+    && !usesSuperDockMetadata
     && (topologyProductKey
       ? topologyProductKey === '3-2-0'
       : Boolean(configured) && (configured?.dockModel ?? 'dock2') === 'dock2')
   const usesDock3Metadata = deviceType === 'dock'
+    && !usesSuperDockMetadata
     && (topologyProductKey
       ? topologyProductKey === '3-3-0'
       : configured?.dockModel === 'dock3')
@@ -1296,6 +1369,7 @@ export function Overview({
       usesDock2Metadata,
       layoutFieldsByKey.get(normalizeTelemetryFieldKey(field.path)),
       usesDock3Metadata,
+      usesSuperDockMetadata,
     ),
   )
   const telemetryTabs = deviceLayout.tabs
@@ -1379,14 +1453,16 @@ export function Overview({
   const deviceOnline = status === 'connected'
     && Boolean(selected && selected.online !== false && Date.now() - selected.lastSeenAt < 20_000)
   const deviceStatus = `${typeMeta.label}${deviceOnline ? '在线' : '离线'}`
-  const configuredDockModel = configured?.dockModel === 'dock3'
-    ? 'DJI Dock 3'
-    : (configured?.dockModel ?? 'dock2') === 'dock2'
-      ? 'DJI Dock 2'
+  const configuredDockModel = configured?.type === 'dock'
+    ? dockModelName(configured.dockModel, deviceProvider(configured))
+    : deviceType === 'dock' && selectedProvider === 'superdock'
+      ? 'SuperDock 机场'
       : typeMeta.model
-  const deviceModel = djiProductName(selected?.identity)
-    ?? (productKey ? DJI_PRODUCT_NAMES[productKey] : undefined)
-    ?? (deviceType === 'aircraft' ? '飞机型号待识别' : configured?.type === 'dock' ? configuredDockModel : typeMeta.model)
+  const identityMatchesProvider = !selected?.identity || providerFromIdentity(selected.identity) === selectedProvider
+  const deviceModel = (identityMatchesProvider ? productName(selected?.identity) : undefined)
+    ?? (identityMatchesProvider && productKey ? PRODUCT_NAMES[productKey] : undefined)
+    ?? (deviceType === 'aircraft' ? '飞机型号待识别' : deviceType === 'dock' ? configuredDockModel : typeMeta.model)
+  const providerName = selectedProvider === 'superdock' ? '草莓创新 SuperDock' : 'DJI'
   const identityProtocol = selected?.identity
     ? [selected.identity.thingVersion ? `v${selected.identity.thingVersion}` : undefined, selected.identity.channelIndex ? `通道 ${selected.identity.channelIndex}` : undefined]
       .filter(Boolean)
@@ -1409,11 +1485,17 @@ export function Overview({
     { id: 'messages', label: 'MQTT 消息', icon: MessagesSquare, count: deviceRecords.length },
     { id: 'history', label: '最近指令', icon: Clock3, count: transactions.length },
   ]
+  const providerTabs = usesSuperDockGatewayCapabilities
+    ? tabs.filter((tab) => tab.id !== 'logs' && tab.id !== 'firmware')
+    : tabs
+  const configuredTabs = configured
+    ? providerTabs
+    : providerTabs.filter((tab) => tab.id !== 'commands')
   const visibleTabs = deviceType === 'aircraft'
-    ? tabs.filter((tab) => tab.id !== 'events' && tab.id !== 'logs' && tab.id !== 'history' && tab.id !== 'commands')
+    ? configuredTabs.filter((tab) => tab.id !== 'events' && tab.id !== 'logs' && tab.id !== 'history' && tab.id !== 'commands')
     : deviceType === 'dock'
-      ? tabs.filter((tab) => tab.id !== 'payload')
-      : tabs.filter((tab) => tab.id !== 'payload' && tab.id !== 'firmware')
+      ? configuredTabs.filter((tab) => tab.id !== 'payload')
+      : configuredTabs.filter((tab) => tab.id !== 'payload' && tab.id !== 'firmware')
   const activeWorkbenchTab = visibleTabs.some((tab) => tab.id === activeTab) ? activeTab : 'remote'
   const renderTelemetryTable = (categoryFields: typeof fields) => {
     type TelemetryField = (typeof fields)[number]
@@ -1505,6 +1587,7 @@ export function Overview({
           context,
           layoutField,
           usesDock3Metadata,
+          usesSuperDockMetadata,
         )
         const { label, description, unit, officialMetadata, metadataSourceLabel, propertyPath } = presentation
         const arrayItemIndex = context?.primitiveItem ? Number(leaf) : undefined
@@ -1513,7 +1596,7 @@ export function Overview({
           <div className="telemetry-row" key={`${field.source}:${field.path}`}>
             <div className="telemetry-field-label">
               <span className={arrayItemIndex !== undefined ? 'telemetry-index-badge' : undefined}>{label}</span>
-              {(usesDock2Metadata || deviceType === 'aircraft' || officialMetadata || description) && (
+              {(usesDock2Metadata || usesSuperDockMetadata || deviceType === 'aircraft' || officialMetadata || description) && (
                 <FieldHelp
                   path={field.path}
                   metadata={officialMetadata}
@@ -1571,18 +1654,30 @@ export function Overview({
             && /^(drone_charge_state|drone_battery_maintenance_info)(\.|$)/.test(node.path)
           const dockArrayMetadata = relayedAircraftArray
             ? getDjiFieldMetadata(arrayLabelPath)
-            : usesDock3Metadata
-              ? getDjiDock3FieldMetadata(arrayLabelPath)
-              : usesDock2Metadata
-                ? getDjiFieldMetadata(arrayLabelPath)
-                : undefined
+            : usesSuperDockMetadata
+              ? getSuperDockFieldMetadata(arrayLabelPath)
+              : usesDock3Metadata
+                ? getDjiDock3FieldMetadata(arrayLabelPath)
+                : usesDock2Metadata
+                  ? getDjiFieldMetadata(arrayLabelPath)
+                  : undefined
           const aircraftArrayMetadata = deviceType === 'aircraft' && !relayedAircraftArray
             ? getDjiAircraftFieldMetadata(arrayLabelPath)
             : undefined
           const arrayMetadata = dockArrayMetadata ?? aircraftArrayMetadata
           const arrayFallback = FIELD_LABELS[arrayLabelPath] ?? FIELD_LABELS[arrayLeaf]
           const arrayLayoutField = layoutFieldsByKey.get(normalizeTelemetryFieldKey(arrayLabelPath))
-          const arrayLabel = arrayLayoutField?.label || arrayMetadata?.label || arrayFallback?.label || arrayLeaf
+          const baselineArrayMetadata = relayedAircraftArray || deviceType === 'dock'
+            ? getDjiFieldMetadata(arrayLabelPath)
+            : deviceType === 'aircraft'
+              ? getDjiAircraftFieldMetadata(arrayLabelPath)
+              : undefined
+          const arrayLayoutOverrides = telemetryLayoutOverrides(
+            arrayLabelPath,
+            arrayLayoutField,
+            baselineArrayMetadata,
+          )
+          const arrayLabel = arrayLayoutOverrides.label || arrayMetadata?.label || arrayFallback?.label || arrayLeaf
           const arrayItems = Array.from(node.children.values())
             .sort((left, right) => Number(left.segment) - Number(right.segment))
           const primitiveArray = arrayItems.every((item) => item.field && !item.children.size)
@@ -1606,13 +1701,15 @@ export function Overview({
                       <FieldHelp
                         path={node.path}
                         metadata={arrayMetadata}
-                        sourceLabel={usesDock3Metadata && dockArrayMetadata
+                        sourceLabel={usesSuperDockMetadata && dockArrayMetadata
+                          ? `SuperDock 机场设备属性 · ${SUPERDOCK_PROPERTY_DOC_DATE}`
+                          : usesDock3Metadata && dockArrayMetadata
                           ? `DJI Dock 3 设备属性 · ${DJI_DOCK3_PROPERTY_DOC_DATE}`
                           : dockArrayMetadata || usesDock2Metadata
                             ? `DJI Dock 2 设备属性 · ${DJI_DOCK2_PROPERTY_DOC_DATE}`
                             : `DJI 飞行器设备属性（通用字段） · ${DJI_AIRCRAFT_PROPERTY_DOC_DATE}`}
                         displayLabel={arrayLabel}
-                        description={arrayLayoutField?.description || arrayMetadata?.description}
+                        description={arrayLayoutOverrides.description || arrayMetadata?.description}
                       />
                     )}
                   </strong>
@@ -1855,6 +1952,7 @@ export function Overview({
         <div className="device-facts">
           <div><span>设备 SN</span><strong title={deviceSn}>{deviceSn}</strong></div>
           <div><span>设备状态</span><strong className={deviceOnline ? 'online-text' : 'offline-text'}>{deviceStatus}</strong></div>
+          <div><span>设备厂商</span><strong>{providerName}</strong></div>
           <div><span>设备型号</span><strong title={productKey}>{deviceModel}</strong></div>
           <div><span>产品枚举</span><strong title={productKey}>{productKey ?? '尚未上报'}</strong></div>
           <div><span>物模型 / 通道</span><strong title={identityProtocol}>{identityProtocol}</strong></div>
@@ -1935,7 +2033,7 @@ export function Overview({
           {activeWorkbenchTab === 'events' && (
             <DeviceEventWorkspace activities={generalActivities} onNotify={onNotify} />
           )}
-          {activeWorkbenchTab === 'logs' && onPublish && onNotify && onOpenOssManager && onSelectObjectStorage && (
+          {!usesSuperDockGatewayCapabilities && activeWorkbenchTab === 'logs' && onPublish && onNotify && onOpenOssManager && onSelectObjectStorage && (
             <RemoteLogCenter
               gatewaySn={deviceSn}
               status={status}
@@ -1949,7 +2047,7 @@ export function Overview({
               onOpenOssManager={onOpenOssManager}
             />
           )}
-          {activeWorkbenchTab === 'firmware' && onService && onSelectObjectStorage && onOpenOssManager && (
+          {!usesSuperDockGatewayCapabilities && activeWorkbenchTab === 'firmware' && onService && onSelectObjectStorage && onOpenOssManager && (
             <FirmwareUpgradeCenter
               profile={profile}
               gatewaySn={deviceSn}
@@ -1968,7 +2066,7 @@ export function Overview({
           {activeWorkbenchTab === 'history' && (
             <CommandHistory transactions={transactions} onNotify={onNotify} />
           )}
-          {onPublish && (
+          {onPublish && configured && (
             <div className="persistent-command-center" hidden={activeWorkbenchTab !== 'commands'}>
               <CommandCenter
                 profile={profile}
