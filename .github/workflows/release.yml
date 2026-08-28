@@ -104,7 +104,7 @@ jobs:
       - name: Prepare bundled FFmpeg for Windows
         if: matrix.platform == 'win' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
         shell: pwsh
-        run: npm run ci:prepare:ffmpeg:win -- -Architecture ${{ matrix.arch }}
+        run: ./scripts/prepare-ffmpeg-windows.ps1 -Architecture ${{ matrix.arch }}
 
       - name: Verify bundled FFmpeg
         shell: bash
@@ -140,7 +140,8 @@ jobs:
         if: matrix.platform == 'win' && steps.zlm-cache.outputs.cache-hit != 'true'
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: npm run ci:build:zlm:win -- -Architecture ${{ matrix.arch }}
+        shell: pwsh
+        run: ./scripts/build-zlmediakit-windows.ps1 -Architecture ${{ matrix.arch }}
 
       - name: Verify bundled ZLMediaKit
         shell: bash

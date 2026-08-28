@@ -23,6 +23,26 @@ $Executable = Join-Path $Destination 'ffmpeg.exe'
 $License = Join-Path $Destination 'LICENSE'
 $Marker = Join-Path $Destination '.archive-sha256'
 
+function Get-Sha256Hex {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path
+  )
+
+  $Stream = [System.IO.File]::OpenRead($Path)
+  try {
+    $Hasher = [System.Security.Cryptography.SHA256]::Create()
+    try {
+      $Hash = $Hasher.ComputeHash($Stream)
+    } finally {
+      $Hasher.Dispose()
+    }
+  } finally {
+    $Stream.Dispose()
+  }
+
+  return ([System.BitConverter]::ToString($Hash)).Replace('-', '').ToLowerInvariant()
+}
+
 if ((Test-Path -LiteralPath $Executable -PathType Leaf) -and
     (Test-Path -LiteralPath $License -PathType Leaf) -and
     (Test-Path -LiteralPath $Marker -PathType Leaf) -and
@@ -48,7 +68,7 @@ try {
       Start-Sleep -Seconds (2 * $Attempt)
     }
   }
-  $ActualSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $ArchivePath).Hash.ToLowerInvariant()
+  $ActualSha256 = Get-Sha256Hex -Path $ArchivePath
   if ($ActualSha256 -ne $Asset.Sha256) {
     throw "SHA-256 mismatch for $Url`: expected $($Asset.Sha256), got $ActualSha256"
   }

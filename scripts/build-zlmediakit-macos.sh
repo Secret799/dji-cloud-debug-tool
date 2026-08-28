@@ -93,7 +93,7 @@ cmake -S "$SRTP_SOURCE_DIR" -B "$SRTP_BUILD_DIR" \
   -DCMAKE_INSTALL_PREFIX="$SRTP_INSTALL_DIR" \
   -DBUILD_SHARED_LIBS=OFF \
   -DENABLE_OPENSSL=OFF \
-  -DTEST_APPS=OFF
+  -DLIBSRTP_TEST_APPS=OFF
 cmake --build "$SRTP_BUILD_DIR" --target install --config Release -j "${BUILD_JOBS:-2}"
 
 cmake -S "$SOURCE_DIR" -B "$BUILD_DIR" \

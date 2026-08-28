@@ -22,11 +22,17 @@ esac
 FFMPEG_VERSION="9.0.1"
 SOURCE_SHA256="cf38e0e28c7e5605942c4a77755349b0145804a397af37eb1fb4c77cb237f635"
 SOURCE_URL="https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.xz"
-BUILD_PROFILE="rtmp-relay-sei-lgpl-v2"
+BUILD_PROFILE="rtmp-relay-sei-lgpl-v3"
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DESTINATION="$PROJECT_ROOT/vendor/ffmpeg/darwin-$OUTPUT_ARCH"
 MARKER_VALUE="$SOURCE_SHA256:$BUILD_PROFILE:$OUTPUT_ARCH"
 MARKER="$DESTINATION/.build-marker"
+X86_ASM_OPTION=""
+
+if [[ "$OUTPUT_ARCH" == "x64" ]] && ! command -v nasm >/dev/null 2>&1; then
+  X86_ASM_OPTION="--disable-x86asm"
+  echo "NASM is unavailable; building macOS x64 FFmpeg without x86 assembly optimizations."
+fi
 
 if [[ -x "$DESTINATION/ffmpeg" && -f "$DESTINATION/LICENSE" && -f "$MARKER" ]] &&
   [[ "$(tr -d '[:space:]' < "$MARKER")" == "$MARKER_VALUE" ]]; then
@@ -63,6 +69,7 @@ pushd "$SOURCE_DIR" >/dev/null
   --cc="clang -arch $COMPILER_ARCH" \
   --extra-cflags="-mmacosx-version-min=$MIN_MACOS_VERSION" \
   --extra-ldflags="-mmacosx-version-min=$MIN_MACOS_VERSION" \
+  ${X86_ASM_OPTION:+"$X86_ASM_OPTION"} \
   --disable-autodetect \
   --disable-debug \
   --disable-doc \

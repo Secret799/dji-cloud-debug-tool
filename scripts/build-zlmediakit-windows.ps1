@@ -83,7 +83,7 @@ try {
     '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded',
     '-DBUILD_SHARED_LIBS=OFF',
     '-DENABLE_OPENSSL=OFF',
-    '-DTEST_APPS=OFF'
+    '-DLIBSRTP_TEST_APPS=OFF'
   )
   Invoke-CheckedCommand -Command 'cmake.exe' -Arguments @(
     '--build', $SrtpBuildDir,
