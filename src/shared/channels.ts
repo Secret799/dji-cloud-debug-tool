@@ -29,5 +29,8 @@ export const IPC_CHANNELS = {
   objectStorageSave: 'object-storage:save',
   objectStorageRemove: 'object-storage:remove',
   objectStorageResolve: 'object-storage:resolve',
+  firmwarePickPackage: 'firmware:pick-package',
+  firmwareUploadPackage: 'firmware:upload-package',
+  firmwareUploadProgress: 'firmware:upload-progress',
   runtimeEvent: 'runtime:event',
 } as const

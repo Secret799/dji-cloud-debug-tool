@@ -5,6 +5,8 @@ import type {
   DeviceArchive,
   DjiDesktopApi,
   ExportMessageOptions,
+  FirmwareUploadProgress,
+  FirmwareUploadRequest,
   MediaServerProfile,
   MediaServerRuntime,
   MqttQos,
@@ -68,6 +70,15 @@ const api: DjiDesktopApi = {
     save: (profile: ObjectStorageProfile) => ipcRenderer.invoke(IPC_CHANNELS.objectStorageSave, profile),
     remove: (profileId: string) => ipcRenderer.invoke(IPC_CHANNELS.objectStorageRemove, profileId),
     resolve: (profileId: string) => ipcRenderer.invoke(IPC_CHANNELS.objectStorageResolve, profileId),
+  },
+  firmware: {
+    pickPackage: () => ipcRenderer.invoke(IPC_CHANNELS.firmwarePickPackage),
+    uploadPackage: (request: FirmwareUploadRequest) => ipcRenderer.invoke(IPC_CHANNELS.firmwareUploadPackage, request),
+    onUploadProgress: (listener: (progress: FirmwareUploadProgress) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, progress: FirmwareUploadProgress): void => listener(progress)
+      ipcRenderer.on(IPC_CHANNELS.firmwareUploadProgress, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.firmwareUploadProgress, handler)
+    },
   },
   events: {
     onRuntimeEvent: (listener: (event: MqttRuntimeEvent) => void) => {

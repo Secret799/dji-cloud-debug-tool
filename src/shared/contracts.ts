@@ -242,6 +242,52 @@ export interface ObjectStorageProfile {
   updatedAt: number
 }
 
+export interface FirmwarePackageSelection {
+  token: string
+  fileName: string
+  fileSize: number
+  md5: string
+}
+
+export interface FirmwarePackagePickResult {
+  canceled: boolean
+  package?: FirmwarePackageSelection
+  error?: string
+}
+
+export interface FirmwareUploadRequest {
+  selectionToken: string
+  objectStorageProfileId: string
+  objectKey: string
+}
+
+export interface FirmwareArtifact {
+  selectionToken: string
+  objectStorageProfileId: string
+  objectStorageProfileName: string
+  provider: ObjectStorageProvider
+  bucket: string
+  objectKey: string
+  fileName: string
+  fileSize: number
+  md5: string
+  fileUrl: string
+  urlExpiresAt: number
+  uploadedAt: number
+}
+
+export interface FirmwareUploadResult extends OperationResult {
+  artifact?: FirmwareArtifact
+}
+
+export interface FirmwareUploadProgress {
+  selectionToken: string
+  loaded: number
+  total: number
+  percent: number
+  at: number
+}
+
 export type MediaServerKind = 'local-zlm' | 'remote-zlm' | 'remote-srs' | 'remote-easymedia'
 export type MediaServerRuntimeState = 'stopped' | 'starting' | 'running' | 'unreachable' | 'error'
 
@@ -339,6 +385,11 @@ export interface DjiDesktopApi {
     save: (profile: ObjectStorageProfile) => Promise<ObjectStorageProfile>
     remove: (profileId: string) => Promise<OperationResult>
     resolve: (profileId: string) => Promise<ObjectStorageProfile | undefined>
+  }
+  firmware: {
+    pickPackage: () => Promise<FirmwarePackagePickResult>
+    uploadPackage: (request: FirmwareUploadRequest) => Promise<FirmwareUploadResult>
+    onUploadProgress: (listener: (progress: FirmwareUploadProgress) => void) => () => void
   }
   events: {
     onRuntimeEvent: (listener: (event: MqttRuntimeEvent) => void) => () => void

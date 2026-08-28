@@ -49,6 +49,7 @@ interface CommandCenterProps {
   allowedCategories?: CommandTemplate['category'][]
   defaultPsdkIndex?: number
   showCategoryBar?: boolean
+  mediaServers?: MediaServerProfile[]
 }
 
 const categories: { id: CommandTemplate['category']; label: string; icon: typeof Gamepad2 }[] = [
@@ -126,6 +127,7 @@ export function CommandCenter({
   allowedCategories,
   defaultPsdkIndex,
   showCategoryBar = true,
+  mediaServers = [],
 }: CommandCenterProps) {
   const availableCategories = useMemo(
     () => categories.filter((item) => !allowedCategories || allowedCategories.includes(item.id)),
@@ -145,7 +147,6 @@ export function CommandCenter({
   const [payload, setPayload] = useState(selectedCommand ? buildServicePayload(selectedCommand.method, selectedCommand.data) : '{}')
   const [sending, setSending] = useState(false)
   const [quickSendingCommandId, setQuickSendingCommandId] = useState('')
-  const [mediaServers, setMediaServers] = useState<MediaServerProfile[]>([])
   const [selectedMediaServerId, setSelectedMediaServerId] = useState('')
   const [airConditionerTarget, setAirConditionerTarget] = useState(0)
   const [operatorTargets, setOperatorTargets] = useState<Record<string, number>>({})
@@ -325,24 +326,6 @@ export function CommandCenter({
   const selectedMediaServer = mediaServers.find((server) => server.id === selectedMediaServerId)
     ?? mediaServers.find((server) => server.isDefault)
     ?? mediaServers[0]
-  const needsMediaServers = availableCategories.some((item) => item.id === 'payload')
-
-  useEffect(() => {
-    let disposed = false
-    if (!needsMediaServers) return undefined
-    void window.djiApi.media.listServers()
-      .then((servers) => {
-        if (disposed) return
-        setMediaServers(servers)
-        setSelectedMediaServerId((current) => servers.some((server) => server.id === current)
-          ? current
-          : servers.find((server) => server.isDefault)?.id ?? servers[0]?.id ?? '')
-      })
-      .catch(() => {
-        if (!disposed) setMediaServers([])
-    })
-    return () => { disposed = true }
-  }, [needsMediaServers])
 
   useEffect(() => {
     setGatewaySn(contextualGatewaySn || gatewayDevices[0]?.sn || '')

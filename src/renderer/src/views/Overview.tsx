@@ -1,8 +1,9 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Activity,
   ArrowDownLeft,
+  ArrowLeft,
   ArrowUpRight,
   Battery,
   Bell,
@@ -10,20 +11,24 @@ import {
   Braces,
   Camera,
   ChevronDown,
+  ChevronRight,
   CircleHelp,
   Clock3,
   Cloud,
   Command,
+  Copy,
   Cpu,
   FileArchive,
   Gamepad2,
   MapPin,
   MessagesSquare,
+  Package,
   Plane,
   Pencil,
   Radio,
   RadioTower,
   Search,
+  SearchCheck,
   ShieldCheck,
   Wifi,
   Wrench,
@@ -35,6 +40,7 @@ import type {
   DeviceType,
   MqttMessageRecord,
   MqttQos,
+  MediaServerProfile,
   ObjectStorageProfile,
   OperationResult,
   TelemetryLayoutConfig,
@@ -62,12 +68,12 @@ import {
   FIELD_LABELS,
   DJI_PRODUCT_NAMES,
   type CommandTransaction,
+  type DeviceActivity,
   type DeviceTelemetry,
   type ServiceCaller,
   djiProductKey,
   djiProductName,
   formatValue,
-  groupDeviceActivities,
   isPayloadActivity,
   mergeNestedRecords,
   parseDeviceActivity,
@@ -75,10 +81,19 @@ import {
   prettyPayload,
   telemetryValue,
 } from '../lib/dji'
-import { lookupServiceError } from '../lib/dji-error-codes'
+import { findHmsErrorCode, lookupServiceError } from '../lib/dji-error-codes'
+import {
+  HMS_LIST_LIMIT,
+  hmsFlightStateLabel,
+  hmsImminentLabel,
+  hmsLevelLabel,
+  hmsModuleLabel,
+  parseHmsPayload,
+} from '../lib/dji-hms'
 import { CommandCenter } from './CommandCenter'
 import { MqttConsole } from './MqttConsole'
 import { RemoteLogCenter } from './RemoteLogCenter'
+import { FirmwareUpgradeCenter } from './FirmwareUpgradeCenter'
 import { PropertySetModal, type PropertySetTarget } from '../components/PropertySetModal'
 import { Tooltip } from '../components/Tooltip'
 import {
@@ -106,9 +121,24 @@ interface OverviewProps {
   activeObjectStorageId?: string
   onSelectObjectStorage?: (profileId: string) => void
   telemetryLayout?: TelemetryLayoutConfig
+  mediaServers?: MediaServerProfile[]
 }
 
 const MAX_TELEMETRY_FIELDS = 500
+
+const EVENT_TYPE_OPTIONS = [
+  { method: 'hms', label: '设备告警', description: 'HMS' },
+] as const
+
+export const formatElapsedTime = (elapsedMs: number): string => {
+  const elapsedSeconds = Math.max(0, Math.floor(elapsedMs / 1000))
+  if (elapsedSeconds < 60) return `${elapsedSeconds} 秒前`
+
+  const elapsedMinutes = Math.floor(elapsedSeconds / 60)
+  if (elapsedMinutes < 60) return `${elapsedMinutes} 分钟前`
+
+  return `${Math.floor(elapsedMinutes / 60)} 小时前`
+}
 
 interface FlattenedTelemetry {
   fields: [string, unknown][]
@@ -194,13 +224,225 @@ const transactionText: Record<CommandTransaction['status'], string> = {
   timeout: '响应超时',
 }
 
-export function CommandHistory({ transactions }: { transactions: CommandTransaction[] }) {
+const commandTransactionKey = (transaction: CommandTransaction): string =>
+  `${transaction.gatewaySn}:${transaction.tid}`
+
+type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue }
+
+const parseJsonValue = (payload: string): JsonValue | undefined => {
+  try {
+    return JSON.parse(payload) as JsonValue
+  } catch {
+    return undefined
+  }
+}
+
+const isJsonContainer = (value: JsonValue): value is JsonValue[] | { [key: string]: JsonValue } =>
+  typeof value === 'object' && value !== null
+
+const jsonValueType = (value: JsonValue): string => {
+  if (value === null) return 'null'
+  return typeof value
+}
+
+function JsonTreeNode({
+  value,
+  name,
+  depth,
+  trailingComma = false,
+}: {
+  value: JsonValue
+  name?: string | number
+  depth: number
+  trailingComma?: boolean
+}) {
+  const container = isJsonContainer(value)
+  const childCount = container ? Object.keys(value).length : 0
+  const [expanded, setExpanded] = useState(depth < 3 && childCount <= 100)
+  const lineStyle = { '--json-depth': depth } as CSSProperties
+  const propertyName = name === undefined
+    ? null
+    : typeof name === 'number'
+      ? <><span className="json-tree-index">[{name}]</span><span className="json-tree-punctuation"> </span></>
+      : <><span className="json-tree-key">{JSON.stringify(name)}</span><span className="json-tree-punctuation">: </span></>
+
+  if (!container) {
+    return (
+      <div className="json-tree-line" style={lineStyle} role="treeitem">
+        <span className="json-tree-toggle-placeholder" />
+        {propertyName}
+        <span className={`json-tree-value ${jsonValueType(value)}`}>{JSON.stringify(value)}</span>
+        {trailingComma && <span className="json-tree-punctuation">,</span>}
+      </div>
+    )
+  }
+
+  const array = Array.isArray(value)
+  const opening = array ? '[' : '{'
+  const closing = array ? ']' : '}'
+  const entries = Object.entries(value)
+  const nodeLabel = name === undefined
+    ? 'JSON 根节点'
+    : typeof name === 'number'
+      ? `数组项 ${name}`
+      : `节点 ${name}`
+
+  return (
+    <div className="json-tree-node" role="treeitem" aria-expanded={expanded}>
+      <div className="json-tree-line" style={lineStyle}>
+        <button
+          type="button"
+          className={`json-tree-toggle${expanded ? ' expanded' : ''}`}
+          aria-label={`${expanded ? '收起' : '展开'} ${nodeLabel}`}
+          onClick={() => setExpanded((current) => !current)}
+        >
+          <ChevronRight size={11} />
+        </button>
+        {propertyName}
+        <span className="json-tree-punctuation">{opening}</span>
+        {!expanded && (
+          <>
+            {childCount > 0 && <span className="json-tree-summary">{childCount} 项</span>}
+            <span className="json-tree-punctuation">{closing}{trailingComma ? ',' : ''}</span>
+          </>
+        )}
+      </div>
+      {expanded && (
+        <div role="group">
+          {entries.map(([key, child], index) => (
+            <JsonTreeNode
+              key={key}
+              value={child}
+              name={array ? index : key}
+              depth={depth + 1}
+              trailingComma={index < entries.length - 1}
+            />
+          ))}
+          <div className="json-tree-line" style={lineStyle}>
+            <span className="json-tree-toggle-placeholder" />
+            <span className="json-tree-punctuation">{closing}{trailingComma ? ',' : ''}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function JsonPayloadView({ payload }: { payload: string }) {
+  const parsed = useMemo(() => parseJsonValue(payload), [payload])
+
+  if (parsed === undefined) {
+    return <pre className="command-message-payload command-payload-raw">{payload}</pre>
+  }
+
+  return (
+    <div className="command-message-payload json-tree" role="tree" aria-label="JSON Payload">
+      <JsonTreeNode value={parsed} depth={0} />
+    </div>
+  )
+}
+
+export function CommandResultCheckPage({
+  transaction,
+  onBack,
+}: {
+  transaction: CommandTransaction
+  onBack: () => void
+}) {
+  const errorGuidance = transaction.result !== undefined && transaction.result !== 0
+    ? lookupServiceError(transaction.result)
+    : undefined
+  if (!errorGuidance) return null
+
+  const duration = transaction.finishedAt === undefined
+    ? '等待返回'
+    : `${transaction.finishedAt - transaction.startedAt} ms`
+
+  return (
+    <div className="work-panel command-result-check-page">
+      <header className="command-result-check-header">
+        <button type="button" className="button secondary compact" onClick={onBack}>
+          <ArrowLeft size={14} />返回最近指令
+        </button>
+        <div>
+          <span className="eyebrow">结果码核查</span>
+          <h3>{transaction.method}</h3>
+        </div>
+        <code>{transaction.result}</code>
+      </header>
+      <div className="command-result-check-content">
+        <dl className="command-result-check-context">
+          <div><dt>结果码</dt><dd>{transaction.result}</dd></div>
+          <div><dt>网关 SN</dt><dd>{transaction.gatewaySn}</dd></div>
+          <div><dt>TID</dt><dd>{transaction.tid}</dd></div>
+          <div><dt>耗时</dt><dd>{duration}</dd></div>
+          <div><dt>发送时间</dt><dd>{new Date(transaction.startedAt).toLocaleString()}</dd></div>
+        </dl>
+        <section className="command-error-guidance">
+          <header><Wrench size={15} /><strong>结果码 {transaction.result} 核查结果</strong>{errorGuidance.hmsCode && <code>{errorGuidance.hmsCode}</code>}</header>
+          <div>
+            <span><small>错误说明</small><p>{errorGuidance.message ?? '错误码库暂未收录该错误的详细说明。'}</p></span>
+            {errorGuidance.cause && <span><small>可能原因</small><p>{errorGuidance.cause}</p></span>}
+            <span className="resolution"><small>处理措施</small><p>{errorGuidance.solution ?? '暂无明确处理措施，请结合返回报文并收集设备日志进一步定位。'}</p></span>
+            {errorGuidance.logs && <span><small>建议日志</small><p>{errorGuidance.logs}</p></span>}
+          </div>
+        </section>
+      </div>
+    </div>
+  )
+}
+
+export function CommandHistory({
+  transactions,
+  onNotify,
+}: {
+  transactions: CommandTransaction[]
+  onNotify?: (text: string, tone?: 'info' | 'success' | 'error') => void
+}) {
+  const [resultCheckKey, setResultCheckKey] = useState('')
+  const visibleTransactions = transactions.slice(0, 50)
+  const resultCheckTransaction = visibleTransactions.find(
+    (transaction) => commandTransactionKey(transaction) === resultCheckKey,
+  )
+
+  const copyMessageValue = async (value: string, label: 'Topic' | 'Payload'): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(value)
+      onNotify?.(`${label} 已复制`, 'success')
+    } catch (error) {
+      onNotify?.(error instanceof Error ? error.message : `${label} 复制失败`, 'error')
+    }
+  }
+
+  const copyActions = (message: MqttMessageRecord) => (
+    <span className="command-message-copy-actions">
+      <Tooltip label="复制 Topic">
+        <button
+          type="button"
+          className="command-message-copy-button"
+          onClick={() => void copyMessageValue(message.topic, 'Topic')}
+        >
+          <Copy size={11} /><span>Topic</span>
+        </button>
+      </Tooltip>
+      <Tooltip label="复制 Payload">
+        <button
+          type="button"
+          className="command-message-copy-button"
+          onClick={() => void copyMessageValue(message.payload, 'Payload')}
+        >
+          <Copy size={11} /><span>Payload</span>
+        </button>
+      </Tooltip>
+    </span>
+  )
+
   return (
     <section className="history-workspace">
-      <div className="work-panel command-history-panel">
+      <div className="work-panel command-history-panel" hidden={Boolean(resultCheckTransaction)}>
         <header className="panel-header"><div><Clock3 size={16} /><h3>最近指令</h3></div><span>{transactions.length} 条</span></header>
         <div className="command-history-list">
-          {transactions.slice(0, 50).map((transaction) => {
+          {visibleTransactions.map((transaction) => {
             const duration = transaction.finishedAt === undefined
               ? '等待返回'
               : `${transaction.finishedAt - transaction.startedAt} ms`
@@ -228,32 +470,49 @@ export function CommandHistory({ transactions }: { transactions: CommandTransact
                     <div><dt>TID</dt><dd title={transaction.tid}>{transaction.tid}</dd></div>
                     <div><dt>BID</dt><dd title={transaction.bid}>{transaction.bid ?? '--'}</dd></div>
                     <div><dt>耗时</dt><dd>{duration}</dd></div>
-                    <div><dt>结果码</dt><dd>{transaction.result ?? '--'}</dd></div>
+                    <div>
+                      <dt>结果码</dt>
+                      <dd className="command-result-value">
+                        <span>{transaction.result ?? '--'}</span>
+                        {errorGuidance && (
+                          <button
+                            type="button"
+                            className="command-result-check"
+                            onClick={() => setResultCheckKey(commandTransactionKey(transaction))}
+                          >
+                            <SearchCheck size={12} />核查
+                          </button>
+                        )}
+                      </dd>
+                    </div>
                     <div><dt>发送时间</dt><dd>{new Date(transaction.startedAt).toLocaleString()}</dd></div>
                   </dl>
-                  {errorGuidance && (
-                    <section className="command-error-guidance">
-                      <header><Wrench size={15} /><strong>错误码 {transaction.result} 排障建议</strong>{errorGuidance.hmsCode && <code>{errorGuidance.hmsCode}</code>}</header>
-                      <div>
-                        <span><small>错误说明</small><p>{errorGuidance.message ?? '错误码库暂未收录该错误的详细说明。'}</p></span>
-                        {errorGuidance.cause && <span><small>可能原因</small><p>{errorGuidance.cause}</p></span>}
-                        <span className="resolution"><small>处理措施</small><p>{errorGuidance.solution ?? '暂无明确处理措施，请结合返回报文并收集设备日志进一步定位。'}</p></span>
-                        {errorGuidance.logs && <span><small>建议日志</small><p>{errorGuidance.logs}</p></span>}
-                      </div>
-                    </section>
-                  )}
                   <div className="command-message-pair">
                     <section className="command-message request">
-                      <header><span><ArrowUpRight size={14} />发送信息</span><time>{new Date(transaction.request.timestamp).toLocaleTimeString()}</time></header>
+                      <header>
+                        <span><ArrowUpRight size={14} />发送信息</span>
+                        <span className="command-message-header-actions">
+                          {copyActions(transaction.request)}
+                          <time>{new Date(transaction.request.timestamp).toLocaleTimeString()}</time>
+                        </span>
+                      </header>
                       <div className="command-message-topic"><span>Topic</span><code>{transaction.request.topic}</code></div>
-                      <pre>{prettyPayload(transaction.request.payload)}</pre>
+                      <JsonPayloadView payload={transaction.request.payload} />
                     </section>
                     <section className={`command-message response ${transaction.response ? '' : 'empty'}`}>
-                      <header><span><ArrowDownLeft size={14} />返回信息</span>{transaction.response && <time>{new Date(transaction.response.timestamp).toLocaleTimeString()}</time>}</header>
+                      <header>
+                        <span><ArrowDownLeft size={14} />返回信息</span>
+                        {transaction.response && (
+                          <span className="command-message-header-actions">
+                            {copyActions(transaction.response)}
+                            <time>{new Date(transaction.response.timestamp).toLocaleTimeString()}</time>
+                          </span>
+                        )}
+                      </header>
                       {transaction.response ? (
                         <>
                           <div className="command-message-topic"><span>Topic</span><code>{transaction.response.topic}</code></div>
-                          <pre>{prettyPayload(transaction.response.payload)}</pre>
+                          <JsonPayloadView payload={transaction.response.payload} />
                         </>
                       ) : (
                         <div className="command-response-empty">{transaction.status === 'timeout' ? '在 10 秒内未收到返回信息' : '等待设备返回信息'}</div>
@@ -267,11 +526,17 @@ export function CommandHistory({ transactions }: { transactions: CommandTransact
           {!transactions.length && <div className="panel-empty"><Clock3 size={22} /><span>暂无服务调用</span></div>}
         </div>
       </div>
+      {resultCheckTransaction && (
+        <CommandResultCheckPage
+          transaction={resultCheckTransaction}
+          onBack={() => setResultCheckKey('')}
+        />
+      )}
     </section>
   )
 }
 
-type WorkbenchTab = 'remote' | 'payload' | 'events' | 'logs' | 'history' | 'commands' | 'messages'
+type WorkbenchTab = 'remote' | 'payload' | 'events' | 'logs' | 'firmware' | 'history' | 'commands' | 'messages'
 
 const deviceTypeCopy = {
   dock: { label: '机场', model: 'DJI Dock', icon: RadioTower },
@@ -651,6 +916,292 @@ function FieldHelp({ path, metadata, sourceLabel, displayLabel, description }: F
   )
 }
 
+export function HmsPayloadDetails({ payload }: { payload: string }) {
+  const parsed = useMemo(() => parseHmsPayload(payload), [payload])
+
+  if (!parsed) {
+    return (
+      <div className="hms-parse-fallback">
+        <span>报文不符合 Dock 3 HMS 数据结构，已保留原始内容。</span>
+        <JsonPayloadView payload={payload} />
+      </div>
+    )
+  }
+
+  const warningCount = parsed.alarms.filter((alarm) => alarm.level === 2).length
+  const imminentCount = parsed.alarms.filter((alarm) => alarm.imminent === 1).length
+  const envelopeTime = parsed.timestamp === undefined ? undefined : new Date(parsed.timestamp)
+  const validEnvelopeTime = envelopeTime && !Number.isNaN(envelopeTime.getTime()) ? envelopeTime : undefined
+
+  return (
+    <div className="hms-parsed-payload">
+      <div className="hms-summary-strip" aria-label="HMS 通用字段">
+        <span><small>告警项</small><strong>{parsed.alarms.length}</strong></span>
+        <span><small>警告等级</small><strong className={warningCount ? 'danger' : ''}>{warningCount}</strong></span>
+        <span><small>实时性告警</small><strong>{imminentCount}</strong></span>
+      </div>
+
+      {(parsed.tid || parsed.bid || validEnvelopeTime) && (
+        <dl className="hms-envelope-meta">
+          {parsed.tid && <div><dt>TID</dt><dd title={parsed.tid}>{parsed.tid}</dd></div>}
+          {parsed.bid && <div><dt>BID</dt><dd title={parsed.bid}>{parsed.bid}</dd></div>}
+          {validEnvelopeTime && (
+            <div><dt>设备上报时间</dt><dd>{validEnvelopeTime.toLocaleString()}</dd></div>
+          )}
+        </dl>
+      )}
+
+      {parsed.exceedsListLimit && (
+        <div className="hms-limit-warning">告警列表超过文档限制的 {HMS_LIST_LIMIT} 项，请检查设备报文。</div>
+      )}
+
+      {parsed.alarms.length ? (
+        <div className="hms-alarm-list" role="list" aria-label="HMS 告警列表">
+          {parsed.alarms.map((alarm, index) => {
+            const guidance = findHmsErrorCode(alarm.normalizedCode ?? alarm.code)
+            const displayCode = alarm.normalizedCode ?? alarm.code
+            const deviceName = alarm.deviceType
+              ? DJI_PRODUCT_NAMES[alarm.deviceType] ?? '未收录设备'
+              : '未上报'
+            const severityClass = alarm.level === 2
+              ? 'warning'
+              : alarm.level === 1
+                ? 'reminder'
+                : alarm.level === 0
+                  ? 'notice'
+                  : 'unknown'
+            return (
+              <section
+                className={`hms-alarm-item ${severityClass}`}
+                key={`${displayCode}:${index}`}
+                role="listitem"
+              >
+                <header>
+                  <div className="hms-alarm-title">
+                    <span className="hms-alarm-index">#{index + 1}</span>
+                    <span className={`hms-level-badge ${severityClass}`}>{hmsLevelLabel(alarm.level)}</span>
+                    <code>{displayCode}</code>
+                    <strong>{guidance?.message ?? guidance?.faq ?? '错误码库暂未收录该告警'}</strong>
+                  </div>
+                  <span className={`hms-imminent-badge${alarm.imminent === 1 ? ' active' : ''}`}>
+                    {hmsImminentLabel(alarm.imminent)}
+                  </span>
+                </header>
+
+                <div className="hms-alarm-detail">
+                  <dl className="hms-alarm-fields">
+                    <div><dt>事件模块</dt><dd>{hmsModuleLabel(alarm.module)}</dd></div>
+                    <div><dt>飞行状态</dt><dd>{hmsFlightStateLabel(alarm.inTheSky)}</dd></div>
+                    <div><dt>设备类型</dt><dd title={alarm.deviceType}>{deviceName}{alarm.deviceType ? ` (${alarm.deviceType})` : ''}</dd></div>
+                    <div><dt>组件索引</dt><dd>{alarm.args?.componentIndex ?? '未上报'}</dd></div>
+                    <div><dt>传感器索引</dt><dd>{alarm.args?.sensorIndex ?? '未上报'}</dd></div>
+                  </dl>
+
+                  {guidance && (
+                    <div className="hms-guidance">
+                      {guidance.cause && <span><small>可能原因</small><p>{guidance.cause}</p></span>}
+                      {(guidance.solution || guidance.faq) && (
+                        <span><small>处理建议</small><p>{guidance.solution ?? guidance.faq}</p></span>
+                      )}
+                      {guidance.materials.length > 0 && (
+                        <span><small>相关物料</small><p>{guidance.materials.join('、')}</p></span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </section>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="hms-empty-list">报文已解析，但 data.list 中没有有效告警项。</div>
+      )}
+
+      <details className="hms-raw-payload">
+        <summary><Braces size={13} /><span>原始 MQTT 报文</span><ChevronDown size={13} /></summary>
+        <JsonPayloadView payload={payload} />
+      </details>
+    </div>
+  )
+}
+
+export function DeviceEventWorkspace({
+  activities,
+  onNotify,
+}: {
+  activities: DeviceActivity[]
+  onNotify?: (text: string, tone?: 'info' | 'success' | 'error') => void
+}) {
+  const [selectedMethod, setSelectedMethod] = useState<string>(EVENT_TYPE_OPTIONS[0].method)
+  const [selectedMessageId, setSelectedMessageId] = useState('')
+  const selectedType = EVENT_TYPE_OPTIONS.find((option) => option.method === selectedMethod)
+    ?? EVENT_TYPE_OPTIONS[0]
+  const selectedActivities = activities
+    .filter((activity) => activity.method === selectedType.method)
+    .slice()
+    .sort((left, right) => right.record.timestamp - left.record.timestamp)
+  const selectedMessageIndex = selectedActivities.findIndex((activity) => activity.record.id === selectedMessageId)
+  const selectedActivity = selectedMessageIndex >= 0 ? selectedActivities[selectedMessageIndex] : undefined
+  const selectedMessageNumber = selectedActivity ? selectedActivities.length - selectedMessageIndex : undefined
+
+  const copyMessageValue = async (value: string, label: 'Topic' | 'Payload'): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(value)
+      onNotify?.(`${label} 已复制`, 'success')
+    } catch (error) {
+      onNotify?.(error instanceof Error ? error.message : `${label} 复制失败`, 'error')
+    }
+  }
+
+  return (
+    <section className="event-workspace">
+      <aside className="event-type-pane">
+        <header className="event-pane-header">
+          <div><Bell size={17} /><h3>事件类型</h3></div>
+          <span>{EVENT_TYPE_OPTIONS.length} 种</span>
+        </header>
+        <nav className="event-type-list" aria-label="事件类型">
+          {EVENT_TYPE_OPTIONS.map((option) => {
+            const count = activities.filter((activity) => activity.method === option.method).length
+            const active = selectedType.method === option.method
+            return (
+              <button
+                type="button"
+                key={option.method}
+                className={active ? 'active' : ''}
+                aria-current={active ? 'page' : undefined}
+                onClick={() => {
+                  setSelectedMethod(option.method)
+                  setSelectedMessageId('')
+                }}
+              >
+                <span className="event-type-icon"><Bell size={16} /></span>
+                <span className="event-type-copy">
+                  <strong>{option.label}</strong>
+                  <code>{option.method}</code>
+                </span>
+                <small>{count}</small>
+                <ChevronRight size={15} className="event-type-chevron" />
+              </button>
+            )
+          })}
+        </nav>
+      </aside>
+
+      <section className={`event-detail-pane${selectedActivity ? '' : ' list-mode'}`}>
+        {selectedActivity && selectedMessageNumber && (
+          <header className="event-pane-header event-detail-header">
+            <div>
+              <Radio size={17} />
+              <span>
+                <h3>告警详情</h3>
+                <small>{selectedType.label} · 消息 #{selectedMessageNumber}</small>
+              </span>
+            </div>
+            <span>{selectedActivities.length} 条</span>
+          </header>
+        )}
+
+        {selectedActivity && selectedMessageNumber ? (
+          <div className="event-detail-body detail-mode">
+            <div className="event-detail-toolbar">
+              <button type="button" className="event-detail-back" onClick={() => setSelectedMessageId('')}>
+                <ArrowLeft size={14} /><span>返回消息列表</span>
+              </button>
+              <time dateTime={new Date(selectedActivity.record.timestamp).toISOString()}>
+                {new Date(selectedActivity.record.timestamp).toLocaleString()}
+              </time>
+            </div>
+            <div className="event-detail-list">
+              <article className="event-message-detail" key={selectedActivity.record.id}>
+                  <header>
+                    <div>
+                      <span className="event-message-index">#{selectedMessageNumber}</span>
+                      <strong>{selectedType.label}</strong>
+                      <code>{selectedActivity.method}</code>
+                    </div>
+                    <div className="event-message-actions">
+                      <Tooltip label="复制 Topic">
+                        <button type="button" aria-label="复制 Topic" onClick={() => void copyMessageValue(selectedActivity.record.topic, 'Topic')}>
+                          <Copy size={13} />
+                        </button>
+                      </Tooltip>
+                      <Tooltip label="复制 Payload">
+                        <button type="button" aria-label="复制 Payload" onClick={() => void copyMessageValue(selectedActivity.record.payload, 'Payload')}>
+                          <Braces size={13} />
+                        </button>
+                      </Tooltip>
+                    </div>
+                  </header>
+                  <dl className="event-message-meta">
+                    <div className="event-message-topic"><dt>Topic</dt><dd title={selectedActivity.record.topic}>{selectedActivity.record.topic}</dd></div>
+                    <div><dt>QoS</dt><dd>{selectedActivity.record.qos}</dd></div>
+                    <div><dt>大小</dt><dd>{selectedActivity.record.size} B</dd></div>
+                  </dl>
+                  <HmsPayloadDetails payload={selectedActivity.record.payload} />
+              </article>
+            </div>
+          </div>
+        ) : selectedActivities.length ? (
+          <div className="event-message-list" role="table" aria-label="HMS 消息列表">
+            <div className="event-message-list-head" role="row">
+              <span role="columnheader">序号</span>
+              <span role="columnheader">上报消息</span>
+              <span role="columnheader">告警项</span>
+              <span role="columnheader">最高等级</span>
+              <span role="columnheader">实时性</span>
+              <span role="columnheader">操作</span>
+            </div>
+            <div className="event-message-list-body" role="rowgroup">
+              {selectedActivities.map((activity, index) => {
+                const parsed = parseHmsPayload(activity.record.payload)
+                const highestLevel = parsed?.alarms.reduce<number | undefined>((highest, alarm) => (
+                  alarm.level === undefined ? highest : Math.max(highest ?? alarm.level, alarm.level)
+                ), undefined)
+                const imminentCount = parsed?.alarms.filter((alarm) => alarm.imminent === 1).length ?? 0
+                const severityClass = highestLevel === 2
+                  ? 'warning'
+                  : highestLevel === 1
+                    ? 'reminder'
+                    : highestLevel === 0
+                      ? 'notice'
+                      : 'unknown'
+                return (
+                  <div className="event-message-list-row" role="row" key={activity.record.id}>
+                    <span className="event-list-index" role="cell">#{selectedActivities.length - index}</span>
+                    <span className="event-list-message" role="cell">
+                      <strong>{new Date(activity.record.timestamp).toLocaleString()}</strong>
+                      <code title={activity.record.topic}>{activity.record.topic}</code>
+                    </span>
+                    <strong role="cell">{parsed?.alarms.length ?? 0}</strong>
+                    <span role="cell"><span className={`hms-level-badge ${severityClass}`}>{hmsLevelLabel(highestLevel)}</span></span>
+                    <strong role="cell">{imminentCount}</strong>
+                    <span role="cell">
+                      <button
+                        type="button"
+                        className="event-message-detail-button"
+                        onClick={() => setSelectedMessageId(activity.record.id)}
+                      >
+                        <span>详情</span><ChevronRight size={13} />
+                      </button>
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="event-detail-empty">
+            <Bell size={24} />
+            <strong>暂无 HMS 消息</strong>
+            <span>收到 method = hms 的设备事件后将在此显示。</span>
+          </div>
+        )}
+      </section>
+    </section>
+  )
+}
+
 export function Overview({
   profile,
   telemetry,
@@ -669,13 +1220,13 @@ export function Overview({
   activeObjectStorageId = '',
   onSelectObjectStorage,
   telemetryLayout = DEFAULT_TELEMETRY_LAYOUT,
+  mediaServers = [],
 }: OverviewProps) {
   const [activeTab, setActiveTab] = useState<WorkbenchTab>('remote')
   const [activeTelemetryTab, setActiveTelemetryTab] = useState<TelemetryTabId>('operation')
   const [activeTelemetrySection, setActiveTelemetrySection] = useState<TelemetrySectionId>()
   const [telemetrySearch, setTelemetrySearch] = useState('')
   const [selectedPsdkIndex, setSelectedPsdkIndex] = useState<number>()
-  const [expandedEventGroups, setExpandedEventGroups] = useState<Record<string, boolean>>({})
   const [propertySetTarget, setPropertySetTarget] = useState<PropertySetTarget>()
   const telemetryPanelsRef = useRef<HTMLDivElement>(null)
   const requestedConfigured = profile.devices.find((device) => device.sn === selectedDeviceSn)
@@ -782,7 +1333,6 @@ export function Overview({
       ?.querySelector<HTMLElement>('.telemetry-tab-panel:not([hidden]) .telemetry-section-panels')
       ?.scrollTo({ top: 0 })
   }, [activeTelemetryTab, activeTelemetrySection, deviceSn, telemetrySearchQuery])
-  useEffect(() => setExpandedEventGroups({}), [deviceSn])
   const deviceRecords = records.filter((record) => !deviceSn || record.topic.includes(`/${deviceSn}/`))
   const deviceActivities = deviceRecords.flatMap((record) => {
     const activity = parseDeviceActivity(record)
@@ -798,7 +1348,7 @@ export function Overview({
     return activity && isPayloadActivity(activity) ? [activity] : []
   })
   const generalActivities = deviceActivities.filter((activity) => !isPayloadActivity(activity))
-  const groupedGeneralActivities = groupDeviceActivities(generalActivities)
+  const hmsActivities = generalActivities.filter((activity) => activity.method === 'hms')
   const payloadIndexes = Array.from(new Set(payloadActivities.map((activity) => activity.psdkIndex)))
     .sort((left, right) => left - right)
   const latestPsdkIndex = payloadActivities.at(-1)?.psdkIndex
@@ -843,7 +1393,7 @@ export function Overview({
       .join(' / ') || '尚未上报'
     : '尚未上报'
   const lastSeen = selected?.lastSeenAt
-    ? `${Math.max(0, Math.round((Date.now() - selected.lastSeenAt) / 1000))} 秒前`
+    ? formatElapsedTime(Date.now() - selected.lastSeenAt)
     : '尚未上报'
   const reportedFirmwareVersion = telemetryValue(source, 'firmware_version')
   const firmwareVersion = typeof reportedFirmwareVersion === 'string' || typeof reportedFirmwareVersion === 'number'
@@ -852,41 +1402,98 @@ export function Overview({
   const tabs: { id: WorkbenchTab; label: string; icon: typeof Activity; count?: number }[] = [
     { id: 'remote', label: '遥测', icon: Activity },
     { id: 'payload', label: '负载', icon: Box, count: payloadIndexes.length },
-    { id: 'events', label: '事件', icon: Bell, count: generalActivities.length },
+    { id: 'events', label: '事件', icon: Bell, count: hmsActivities.length },
     { id: 'logs', label: '远程日志', icon: FileArchive },
+    { id: 'firmware', label: '固件升级', icon: Package },
     { id: 'commands', label: '控制中心', icon: Command },
     { id: 'messages', label: 'MQTT 消息', icon: MessagesSquare, count: deviceRecords.length },
     { id: 'history', label: '最近指令', icon: Clock3, count: transactions.length },
   ]
   const visibleTabs = deviceType === 'aircraft'
     ? tabs.filter((tab) => tab.id !== 'events' && tab.id !== 'logs' && tab.id !== 'history' && tab.id !== 'commands')
-    : tabs.filter((tab) => tab.id !== 'payload')
+    : deviceType === 'dock'
+      ? tabs.filter((tab) => tab.id !== 'payload')
+      : tabs.filter((tab) => tab.id !== 'payload' && tab.id !== 'firmware')
   const activeWorkbenchTab = visibleTabs.some((tab) => tab.id === activeTab) ? activeTab : 'remote'
   const renderTelemetryTable = (categoryFields: typeof fields) => {
     type TelemetryField = (typeof fields)[number]
-    type TelemetryRenderGroup = {
-      key: string
-      matchKey: string
-      context?: TelemetryArrayContext
-      fields: TelemetryField[]
+    type TelemetryTreeNode = {
+      segment: string
+      path: string
+      field?: TelemetryField
+      children: Map<string, TelemetryTreeNode>
     }
-    const renderGroups: TelemetryRenderGroup[] = []
+    type TelemetryRenderEntry =
+      | { kind: 'field'; field: TelemetryField }
+      | { kind: 'array'; node: TelemetryTreeNode }
+    type TelemetryRenderBlock =
+      | { kind: 'fields'; key: string; fields: TelemetryField[] }
+      | { kind: 'array'; key: string; node: TelemetryTreeNode }
 
+    const sourceRoots = new Map<TelemetryField['source'], TelemetryTreeNode>()
     categoryFields.forEach((field) => {
-      const context = telemetryArrayContext(field.path)
-      const matchKey = context ? `array:${field.source}:${context.arrayPath}` : `fields:${field.source}`
-      const previous = renderGroups.at(-1)
-      if (previous?.matchKey === matchKey) {
-        previous.fields.push(field)
-      } else {
-        renderGroups.push({
-          key: `${matchKey}:${field.path}`,
-          matchKey,
-          context,
-          fields: [field],
-        })
+      let node = sourceRoots.get(field.source)
+      if (!node) {
+        node = { segment: field.source, path: '', children: new Map() }
+        sourceRoots.set(field.source, node)
       }
+
+      field.path.split('.').forEach((segment, index, segments) => {
+        const path = segments.slice(0, index + 1).join('.')
+        let child = node?.children.get(segment)
+        if (!child) {
+          child = { segment, path, children: new Map() }
+          node?.children.set(segment, child)
+        }
+        node = child
+      })
+      if (node) node.field = field
     })
+
+    const isArrayNode = (node: TelemetryTreeNode): boolean =>
+      node.children.size > 0
+      && Array.from(node.children.keys()).every((segment) => /^\d+$/.test(segment))
+
+    const descendantFieldCount = (node: TelemetryTreeNode): number =>
+      (node.field ? 1 : 0)
+      + Array.from(node.children.values()).reduce(
+        (count, child) => count + descendantFieldCount(child),
+        0,
+      )
+
+    const collectRenderEntries = (nodes: Iterable<TelemetryTreeNode>): TelemetryRenderEntry[] => {
+      const entries: TelemetryRenderEntry[] = []
+      Array.from(nodes).forEach((node) => {
+        if (isArrayNode(node)) {
+          entries.push({ kind: 'array', node })
+          return
+        }
+        if (node.field) entries.push({ kind: 'field', field: node.field })
+        entries.push(...collectRenderEntries(node.children.values()))
+      })
+      return entries
+    }
+
+    const createRenderBlocks = (entries: TelemetryRenderEntry[]): TelemetryRenderBlock[] => {
+      const blocks: TelemetryRenderBlock[] = []
+      entries.forEach((entry) => {
+        if (entry.kind === 'array') {
+          blocks.push({ kind: 'array', key: `array:${entry.node.path}`, node: entry.node })
+          return
+        }
+        const previous = blocks.at(-1)
+        if (previous?.kind === 'fields') {
+          previous.fields.push(entry.field)
+          return
+        }
+        blocks.push({
+          kind: 'fields',
+          key: `fields:${entry.field.source}:${entry.field.path}`,
+          fields: [entry.field],
+        })
+      })
+      return blocks
+    }
 
     const renderTelemetryRow = (field: TelemetryField, context?: TelemetryArrayContext) => {
         const leaf = field.path.split('.').at(-1) ?? field.path
@@ -949,20 +1556,19 @@ export function Overview({
         )
     }
 
-    return (
-      <div className="telemetry-table">
-        {renderGroups.map((group) => {
-          if (!group.context) {
-            return <div className="telemetry-field-grid" key={group.key}>{group.fields.map((field) => renderTelemetryRow(field))}</div>
-          }
-
-          const arrayLabelPath = group.context.arrayPath
+    const renderArrayNode = (
+      node: TelemetryTreeNode,
+      source: TelemetryField['source'],
+      depth: number,
+      parentArrayPath?: string,
+    ) => {
+          const arrayLabelPath = node.path
             .split('.')
             .filter((segment) => !/^\d+$/.test(segment))
             .join('.')
           const arrayLeaf = arrayLabelPath.split('.').at(-1) ?? arrayLabelPath
           const relayedAircraftArray = deviceType === 'aircraft'
-            && /^(drone_charge_state|drone_battery_maintenance_info)(\.|$)/.test(group.context.arrayPath)
+            && /^(drone_charge_state|drone_battery_maintenance_info)(\.|$)/.test(node.path)
           const dockArrayMetadata = relayedAircraftArray
             ? getDjiFieldMetadata(arrayLabelPath)
             : usesDock3Metadata
@@ -977,20 +1583,19 @@ export function Overview({
           const arrayFallback = FIELD_LABELS[arrayLabelPath] ?? FIELD_LABELS[arrayLeaf]
           const arrayLayoutField = layoutFieldsByKey.get(normalizeTelemetryFieldKey(arrayLabelPath))
           const arrayLabel = arrayLayoutField?.label || arrayMetadata?.label || arrayFallback?.label || arrayLeaf
-          const primitiveArray = group.context.primitiveItem
-          const arrayItems = primitiveArray
-            ? []
-            : Array.from(group.fields.reduce((items, field) => {
-                const itemIndex = telemetryArrayContext(field.path)?.itemIndex
-                if (itemIndex === undefined) return items
-                const itemFields = items.get(itemIndex) ?? []
-                itemFields.push(field)
-                items.set(itemIndex, itemFields)
-                return items
-              }, new Map<number, TelemetryField[]>()))
-              .sort(([left], [right]) => left - right)
+          const arrayItems = Array.from(node.children.values())
+            .sort((left, right) => Number(left.segment) - Number(right.segment))
+          const primitiveArray = arrayItems.every((item) => item.field && !item.children.size)
+          const fieldCount = descendantFieldCount(node)
           return (
-            <details className="telemetry-array-collection" key={group.key} data-array-path={group.context.arrayPath} open>
+            <details
+              className="telemetry-array-collection"
+              key={`${source}:${node.path}`}
+              data-array-path={node.path}
+              data-parent-array-path={parentArrayPath}
+              data-array-depth={depth}
+              open
+            >
               <summary className="telemetry-array-header">
                 <div>
                   <strong>
@@ -999,7 +1604,7 @@ export function Overview({
                     <span className="telemetry-array-badge">数组</span>
                     {(arrayMetadata || arrayLayoutField?.description) && (
                       <FieldHelp
-                        path={group.context.arrayPath}
+                        path={node.path}
                         metadata={arrayMetadata}
                         sourceLabel={usesDock3Metadata && dockArrayMetadata
                           ? `DJI Dock 3 设备属性 · ${DJI_DOCK3_PROPERTY_DOC_DATE}`
@@ -1011,35 +1616,56 @@ export function Overview({
                       />
                     )}
                   </strong>
-                  <code><span className={`telemetry-source ${group.fields[0].source}`}>{group.fields[0].source.toUpperCase()}</span>{group.context.arrayPath}</code>
+                  <code><span className={`telemetry-source ${source}`}>{source.toUpperCase()}</span>{node.path}</code>
                 </div>
-                <small>{primitiveArray ? group.fields.length : arrayItems.length} 项 · {group.fields.length} 个字段</small>
+                <small>{arrayItems.length} 项 · {fieldCount} 个字段</small>
                 <ChevronDown size={14} className="telemetry-array-chevron" />
               </summary>
               {primitiveArray ? (
                 <div className="telemetry-field-grid telemetry-array-values">
-                  {group.fields.map((field) => renderTelemetryRow(field, telemetryArrayContext(field.path)))}
+                  {arrayItems.flatMap((item) => item.field
+                    ? [renderTelemetryRow(item.field, telemetryArrayContext(item.field.path))]
+                    : [])}
                 </div>
               ) : (
                 <div className="telemetry-array-items">
-                  {arrayItems.map(([itemIndex, itemFields], index) => (
-                    <details className="telemetry-array-item" key={itemIndex} open={index === 0}>
-                      <summary>
-                        <span className="telemetry-index-badge">[{itemIndex}]</span>
-                        <span>第 {itemIndex + 1} 项</span>
-                        <small>{itemFields.length} 个字段</small>
-                        <ChevronDown size={14} />
-                      </summary>
-                      <div className="telemetry-field-grid telemetry-array-values">
-                        {itemFields.map((field) => renderTelemetryRow(field, telemetryArrayContext(field.path)))}
-                      </div>
-                    </details>
-                  ))}
+                  {arrayItems.map((item, index) => {
+                    const itemIndex = Number(item.segment)
+                    const itemEntries = collectRenderEntries(item.children.values())
+                    if (item.field) itemEntries.unshift({ kind: 'field', field: item.field })
+                    const itemBlocks = createRenderBlocks(itemEntries)
+                    return (
+                      <details className="telemetry-array-item" key={item.segment} open={index === 0}>
+                        <summary>
+                          <span className="telemetry-index-badge">[{itemIndex}]</span>
+                          <span>第 {itemIndex + 1} 项</span>
+                          <small>{descendantFieldCount(item)} 个字段</small>
+                          <ChevronDown size={14} />
+                        </summary>
+                        <div className="telemetry-array-item-content">
+                          {itemBlocks.map((block) => block.kind === 'fields'
+                            ? (
+                                <div className="telemetry-field-grid telemetry-array-values" key={block.key}>
+                                  {block.fields.map((field) => renderTelemetryRow(field, telemetryArrayContext(field.path)))}
+                                </div>
+                              )
+                            : renderArrayNode(block.node, source, depth + 1, node.path))}
+                        </div>
+                      </details>
+                    )
+                  })}
                 </div>
               )}
             </details>
           )
-        })}
+    }
+
+    return (
+      <div className="telemetry-table">
+        {Array.from(sourceRoots.entries()).flatMap(([source, root]) =>
+          createRenderBlocks(collectRenderEntries(root.children.values())).map((block) => block.kind === 'fields'
+            ? <div className="telemetry-field-grid" key={`${source}:${block.key}`}>{block.fields.map((field) => renderTelemetryRow(field))}</div>
+            : renderArrayNode(block.node, source, 0)))}
       </div>
     )
   }
@@ -1179,28 +1805,19 @@ export function Overview({
       )}
     </section>
   )
-  const renderEventRows = (activities: typeof deviceActivities, grouped = false) => activities.map((activity) => {
+  const renderEventRows = (activities: typeof deviceActivities) => activities.map((activity) => {
     const { record } = activity
     return (
       <div className="event-row" key={record.id}>
-        {grouped ? (
-          <div className="event-meta grouped-event-meta">
-            <code title={record.topic}>{record.topic}</code>
-            <span>{new Date(record.timestamp).toLocaleTimeString()}</span>
+        <div className="event-meta">
+          <div className="event-title">
+            <span className={`event-kind ${activity.kind}`}>{activity.kind === 'event' ? '事件' : '请求'}</span>
+            <strong>{activity.label}</strong>
+            <code>{activity.method}</code>
           </div>
-        ) : (
-          <>
-            <div className="event-meta">
-              <div className="event-title">
-                <span className={`event-kind ${activity.kind}`}>{activity.kind === 'event' ? '事件' : '请求'}</span>
-                <strong>{activity.label}</strong>
-                <code>{activity.method}</code>
-              </div>
-              <span>{new Date(record.timestamp).toLocaleTimeString()}</span>
-            </div>
-            <code>{record.topic}</code>
-          </>
-        )}
+          <span>{new Date(record.timestamp).toLocaleTimeString()}</span>
+        </div>
+        <code>{record.topic}</code>
         <pre>{prettyPayload(record.payload).slice(0, 360)}</pre>
       </div>
     )
@@ -1211,37 +1828,6 @@ export function Overview({
       {!activities.length && <div className="panel-empty small"><Radio size={22} /><span>{emptyText}</span></div>}
     </div>
   )
-  const renderGroupedEventList = () => groupedGeneralActivities.length ? (
-    <div className="event-group-list">
-      {groupedGeneralActivities.map((group, index) => (
-        <details
-          className="event-message-group"
-          key={group.id}
-          open={expandedEventGroups[group.id] ?? index === 0}
-          onToggle={(event) => {
-            const open = event.currentTarget.open
-            setExpandedEventGroups((current) => current[group.id] === open
-              ? current
-              : { ...current, [group.id]: open })
-          }}
-        >
-          <summary>
-            <span className="event-group-chevron"><ChevronDown size={14} /></span>
-            <span className={`event-kind ${group.kind}`}>{group.kind === 'event' ? '事件' : '请求'}</span>
-            <span className="event-group-copy">
-              <strong>{group.label}</strong>
-              <code>{group.method}</code>
-            </span>
-            <span className="event-group-latest">最近 {new Date(group.latestAt).toLocaleTimeString()}</span>
-            <small>{group.activities.length} 条</small>
-          </summary>
-          <div className="event-list grouped-event-list">
-            {renderEventRows(group.activities, true)}
-          </div>
-        </details>
-      ))}
-    </div>
-  ) : <div className="panel-empty small"><Radio size={22} /><span>暂无设备事件或请求</span></div>
 
   if (!deviceSn) {
     return (
@@ -1347,10 +1933,7 @@ export function Overview({
             </section>
           )}
           {activeWorkbenchTab === 'events' && (
-            <section className="event-workspace">
-              <header className="event-workspace-header"><div><Bell size={17} /><h3>设备事件</h3></div><span>{groupedGeneralActivities.length} 种类型 · 共 {generalActivities.length} 条</span></header>
-              {renderGroupedEventList()}
-            </section>
+            <DeviceEventWorkspace activities={generalActivities} onNotify={onNotify} />
           )}
           {activeWorkbenchTab === 'logs' && onPublish && onNotify && onOpenOssManager && onSelectObjectStorage && (
             <RemoteLogCenter
@@ -1366,8 +1949,24 @@ export function Overview({
               onOpenOssManager={onOpenOssManager}
             />
           )}
+          {activeWorkbenchTab === 'firmware' && onService && onSelectObjectStorage && onOpenOssManager && (
+            <FirmwareUpgradeCenter
+              profile={profile}
+              gatewaySn={deviceSn}
+              status={status}
+              busy={busy}
+              telemetry={telemetry}
+              records={records}
+              objectStorageProfiles={objectStorageProfiles}
+              activeObjectStorageId={activeObjectStorageId}
+              onSelectObjectStorage={onSelectObjectStorage}
+              onOpenOssManager={onOpenOssManager}
+              onService={onService}
+              onNotify={onNotify}
+            />
+          )}
           {activeWorkbenchTab === 'history' && (
-            <CommandHistory transactions={transactions} />
+            <CommandHistory transactions={transactions} onNotify={onNotify} />
           )}
           {onPublish && (
             <div className="persistent-command-center" hidden={activeWorkbenchTab !== 'commands'}>
@@ -1381,6 +1980,7 @@ export function Overview({
                 onService={onService}
                 onNotify={onNotify}
                 allowedCategories={['debug', 'flight', 'payload']}
+                mediaServers={mediaServers}
               />
             </div>
           )}

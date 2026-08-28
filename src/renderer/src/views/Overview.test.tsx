@@ -1,9 +1,29 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { ConnectionProfile, MqttMessageRecord } from '../../../shared/contracts'
-import type { CommandTransaction, DeviceTelemetry } from '../lib/dji'
+import type { CommandTransaction, DeviceActivity, DeviceTelemetry } from '../lib/dji'
 import { createDefaultTelemetryLayout, reconcileTelemetryLayout } from '../lib/telemetry-layout'
-import { CommandHistory, Overview, telemetryFieldMatchesSearch } from './Overview'
+import {
+  CommandHistory,
+  CommandResultCheckPage,
+  DeviceEventWorkspace,
+  formatElapsedTime,
+  HmsPayloadDetails,
+  JsonPayloadView,
+  Overview,
+  telemetryFieldMatchesSearch,
+} from './Overview'
+
+describe('elapsed time formatting', () => {
+  it('uses seconds, minutes and hours at their respective boundaries', () => {
+    expect(formatElapsedTime(-1_000)).toBe('0 秒前')
+    expect(formatElapsedTime(59_999)).toBe('59 秒前')
+    expect(formatElapsedTime(60_000)).toBe('1 分钟前')
+    expect(formatElapsedTime(3_599_999)).toBe('59 分钟前')
+    expect(formatElapsedTime(3_600_000)).toBe('1 小时前')
+    expect(formatElapsedTime(3_960_000)).toBe('1 小时前')
+  })
+})
 
 describe('telemetry field search', () => {
   it('matches localized display names and raw field paths', () => {
@@ -46,15 +66,20 @@ describe('CommandHistory request and response details', () => {
     expect(markup).not.toContain('<details class="command-history-item" open=""')
     expect(markup).toContain('发送信息')
     expect(markup).toContain('返回信息')
+    expect(markup.match(/aria-label="复制 Topic"/g)).toHaveLength(2)
+    expect(markup.match(/aria-label="复制 Payload"/g)).toHaveLength(2)
     expect(markup).toContain('thing/product/DOCK-1/services')
     expect(markup).toContain('thing/product/DOCK-1/services_reply')
-    expect(markup).toContain('&quot;force&quot;: true')
-    expect(markup).toContain('&quot;detail&quot;: &quot;opened&quot;')
+    expect(markup).toContain('class="json-tree-key">&quot;force&quot;')
+    expect(markup).toContain('class="json-tree-value boolean">true')
+    expect(markup).toContain('class="json-tree-key">&quot;detail&quot;')
+    expect(markup).toContain('class="json-tree-value string">&quot;opened&quot;')
     expect(markup).toContain('<dt>耗时</dt><dd>45 ms</dd>')
-    expect(markup).toContain('<dt>结果码</dt><dd>0</dd>')
+    expect(markup).toContain('<dt>结果码</dt><dd class="command-result-value"><span>0</span></dd>')
+    expect(markup).not.toContain('核查')
   })
 
-  it('shows workbook guidance when a command reply has a non-zero result', () => {
+  it('offers workbook guidance on demand when a command reply has a non-zero result', () => {
     const request = {
       id: 'request-error', profileId: 'profile', direction: 'out', topic: 'thing/product/DOCK-1/services',
       payload: JSON.stringify({ tid: 'tid-error', method: 'flighttask_prepare', data: {} }),
@@ -72,10 +97,119 @@ describe('CommandHistory request and response details', () => {
 
     const markup = renderToStaticMarkup(<CommandHistory transactions={[transaction]} />)
 
-    expect(markup).toContain('错误码 316031 排障建议')
-    expect(markup).toContain('设置返航模式失败')
-    expect(markup).toContain('2代机库下发任务需指定返航模式')
-    expect(markup).toContain('机场日志、飞机日志')
+    expect(markup).toContain('<span>316031</span>')
+    expect(markup).toContain('核查')
+    expect(markup).not.toContain('结果码 316031 核查结果')
+    expect(markup).not.toContain('设置返航模式失败')
+
+    const checkMarkup = renderToStaticMarkup(
+      <CommandResultCheckPage transaction={transaction} onBack={() => undefined} />,
+    )
+    expect(checkMarkup).toContain('返回最近指令')
+    expect(checkMarkup).toContain('结果码 316031 核查结果')
+    expect(checkMarkup).toContain('设置返航模式失败')
+    expect(checkMarkup).toContain('2代机库下发任务需指定返航模式')
+  })
+})
+
+describe('JSON payload tree', () => {
+  it('parses JSON and exposes expandable object and array nodes', () => {
+    const markup = renderToStaticMarkup(
+      <JsonPayloadView payload={JSON.stringify({ data: { files: [{ size: 42 }] } })} />,
+    )
+
+    expect(markup).toContain('role="tree"')
+    expect(markup).toContain('aria-label="收起 JSON 根节点"')
+    expect(markup).toContain('aria-label="展开 数组项 0"')
+    expect(markup).toContain('class="json-tree-key">&quot;files&quot;')
+    expect(markup).toContain('class="json-tree-index">[0]')
+  })
+
+  it('keeps invalid JSON available as scrollable raw text', () => {
+    const markup = renderToStaticMarkup(<JsonPayloadView payload="not-json" />)
+
+    expect(markup).toContain('command-payload-raw')
+    expect(markup).toContain('not-json')
+    expect(markup).not.toContain('role="tree"')
+  })
+})
+
+describe('device event workspace', () => {
+  it('uses a type list on the left and shows only HMS message details on the right', () => {
+    const hmsRecord = {
+      id: 'hms-event', profileId: 'profile', direction: 'in', topic: 'thing/product/DOCK-1/events',
+      payload: JSON.stringify({
+        tid: 'hms-tid',
+        bid: 'hms-bid',
+        timestamp: 1654070968655,
+        method: 'hms',
+        data: {
+          list: [
+            {
+              args: { component_index: 0, sensor_index: 1 },
+              code: '0x16100016',
+              device_type: '0-67-0',
+              imminent: 1,
+              in_the_sky: 0,
+              level: 2,
+              module: 3,
+            },
+            {
+              args: { component_index: 1, sensor_index: 0 },
+              code: '0x19113414',
+              device_type: '3-2-0',
+              imminent: 1,
+              in_the_sky: 0,
+              level: 1,
+              module: 3,
+            },
+          ],
+        },
+      }),
+      qos: 1, retain: false, timestamp: 200, size: 88,
+    } satisfies MqttMessageRecord
+    const drcRecord = {
+      ...hmsRecord,
+      id: 'drc-event',
+      payload: JSON.stringify({ method: 'drc_status_notify', data: { result: 0 } }),
+      timestamp: 100,
+    } satisfies MqttMessageRecord
+    const olderHmsRecord = {
+      ...hmsRecord,
+      id: 'hms-event-older',
+      timestamp: 150,
+    } satisfies MqttMessageRecord
+    const activities = [
+      { record: hmsRecord, method: 'hms', kind: 'event', label: '设备告警', knownMethod: true },
+      { record: olderHmsRecord, method: 'hms', kind: 'event', label: '设备告警', knownMethod: true },
+      { record: drcRecord, method: 'drc_status_notify', kind: 'event', label: 'DRC 状态通知', knownMethod: true },
+    ] satisfies DeviceActivity[]
+
+    const markup = renderToStaticMarkup(<DeviceEventWorkspace activities={activities} />)
+
+    expect(markup).toContain('<h3>事件类型</h3>')
+    expect(markup).not.toContain('<h3>消息列表</h3>')
+    expect(markup).toContain('aria-current="page"')
+    expect(markup).toContain('<strong>设备告警</strong><code>hms</code>')
+    expect(markup.match(/class="event-message-list-row"/g)).toHaveLength(2)
+    expect(markup.match(/class="event-message-detail-button"/g)).toHaveLength(2)
+    expect(markup).not.toContain('class="event-message-detail"')
+    expect(markup).not.toContain('DRC 状态通知')
+    expect(markup).not.toContain('drc_status_notify')
+
+    const detailMarkup = renderToStaticMarkup(<HmsPayloadDetails payload={hmsRecord.payload} />)
+    expect(detailMarkup.match(/class="hms-alarm-item /g)).toHaveLength(2)
+    expect(detailMarkup).toContain('class="hms-alarm-index">#1</span>')
+    expect(detailMarkup).toContain('class="hms-alarm-index">#2</span>')
+    expect(detailMarkup).toContain('class="hms-level-badge warning">警告</span>')
+    expect(detailMarkup).toContain('无法起飞:飞行器未激活')
+    expect(detailMarkup).toContain('电池温度过高')
+    expect(detailMarkup).toContain('<dt>事件模块</dt><dd>HMS</dd>')
+    expect(detailMarkup).toContain('<dt>飞行状态</dt><dd>在地上</dd>')
+    expect(detailMarkup).toContain('<dt>组件索引</dt><dd>0</dd>')
+    expect(detailMarkup).toContain('<dt>传感器索引</dt><dd>1</dd>')
+    expect(detailMarkup).toContain('处理建议')
+    expect(detailMarkup).toContain('原始 MQTT 报文')
   })
 })
 
@@ -619,6 +753,52 @@ describe('Overview DJI field presentation', () => {
     expect(markup).toContain('<span>第 1 项</span>')
     expect(markup).toContain('<span>第 2 项</span>')
     expect(markup).toContain('maintain_status.maintain_status_array.1.last_maintain_type')
+  })
+
+  it('preserves the parent-child hierarchy of nested telemetry arrays', () => {
+    const profile = {
+      id: 'profile',
+      name: 'Nested array telemetry',
+      devices: [{ id: 'dock', name: '测试机场', sn: 'DOCK-1', type: 'dock' }],
+    } as ConnectionProfile
+    const telemetry = [{
+      profileId: 'profile',
+      sn: 'DOCK-1',
+      type: 'dock',
+      name: '测试机场',
+      online: true,
+      lastSeenAt: Date.now(),
+      lastTopic: 'thing/product/DOCK-1/osd',
+      status: {},
+      state: {},
+      osd: {
+        live_capacity: {
+          device_list: [{
+            sn: 'AIR-1',
+            camera_list: [{
+              camera_index: '81-0-0',
+              video_list: [{ video_index: 'wide-0', video_type: 'wide' }],
+            }],
+          }],
+        },
+      },
+    }] satisfies DeviceTelemetry[]
+
+    const markup = renderToStaticMarkup(
+      <Overview
+        profile={profile}
+        status="connected"
+        telemetry={telemetry}
+        selectedDeviceSn="DOCK-1"
+        records={[]}
+        transactions={[]}
+      />,
+    )
+
+    expect(markup).toContain('data-array-path="live_capacity.device_list" data-array-depth="0"')
+    expect(markup).toContain('data-array-path="live_capacity.device_list.0.camera_list" data-parent-array-path="live_capacity.device_list" data-array-depth="1"')
+    expect(markup).toContain('data-array-path="live_capacity.device_list.0.camera_list.0.video_list" data-parent-array-path="live_capacity.device_list.0.camera_list" data-array-depth="2"')
+    expect(markup).toContain('live_capacity.device_list.0.camera_list.0.video_list.0.video_index')
   })
 
   it('does not report a device as online when MQTT is disconnected', () => {

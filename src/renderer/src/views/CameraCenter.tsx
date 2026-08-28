@@ -21,7 +21,6 @@ import type {
 import { LivePlayer } from '../components/LivePlayer'
 import { Tooltip } from '../components/Tooltip'
 import {
-  cameraLiveCapacity,
   cameraStreamName,
   collectCameraSources,
   videoTypeLabel,
@@ -69,6 +68,11 @@ const qualityOptions = [
   { value: 2, label: '标清' },
   { value: 3, label: '高清' },
   { value: 4, label: '超清' },
+]
+
+const dockCameraPositions = [
+  { value: 0, label: '舱内' },
+  { value: 1, label: '舱外' },
 ]
 
 const cameraActions = [
@@ -142,10 +146,6 @@ export function CameraCenter({
     () => cameras.flatMap((camera) => camera.videos.map((video) => ({ camera, video }))),
     [cameras],
   )
-  const liveCapacity = useMemo(
-    () => cameraLiveCapacity(telemetry, gatewaySn),
-    [gatewaySn, telemetry],
-  )
   const [pushProtocol, setPushProtocol] = useState<PushProtocol>('rtmp')
   const compatibleMediaServers = useMemo(
     () => mediaServers.filter((server) => pushProtocol === 'webrtc'
@@ -158,6 +158,7 @@ export function CameraCenter({
   const [sending, setSending] = useState('')
   const [playbacks, setPlaybacks] = useState<Record<string, ActivePlayback>>({})
   const [selectedLensTypes, setSelectedLensTypes] = useState<Record<string, string>>({})
+  const [selectedDockCameraPositions, setSelectedDockCameraPositions] = useState<Record<string, number>>({})
   const [selectedQualities, setSelectedQualities] = useState<Record<string, number>>({})
   const hasActivePlaybacks = Object.keys(playbacks).length > 0
   const qualityForVideo = (video: CameraVideoStream): number =>
@@ -480,6 +481,33 @@ export function CameraCenter({
     }
   }
 
+  const switchDockCameraPosition = async (video: CameraVideoStream, cameraPosition: number): Promise<void> => {
+    const source = videoSources.find((item) => item.video.id === video.id)
+    if (source) setSelectedCameraId(source.camera.id)
+    setSelectedVideoId(video.id)
+    if (selectedDockCameraPositions[video.id] === cameraPosition) return
+
+    const sendingId = `camera-position:${video.id}`
+    setSending(sendingId)
+    try {
+      const response = await publishLiveService(video.gatewaySn, 'live_camera_change', {
+        video_id: video.id,
+        camera_position: cameraPosition,
+      })
+      if (!response.ok) {
+        onNotify?.(liveCommandError(response, '切换机场直播相机失败'), 'error')
+        return
+      }
+      setSelectedDockCameraPositions((current) => ({ ...current, [video.id]: cameraPosition }))
+      const positionLabel = dockCameraPositions.find((position) => position.value === cameraPosition)?.label ?? String(cameraPosition)
+      onNotify?.(`已切换到${positionLabel}相机`, 'success')
+    } catch (error) {
+      onNotify?.(error instanceof Error ? error.message : String(error), 'error')
+    } finally {
+      setSending('')
+    }
+  }
+
   const switchVideoQuality = async (video: CameraVideoStream, nextQuality: number): Promise<void> => {
     const source = videoSources.find((item) => item.video.id === video.id)
     if (source) setSelectedCameraId(source.camera.id)
@@ -592,13 +620,6 @@ export function CameraCenter({
                 {qualityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </label>
-            <div className="camera-stream-capacity" aria-label="OSD 当前推流">
-              <span>OSD 当前推流</span>
-              <strong>{liveCapacity.currentVideoNumber !== undefined ? `${liveCapacity.currentVideoNumber} 路` : '尚未上报'}</strong>
-            </div>
-            <span className="camera-concurrency-note">
-              OSD 上报最大：{liveCapacity.coexistVideoNumberMax !== undefined ? `${liveCapacity.coexistVideoNumberMax} 路` : '尚未上报'}
-            </span>
             <div className="camera-stream-bulk-actions">
               {videoSources.some(({ video }) => !playbacks[video.id]) && (
                 <button className="button primary compact" disabled={!selectedServer || status !== 'connected' || busy || Boolean(sending)} onClick={() => void startAllPlaybacks()}>
@@ -657,6 +678,24 @@ export function CameraCenter({
 
                   <footer className="camera-monitor-footer">
                     <div className="camera-monitor-options">
+                      {camera.sourceType === 'dock' ? (
+                        <label className="camera-monitor-select-control camera-position-control">
+                          <span>相机</span>
+                          <select
+                            className="camera-monitor-select camera-position-select"
+                            aria-label={`${video.videoIndex} 切换机场相机`}
+                            value={selectedDockCameraPositions[video.id] ?? ''}
+                            disabled={status !== 'connected' || busy || Boolean(sending)}
+                            onChange={(event) => void switchDockCameraPosition(video, Number(event.target.value))}
+                          >
+                            <option value="" disabled>选择</option>
+                            {dockCameraPositions.map((position) => (
+                              <option key={position.value} value={position.value}>{position.label}</option>
+                            ))}
+                          </select>
+                          <ChevronDown size={13} aria-hidden="true" />
+                        </label>
+                      ) : null}
                       {supportedTypes.length > 1 ? (
                         <label className="camera-monitor-select-control camera-lens-control">
                           <span>镜头</span>

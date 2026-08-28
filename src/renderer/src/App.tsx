@@ -1,7 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import {
   Activity,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   CircleAlert,
   Database,
   Download,
@@ -19,6 +29,8 @@ import type {
   ConnectionStatus,
   DeviceArchive,
   DjiDevice,
+  MediaServerProfile,
+  MediaServerRuntime,
   MqttMessageRecord,
   MqttQos,
   ObjectStorageProfile,
@@ -53,6 +65,7 @@ import { TelemetryManager } from './views/TelemetryManager'
 import { ErrorCodeManager } from './views/ErrorCodeManager'
 import { OssManager } from './views/OssManager'
 import { errorCodeStats, formatServiceError } from './lib/dji-error-codes'
+import { buildFirmwareEventReply } from './lib/dji-firmware'
 import {
   loadTelemetryLayout,
   reconcileTelemetryLayout,
@@ -99,6 +112,29 @@ const shouldDisconnectForProfileSave = (status: ConnectionStatus): boolean => st
 const isGatewayType = (type: DjiDevice['type']): boolean => type === 'dock' || type === 'pilot'
 
 const SERVICE_REPLY_TIMEOUT_MS = 20_000
+const DEFAULT_SIDEBAR_WIDTH = 240
+const MIN_SIDEBAR_WIDTH = 210
+const MAX_SIDEBAR_WIDTH = 420
+const MIN_WORKSPACE_WIDTH = 420
+const SIDEBAR_WIDTH_STORAGE_KEY = 'dji-cloud-studio.sidebar-width'
+
+const clampSidebarWidth = (width: number): number => {
+  const viewportMax = typeof window === 'undefined'
+    ? MAX_SIDEBAR_WIDTH
+    : window.innerWidth - 54 - MIN_WORKSPACE_WIDTH
+  const maxWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, viewportMax))
+  return Math.round(Math.min(maxWidth, Math.max(MIN_SIDEBAR_WIDTH, width)))
+}
+
+const loadSidebarWidth = (): number => {
+  if (typeof window === 'undefined') return DEFAULT_SIDEBAR_WIDTH
+  try {
+    const stored = Number(window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY))
+    return Number.isFinite(stored) && stored > 0 ? clampSidebarWidth(stored) : DEFAULT_SIDEBAR_WIDTH
+  } catch {
+    return DEFAULT_SIDEBAR_WIDTH
+  }
+}
 
 interface PendingServiceReply {
   profileId: string
@@ -139,8 +175,15 @@ export default function App() {
   const deviceArchivesRef = useRef<DeviceArchive[]>([])
   const [selectedDeviceSn, setSelectedDeviceSn] = useState('')
   const [activeView, setActiveView] = useState<WorkspaceView>('overview')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarWidth, setSidebarWidth] = useState(loadSidebarWidth)
+  const [sidebarResizing, setSidebarResizing] = useState(false)
+  const sidebarResizeStartRef = useRef({ x: 0, width: DEFAULT_SIDEBAR_WIDTH })
   const [objectStorageProfiles, setObjectStorageProfiles] = useState<ObjectStorageProfile[]>([])
   const [activeObjectStorageId, setActiveObjectStorageId] = useState('')
+  const [mediaServers, setMediaServers] = useState<MediaServerProfile[]>([])
+  const [mediaServerRuntimes, setMediaServerRuntimes] = useState<Record<string, MediaServerRuntime>>({})
+  const [mediaServersLoading, setMediaServersLoading] = useState(true)
   const [telemetryLayout, setTelemetryLayout] = useState<TelemetryLayoutConfig>(() => loadTelemetryLayout())
   const [connectionEditor, setConnectionEditor] = useState<{ profile: ConnectionProfile; isNew: boolean } | null>(null)
   const [deviceEditor, setDeviceEditor] = useState<{ device: DjiDevice; isNew: boolean } | null>(null)
@@ -158,10 +201,84 @@ export default function App() {
   const discoveredAircraftSubscriptionRef = useRef(new Set<string>())
   const pendingServiceRepliesRef = useRef(new Map<string, PendingServiceReply>())
 
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth))
+    } catch {
+      // The current window can still use the resized width when storage is unavailable.
+    }
+  }, [sidebarWidth])
+
+  useEffect(() => {
+    const fitSidebarToViewport = (): void => setSidebarWidth((current) => clampSidebarWidth(current))
+    window.addEventListener('resize', fitSidebarToViewport)
+    return () => window.removeEventListener('resize', fitSidebarToViewport)
+  }, [])
+
+  useEffect(() => {
+    if (!sidebarResizing) return
+
+    const resizeSidebar = (event: PointerEvent): void => {
+      const delta = event.clientX - sidebarResizeStartRef.current.x
+      setSidebarWidth(clampSidebarWidth(sidebarResizeStartRef.current.width + delta))
+    }
+    const finishResize = (): void => setSidebarResizing(false)
+
+    window.addEventListener('pointermove', resizeSidebar)
+    window.addEventListener('pointerup', finishResize)
+    window.addEventListener('pointercancel', finishResize)
+    return () => {
+      window.removeEventListener('pointermove', resizeSidebar)
+      window.removeEventListener('pointerup', finishResize)
+      window.removeEventListener('pointercancel', finishResize)
+    }
+  }, [sidebarResizing])
+
+  const startSidebarResize = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (event.button !== 0 || sidebarCollapsed) return
+    event.preventDefault()
+    sidebarResizeStartRef.current = { x: event.clientX, width: sidebarWidth }
+    setSidebarResizing(true)
+  }
+
   const showToast = useCallback((text: string, tone: 'info' | 'success' | 'error' = 'info'): void => {
     toastIdRef.current += 1
     setToast({ id: toastIdRef.current, text, tone })
   }, [])
+
+  const updateMediaServerRuntime = useCallback((runtime: MediaServerRuntime): void => {
+    setMediaServerRuntimes((current) => {
+      const previous = current[runtime.profileId]
+      if (previous && previous.checkedAt > runtime.checkedAt) return current
+      return { ...current, [runtime.profileId]: runtime }
+    })
+  }, [])
+
+  useEffect(() => {
+    const unsubscribe = window.djiApi.media.onRuntimeEvent(updateMediaServerRuntime)
+    void window.djiApi.media.getLocalRuntime()
+      .then(updateMediaServerRuntime)
+      .catch((error) => showToast(`加载本地媒体服务状态失败：${errorMessage(error)}`, 'error'))
+    return unsubscribe
+  }, [showToast, updateMediaServerRuntime])
+
+  useEffect(() => {
+    let disposed = false
+    void window.djiApi.media.listServers().then((servers) => {
+      if (disposed) return
+      setMediaServers(servers)
+      servers.filter((server) => server.kind !== 'local-zlm').forEach((server) => {
+        void window.djiApi.media.checkServer(server.id).then((result) => {
+          if (!disposed && result.runtime) updateMediaServerRuntime(result.runtime)
+        })
+      })
+    }).catch((error) => {
+      if (!disposed) showToast(`加载媒体服务失败：${errorMessage(error)}`, 'error')
+    }).finally(() => {
+      if (!disposed) setMediaServersLoading(false)
+    })
+    return () => { disposed = true }
+  }, [showToast, updateMediaServerRuntime])
 
   const handleObjectStorageSave = async (profile: ObjectStorageProfile): Promise<ObjectStorageProfile> => {
     const saved = await window.djiApi.objectStorage.save(profile)
@@ -464,6 +581,18 @@ export default function App() {
       }
 
       if (event.type === 'message') {
+        const firmwareEventReply = buildFirmwareEventReply(event.message)
+        if (firmwareEventReply) {
+          void window.djiApi.mqtt.publish({
+            profileId: event.profileId,
+            topic: firmwareEventReply.topic,
+            payload: firmwareEventReply.payload,
+            qos: 1,
+            retain: false,
+          }).then((result) => {
+            if (!result.ok) showToast(`固件升级进度确认失败：${result.error ?? '未知错误'}`, 'error')
+          }).catch((error) => showToast(`固件升级进度确认失败：${errorMessage(error)}`, 'error'))
+        }
         const reply = parseServiceReply(event.message)
         if (reply) {
           if (reply.result !== undefined && reply.result !== 0) {
@@ -1154,7 +1283,10 @@ export default function App() {
         </div>
       </header>
 
-      <div className={`app-body ${activeView !== 'overview' ? 'wide-mode' : ''}`}>
+      <div
+        className={`app-body ${activeView !== 'overview' ? 'wide-mode' : ''} ${activeView === 'overview' && sidebarCollapsed ? 'sidebar-collapsed' : ''} ${sidebarResizing ? 'sidebar-resizing' : ''}`}
+        style={{ '--app-sidebar-width': `${sidebarWidth}px` } as CSSProperties}
+      >
         <nav className="app-rail" aria-label="主导航">
           <div className="rail-top">
             <Tooltip label="设备工作台">
@@ -1181,6 +1313,42 @@ export default function App() {
         </nav>
 
         {activeView === 'overview' && (
+          <>
+            {!sidebarCollapsed && (
+              <div
+                className="sidebar-resize-handle"
+                role="separator"
+                aria-label="调整侧栏宽度"
+                aria-orientation="vertical"
+                aria-valuemin={MIN_SIDEBAR_WIDTH}
+                aria-valuemax={MAX_SIDEBAR_WIDTH}
+                aria-valuenow={sidebarWidth}
+                tabIndex={0}
+                onPointerDown={startSidebarResize}
+                onDoubleClick={() => setSidebarWidth(DEFAULT_SIDEBAR_WIDTH)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+                  event.preventDefault()
+                  setSidebarWidth((current) => clampSidebarWidth(current + (event.key === 'ArrowRight' ? 12 : -12)))
+                }}
+              />
+            )}
+            <div className="sidebar-edge-toggle-slot">
+              <Tooltip label={sidebarCollapsed ? '展开侧栏' : '收起侧栏'}>
+                <button
+                  className="sidebar-edge-toggle"
+                  aria-expanded={!sidebarCollapsed}
+                  aria-controls="device-sidebar"
+                  onClick={() => setSidebarCollapsed((current) => !current)}
+                >
+                  {sidebarCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+                </button>
+              </Tooltip>
+            </div>
+          </>
+        )}
+
+        {activeView === 'overview' && (
           <Sidebar
             profiles={profiles}
             activeProfileId={activeProfileId}
@@ -1193,6 +1361,7 @@ export default function App() {
             onEditProfile={(profile) => setConnectionEditor({ profile, isNew: false })}
             onAddDevice={() => setDeviceEditor({ device: createDevice(), isNew: true })}
             onEditDevice={(device) => setDeviceEditor({ device, isNew: false })}
+            onRemoveDevice={handleRemoveDevice}
             onSelectDevice={setSelectedDeviceSn}
             onToggleDevice={handleToggleDevice}
             onToggleSubscription={handleToggleSubscription}
@@ -1255,9 +1424,19 @@ export default function App() {
                 objectStorageProfiles={objectStorageProfiles}
                 activeObjectStorageId={activeObjectStorageId}
                 onSelectObjectStorage={setActiveObjectStorageId}
+                mediaServers={mediaServers}
               />
             </div>
-            {activeView === 'media' && <MediaCenter onNotify={showToast} />}
+            {activeView === 'media' && (
+              <MediaCenter
+                servers={mediaServers}
+                runtimeById={mediaServerRuntimes}
+                loading={mediaServersLoading}
+                onServersChange={setMediaServers}
+                onRuntimeChange={updateMediaServerRuntime}
+                onNotify={showToast}
+              />
+            )}
             {activeView === 'oss' && (
               <OssManager
                 profiles={objectStorageProfiles}

@@ -8,6 +8,7 @@ import {
   validateConnectionProfile,
   validateDeviceArchives,
   validateExportMessageOptions,
+  validateFirmwareUploadRequest,
   validateMediaServerProfile,
   validateObjectStorageProfile,
   validateProfileId,
@@ -27,6 +28,7 @@ import { negotiateWhep } from './whep-client'
 import { ObjectStorageStore } from './object-storage-store'
 import { RtmpRelayManager } from './rtmp-relay-manager'
 import { DeviceArchiveStore } from './device-archive-store'
+import { FirmwareUploadManager } from './firmware-upload-manager'
 
 let mainWindow: BrowserWindow | null = null
 let profileStore: ProfileStore
@@ -36,6 +38,7 @@ let mediaServerManager: MediaServerManager
 let rtmpRelayManager: RtmpRelayManager
 let objectStorageStore: ObjectStorageStore
 let deviceArchiveStore: DeviceArchiveStore
+let firmwareUploadManager: FirmwareUploadManager
 let quitCleanupStarted = false
 let quitCleanupComplete = false
 
@@ -279,6 +282,25 @@ const registerIpc = (): void => {
   ipcMain.handle(IPC_CHANNELS.objectStorageResolve, (_event, rawProfileId: unknown) =>
     objectStorageStore.resolve(validateProfileId(rawProfileId)),
   )
+  ipcMain.handle(IPC_CHANNELS.firmwarePickPackage, async () => {
+    try {
+      const result = await dialog.showOpenDialog({
+        title: '选择本地固件包',
+        properties: ['openFile'],
+        filters: [
+          { name: '固件包', extensions: ['zip', 'bin', 'tar', 'gz', 'tgz', 'pkg'] },
+          { name: '所有文件', extensions: ['*'] },
+        ],
+      })
+      if (result.canceled || !result.filePaths[0]) return { canceled: true }
+      return { canceled: false, package: await firmwareUploadManager.select(result.filePaths[0]) }
+    } catch (error) {
+      return { canceled: false, error: errorMessage(error) }
+    }
+  })
+  ipcMain.handle(IPC_CHANNELS.firmwareUploadPackage, (_event, rawRequest: unknown) =>
+    firmwareUploadManager.upload(validateFirmwareUploadRequest(rawRequest)),
+  )
 }
 
 app.whenReady().then(() => {
@@ -294,6 +316,11 @@ app.whenReady().then(() => {
   })
   rtmpRelayManager = new RtmpRelayManager()
   objectStorageStore = new ObjectStorageStore()
+  firmwareUploadManager = new FirmwareUploadManager(objectStorageStore, (progress) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(IPC_CHANNELS.firmwareUploadProgress, progress)
+    }
+  })
   deviceArchiveStore = new DeviceArchiveStore()
   registerIpc()
   createWindow()

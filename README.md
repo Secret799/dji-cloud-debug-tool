@@ -1,6 +1,6 @@
 # DJI Cloud Studio
 
-一款面向 macOS 的大疆上云 API 与 MQTT 调试工具。项目参考了
+一款面向 macOS 和 Windows 的大疆上云 API 与 MQTT 调试工具。项目参考了
 [Dji-cloud-api-tool](https://github.com/damon-liu/Dji-cloud-api-tool) 的设备与控制工作流，以及
 [MQTTX](https://github.com/emqx/MQTTX) 的连接配置、消息检查和发布交互。
 
@@ -8,10 +8,10 @@
 
 ## 已实现功能
 
-- 原生 Electron 桌面窗口，提供 Apple Silicon (`arm64`) 与 Intel (`x64`) 的独立 DMG / ZIP 打包命令。
+- 原生 Electron 桌面窗口，提供 Apple Silicon (`arm64`) / Intel (`x64`) 的 macOS DMG / ZIP，以及 Windows `x64` / `arm64` 安装版、便携版和 ZIP。
 - 多连接 Profile，支持 `mqtt`、`mqtts`、`ws`、`wss` 与 MQTT 3.1.1 / 5.0。
 - 用户名密码、Clean Session、Keep Alive、自动重连、CA/客户端证书/私钥。
-- 密码通过 Electron `safeStorage` 使用 macOS 系统能力加密，Renderer 不读取已保存明文。
+- 密码通过 Electron `safeStorage` 使用操作系统安全存储能力加密，Renderer 不读取已保存明文。
 - 连接侧栏、设备树与设备启停、按上级设备分组的 Topic 订阅、自定义订阅和 QoS 0/1/2。
 - MQTT 消息流、方向/关键字筛选、JSON 检查、发布器、Retain 与 NDJSON 抓包导出。
 - 机场、飞机与 Pilot 设备管理；添加设备时生成 DJI 常用 Topic。
@@ -20,6 +20,7 @@
 - Dock 2 的 144 项设备属性按 DJI 文档显示中文名称、枚举含义和单位；字段旁详情图标可查看类型、约束、读写权限、上报模式与官方描述。
 - 遥测中的 Dock 2、Dock 3 与飞机可读写属性可直接通过 `property/set` 设置，并关联 `property/set_reply` 结果；遥测项管理可查看官方权限、类型、约束和来源，也可为自定义字段配置安全关闭的属性设置能力。
 - 机场、飞行、负载、PSDK 喊话器和直播控制模板，Payload 发送前可编辑。
+- Dock 固件升级工作台：选择本地固件包并上传到指定 OSS，核对访问 URL、MD5、大小、目标设备与版本后下发 `ota_create`，跟踪 `ota_progress` 并自动回复 `events_reply`。
 - 内置 ZLMediaKit，可由用户按需启动或停止；本地服务提供 RTMP 推流、RTSP、HLS、HTTP API 和 RTP Proxy/GB28181 能力。
 - 媒体中心可保存多个远程 ZLMediaKit / SRS / SecretEMS 服务：ZLMediaKit 和 SRS 按应用名、流 ID 生成 RTMP、RTSP、WebRTC 与 HLS 地址；SecretEMS 则生成 RTMP 推流地址，并按其标准网关规范生成 WHIP 推流和 WHEP 播放地址。
 - HLS.js 直接预览所选媒体服务中的 HLS 流；API Secret 通过 Electron `safeStorage` 加密，Renderer 不读取已保存明文。
@@ -36,7 +37,7 @@
 
 ## 开发运行
 
-环境要求：macOS、Node.js `22.12+`，npm `10.8.2`。
+环境要求：macOS 或 Windows、Node.js `22.12+`，npm `10.8.2`。
 
 ```bash
 npm ci
@@ -57,6 +58,9 @@ npm run build:zlm    # 为当前 Mac 架构重建内置 ZLMediaKit
 npm run package:mac  # 先执行单测与构建，再生成 arm64 DMG 与 ZIP
 npm run package:mac:arm64
 npm run package:mac:x64
+npm run package:win        # 默认生成 Windows x64 安装版、便携版与 ZIP
+npm run package:win:x64
+npm run package:win:arm64
 ```
 
 `npm run build` 的生产文件位于 `out/`；`package:mac*` 的安装包和解包应用位于 `release/`。公网 MQTT smoke 会真实发布消息，不属于默认发布门禁。
@@ -69,9 +73,26 @@ DJI_STUDIO_EXECUTABLE="release/mac-arm64/DJI Cloud Studio.app/Contents/MacOS/DJI
 
 `x64` 构建时将环境变量改为 `release/` 下实际生成的 Intel 应用可执行文件。
 
+## GitHub Tag 自动发布
+
+向 GitHub 推送符合 `v主版本.次版本.修订版本` 格式的 tag（例如 `v1.2.0` 或 `v1.2.0-beta.1`）后，`.github/workflows/release.yml` 会先执行测试，再并行构建以下产物，最后连同 `SHA256SUMS.txt` 校验文件自动创建 GitHub Release：
+
+- macOS Apple Silicon (`arm64`)：DMG 和 ZIP。
+- macOS Intel (`x64`)：DMG 和 ZIP。
+- Windows `x64`：NSIS 安装版、便携版和 ZIP。
+- Windows `arm64`：NSIS 安装版、便携版和 ZIP。
+
+可以用项目内置脚本创建并推送 tag。脚本会在工作区有未提交修改时拒绝创建 tag，避免发布内容与本地代码不一致：
+
+```bash
+npm run release:tag -- 1.2.0
+```
+
+也可在 GitHub 页面创建同格式 tag。工作流会在构建机上把 tag 中的版本号写入安装包，无需为发布单独修改 `package.json` 的 `version`。
+
 ## 媒体服务
 
-应用随安装包提供 ZLMediaKit `fdaec260` 的 `arm64` 和 `x64` 原生二进制。媒体中心始终显示一个不可删除的“本地 ZLMediaKit”配置，但是否启动完全由用户决定；应用退出时会停止由本应用启动的子进程。
+macOS 安装包随应用提供 ZLMediaKit `fdaec260` 的 `arm64` 和 `x64` 原生二进制。媒体中心始终显示一个不可删除的“本地 ZLMediaKit”配置，但是否启动完全由用户决定；应用退出时会停止由本应用启动的子进程。Windows 包不会嵌入这两个 macOS 二进制，因此 Windows 上需使用远程 ZLMediaKit / SRS / SecretEMS，或后续单独补充 Windows 版 MediaServer。
 
 本地默认端口为 HTTP/API `9090`、RTMP `1935`、RTSP `8554`，均可在媒体服务设置中修改。界面中的推流地址使用检测到的局域网 IPv4，方便 DJI 设备访问；应用自身的健康检查固定访问 `127.0.0.1`。远程服务可选择 ZLMediaKit、SRS 或 SecretEMS。SecretEMS 默认使用 RTMP `1935` 接收 DJI 推流、HTTPS `443` 提供 WHIP/WHEP 信令，并使用 `8000/tcp+udp` 传输 WebRTC 媒体；该类型不生成 RTSP 或 HLS 地址。目标 SecretEMS 部署需要开启 RTMP listener 并放行对应端口。
 
@@ -93,7 +114,8 @@ npm run build:zlm -- x64
 3. 点击右上角“连接”，启用设备下已开启的订阅会在连接成功或重连后恢复。
 4. 在设备工作台查看 OSD/state 聚合结果，在 MQTT 消息页检查原始报文。
 5. 在控制中心选择网关和指令，核对可编辑 JSON 后发送并等待响应。
-6. 在媒体中心按需启动内置 ZLMediaKit，或添加远程 ZLMediaKit/SRS；复制生成的 RTMP 地址给 DJI 直播配置，并用 HLS 地址预览。
+6. 在机场的“固件升级”页签选择本地固件包与 OSS 配置，上传后核对生成的访问 URL、MD5、大小、目标设备和版本，确认无误再下发并查看实时进度。
+7. 在媒体中心按需启动内置 ZLMediaKit，或添加远程 ZLMediaKit/SRS；复制生成的 RTMP 地址给 DJI 直播配置，并用 HLS 地址预览。
 
 机场默认 Topic 包含：
 

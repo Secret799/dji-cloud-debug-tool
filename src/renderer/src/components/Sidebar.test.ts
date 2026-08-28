@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { ConnectionProfile, DjiDevice, TopicSubscription } from '../../../shared/contracts'
 import type { DeviceTelemetry } from '../lib/dji'
-import { aircraftPowerState, devicesForTree, subscriptionsByParentDevice } from './Sidebar'
+import {
+  aircraftPowerState,
+  deviceContextMenuPosition,
+  devicesForTree,
+  subscriptionsByParentDevice,
+} from './Sidebar'
 
 const device = (sn: string, name: string, type: DjiDevice['type'], parentSn?: string): DjiDevice => ({
   id: sn,
@@ -91,6 +96,17 @@ describe('aircraftPowerState', () => {
   it('returns unknown when the aircraft has not reported a valid power state', () => {
     expect(aircraftPowerState(runtime('AIR-1', 'aircraft'))).toBe('unknown')
     expect(aircraftPowerState(undefined)).toBe('unknown')
+  })
+})
+
+describe('deviceContextMenuPosition', () => {
+  it('keeps the menu inside the viewport', () => {
+    expect(deviceContextMenuPosition(790, 590, 800, 600)).toEqual({ x: 660, y: 550 })
+    expect(deviceContextMenuPosition(-20, -10, 800, 600)).toEqual({ x: 8, y: 8 })
+  })
+
+  it('uses the pointer position when there is enough room', () => {
+    expect(deviceContextMenuPosition(120, 180, 800, 600)).toEqual({ x: 120, y: 180 })
   })
 })
 

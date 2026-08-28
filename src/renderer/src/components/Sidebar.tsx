@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Ban,
   Box,
@@ -42,6 +42,7 @@ interface SidebarProps {
   onEditProfile: (profile: ConnectionProfile) => void
   onAddDevice: () => void
   onEditDevice: (device: DjiDevice) => void
+  onRemoveDevice: (deviceId: string) => Promise<void>
   onSelectDevice: (sn: string) => void
   onToggleDevice: (device: DjiDevice) => Promise<void>
   onToggleSubscription: (subscription: TopicSubscription) => Promise<void>
@@ -149,6 +150,32 @@ interface SubscriptionGroup {
   subscriptions: TopicSubscription[]
 }
 
+interface DeviceContextMenuState {
+  deviceId: string
+  x: number
+  y: number
+}
+
+const DEVICE_CONTEXT_MENU_WIDTH = 132
+const DEVICE_CONTEXT_MENU_HEIGHT = 42
+const DEVICE_CONTEXT_MENU_MARGIN = 8
+
+export const deviceContextMenuPosition = (
+  clientX: number,
+  clientY: number,
+  viewportWidth: number,
+  viewportHeight: number,
+): { x: number; y: number } => ({
+  x: Math.max(
+    DEVICE_CONTEXT_MENU_MARGIN,
+    Math.min(clientX, viewportWidth - DEVICE_CONTEXT_MENU_WIDTH - DEVICE_CONTEXT_MENU_MARGIN),
+  ),
+  y: Math.max(
+    DEVICE_CONTEXT_MENU_MARGIN,
+    Math.min(clientY, viewportHeight - DEVICE_CONTEXT_MENU_HEIGHT - DEVICE_CONTEXT_MENU_MARGIN),
+  ),
+})
+
 export const subscriptionsByParentDevice = (
   profile: ConnectionProfile,
   devices: DjiDevice[],
@@ -199,6 +226,7 @@ export function Sidebar({
   onEditProfile,
   onAddDevice,
   onEditDevice,
+  onRemoveDevice,
   onSelectDevice,
   onToggleDevice,
   onToggleSubscription,
@@ -211,6 +239,8 @@ export function Sidebar({
   const [collapsedSubscriptionGroups, setCollapsedSubscriptionGroups] = useState<Set<string>>(() => new Set())
   const [newTopic, setNewTopic] = useState('')
   const [newQos, setNewQos] = useState<MqttQos>(0)
+  const [deviceContextMenu, setDeviceContextMenu] = useState<DeviceContextMenuState | null>(null)
+  const deviceContextMenuRef = useRef<HTMLDivElement>(null)
   const profile = profiles.find((item) => item.id === activeProfileId)
   const connected = statuses[activeProfileId] === 'connected'
   const devices = useMemo(() => devicesForTree(profile, telemetry), [profile, telemetry])
@@ -233,6 +263,42 @@ export function Sidebar({
       (subscription) => isSubscriptionActive(profileWithLiveRelationships, subscription),
     ).length
     : 0
+  const contextMenuDevice = deviceContextMenu
+    ? devices.find((device) => device.id === deviceContextMenu.deviceId)
+    : undefined
+
+  useEffect(() => {
+    setDeviceContextMenu(null)
+  }, [activeProfileId])
+
+  useEffect(() => {
+    if (!deviceContextMenu) return
+
+    const closeOnPointerDown = (event: PointerEvent): void => {
+      if (!deviceContextMenuRef.current?.contains(event.target as Node)) setDeviceContextMenu(null)
+    }
+    const closeOnEscape = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setDeviceContextMenu(null)
+    }
+    const close = (): void => setDeviceContextMenu(null)
+
+    window.addEventListener('pointerdown', closeOnPointerDown)
+    window.addEventListener('keydown', closeOnEscape)
+    window.addEventListener('resize', close)
+    window.addEventListener('scroll', close, true)
+    return () => {
+      window.removeEventListener('pointerdown', closeOnPointerDown)
+      window.removeEventListener('keydown', closeOnEscape)
+      window.removeEventListener('resize', close)
+      window.removeEventListener('scroll', close, true)
+    }
+  }, [deviceContextMenu])
+
+  const openDeviceContextMenu = (device: DjiDevice, x: number, y: number): void => {
+    const position = deviceContextMenuPosition(x, y, window.innerWidth, window.innerHeight)
+    onSelectDevice(device.sn)
+    setDeviceContextMenu({ deviceId: device.id, ...position })
+  }
 
   const submitSubscription = async (): Promise<void> => {
     if (busy || !newTopic.trim()) return
@@ -251,7 +317,7 @@ export function Sidebar({
   }
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" id="device-sidebar">
       <section className="sidebar-section connection-section">
         <div className="section-heading">
           <span>连接</span>
@@ -336,8 +402,17 @@ export function Sidebar({
                     tabIndex={0}
                     onClick={() => onSelectDevice(device.sn)}
                     onDoubleClick={() => !discovered && !busy && onEditDevice(device)}
+                    onContextMenu={(event) => {
+                      event.preventDefault()
+                      openDeviceContextMenu(device, event.clientX, event.clientY)
+                    }}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter' || event.key === ' ') onSelectDevice(device.sn)
+                      if (event.key === 'ContextMenu' || event.key === 'F10' && event.shiftKey) {
+                        event.preventDefault()
+                        const bounds = event.currentTarget.getBoundingClientRect()
+                        openDeviceContextMenu(device, bounds.left + 24, bounds.top + bounds.height / 2)
+                      }
                     }}
                   >
                     <Icon size={15} />
@@ -379,6 +454,31 @@ export function Sidebar({
           </div>
         )}
       </section>
+
+      {deviceContextMenu && contextMenuDevice && (
+        <div
+          ref={deviceContextMenuRef}
+          className="device-context-menu"
+          role="menu"
+          aria-label={`${contextMenuDevice.name}操作`}
+          style={{ left: deviceContextMenu.x, top: deviceContextMenu.y }}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            className="device-context-menu-delete"
+            disabled={busy || contextMenuDevice.id.startsWith('discovered-')}
+            title={contextMenuDevice.id.startsWith('discovered-') ? '自动发现的设备无法删除' : undefined}
+            onClick={() => {
+              setDeviceContextMenu(null)
+              void onRemoveDevice(contextMenuDevice.id)
+            }}
+          >
+            <Trash2 size={14} />
+            <span>删除</span>
+          </button>
+        </div>
+      )}
 
       <section className="sidebar-section subscription-section">
         <div className="section-heading interactive" onClick={() => setSubscriptionsOpen((value) => !value)}>

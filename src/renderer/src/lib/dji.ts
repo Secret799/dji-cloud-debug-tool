@@ -665,6 +665,14 @@ export const DJI_COMMANDS: CommandTemplate[] = [
     description: '调整正在推流的视频质量',
     data: { video_id: '', video_quality: 2 },
   },
+  {
+    id: 'live-camera-change',
+    category: 'live',
+    label: '切换机场相机',
+    method: 'live_camera_change',
+    description: '切换机场直播的舱内或舱外相机',
+    data: { video_id: '', camera_position: 0 },
+  },
 ]
 
 export const FIELD_LABELS: Record<string, { label: string; unit?: string }> = {

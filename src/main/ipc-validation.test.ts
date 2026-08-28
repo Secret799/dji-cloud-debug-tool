@@ -5,6 +5,7 @@ import {
   validateConnectionProfile,
   validateDeviceArchives,
   validateExportMessageOptions,
+  validateFirmwareUploadRequest,
   validateMediaServerProfile,
   validateObjectStorageProfile,
   validatePublishRequest,
@@ -173,5 +174,18 @@ describe('IPC validation', () => {
     expect(() => validateObjectStorageProfile({ ...profile, provider: 'unknown' })).toThrow('厂商无效')
     expect(() => validateObjectStorageProfile({ ...profile, endpoint: 'file:///tmp/storage' })).toThrow('HTTP 或 HTTPS')
     expect(() => validateObjectStorageProfile({ ...profile, endpoint: 'https://user:pass@example.com' })).toThrow('认证信息')
+  })
+
+  it('validates firmware upload tokens, storage profiles, and object keys', () => {
+    const request = {
+      selectionToken: 'selection-token',
+      objectStorageProfileId: 'storage-1',
+      objectKey: 'firmware/DOCK-1/package.zip',
+    }
+    expect(validateFirmwareUploadRequest(request)).toEqual(request)
+    expect(() => validateFirmwareUploadRequest({ ...request, selectionToken: '' })).toThrow('不能为空')
+    expect(() => validateFirmwareUploadRequest({ ...request, selectionToken: 'x'.repeat(257) })).toThrow('过长')
+    expect(() => validateFirmwareUploadRequest({ ...request, objectKey: '' })).toThrow('不能为空')
+    expect(() => validateFirmwareUploadRequest({ ...request, objectKey: { path: 'firmware.zip' } })).toThrow('字符串')
   })
 })

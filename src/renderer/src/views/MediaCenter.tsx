@@ -20,6 +20,11 @@ import { Tooltip } from '../components/Tooltip'
 import { buildMediaEndpoints } from '../lib/media'
 
 interface MediaCenterProps {
+  servers: MediaServerProfile[]
+  runtimeById: Record<string, MediaServerRuntime>
+  loading: boolean
+  onServersChange: (servers: MediaServerProfile[]) => void
+  onRuntimeChange: (runtime: MediaServerRuntime) => void
   onNotify: (text: string, tone?: 'info' | 'success' | 'error') => void
 }
 
@@ -77,48 +82,29 @@ const createRemoteProfile = (): MediaServerProfile => {
   }
 }
 
-export function MediaCenter({ onNotify }: MediaCenterProps) {
-  const [servers, setServers] = useState<MediaServerProfile[]>([])
-  const [runtimeById, setRuntimeById] = useState<Record<string, MediaServerRuntime>>({})
+export function MediaCenter({
+  servers,
+  runtimeById,
+  loading,
+  onServersChange,
+  onRuntimeChange,
+  onNotify,
+}: MediaCenterProps) {
   const [selectedId, setSelectedId] = useState('')
   const [editor, setEditor] = useState<MediaServerProfile | null>(null)
   const [busyId, setBusyId] = useState('')
-  const [loading, setLoading] = useState(true)
   const [streamApp, setStreamApp] = useState('live')
   const [streamName, setStreamName] = useState('dji')
 
-  const updateRuntime = (runtime: MediaServerRuntime): void => {
-    setRuntimeById((current) => ({ ...current, [runtime.profileId]: runtime }))
-  }
-
   useEffect(() => {
-    let disposed = false
-    const unsubscribe = window.djiApi.media.onRuntimeEvent((runtime) => {
-      if (!disposed) updateRuntime(runtime)
-    })
-    void Promise.all([window.djiApi.media.listServers(), window.djiApi.media.getLocalRuntime()])
-      .then(([loadedServers, localRuntime]) => {
-        if (disposed) return
-        setServers(loadedServers)
-        setSelectedId(loadedServers.find((server) => server.isDefault)?.id ?? loadedServers[0]?.id ?? '')
-        updateRuntime(localRuntime)
-        setLoading(false)
-        loadedServers.filter((server) => server.kind !== 'local-zlm').forEach((server) => {
-          void window.djiApi.media.checkServer(server.id).then((result) => {
-            if (!disposed && result.runtime) updateRuntime(result.runtime)
-          })
-        })
-      })
-      .catch((error: unknown) => {
-        if (!disposed) {
-          setLoading(false)
-          onNotify(`加载媒体服务失败：${error instanceof Error ? error.message : String(error)}`, 'error')
-        }
-      })
-    return () => { disposed = true; unsubscribe() }
-  }, [onNotify])
+    setSelectedId((current) => servers.some((server) => server.id === current)
+      ? current
+      : servers.find((server) => server.isDefault)?.id ?? servers[0]?.id ?? '')
+  }, [servers])
 
-  const selectedServer = servers.find((server) => server.id === selectedId) ?? servers[0]
+  const selectedServer = servers.find((server) => server.id === selectedId)
+    ?? servers.find((server) => server.isDefault)
+    ?? servers[0]
   const selectedRuntime = selectedServer ? runtimeById[selectedServer.id] : undefined
   const endpoints = useMemo(
     () => selectedServer ? buildMediaEndpoints(selectedServer, streamApp, streamName) : null,
@@ -129,7 +115,7 @@ export function MediaCenter({ onNotify }: MediaCenterProps) {
     setBusyId(server.id)
     try {
       const result = await window.djiApi.media.checkServer(server.id)
-      if (result.runtime) updateRuntime(result.runtime)
+      if (result.runtime) onRuntimeChange(result.runtime)
       onNotify(result.ok ? `${server.name} 在线` : result.error ?? '媒体服务不可达', result.ok ? 'success' : 'error')
     } finally {
       setBusyId('')
@@ -143,7 +129,7 @@ export function MediaCenter({ onNotify }: MediaCenterProps) {
     try {
       const running = runtimeById[local.id]?.state === 'running' || runtimeById[local.id]?.state === 'starting'
       const result = running ? await window.djiApi.media.stopLocal() : await window.djiApi.media.startLocal()
-      if (result.runtime) updateRuntime(result.runtime)
+      if (result.runtime) onRuntimeChange(result.runtime)
       onNotify(result.ok ? (running ? '本地 ZLMediaKit 已停止' : '本地 ZLMediaKit 已启动') : result.error ?? '本地服务操作失败', result.ok ? 'success' : 'error')
     } finally {
       setBusyId('')
@@ -161,14 +147,19 @@ export function MediaCenter({ onNotify }: MediaCenterProps) {
       const wasLocalRunning = editor.kind === 'local-zlm' && runtimeById[editor.id]?.state === 'running'
       if (wasLocalRunning) await window.djiApi.media.stopLocal()
       const saved = await window.djiApi.media.saveServer(editor)
-      setServers((current) => current.some((server) => server.id === saved.id)
-        ? current.map((server) => server.id === saved.id ? saved : server)
-        : [...current, saved])
+      onServersChange(servers.some((server) => server.id === saved.id)
+        ? servers.map((server) => server.id === saved.id ? saved : server)
+        : [...servers, saved])
+      if (saved.kind !== 'local-zlm') {
+        void window.djiApi.media.checkServer(saved.id).then((result) => {
+          if (result.runtime) onRuntimeChange(result.runtime)
+        })
+      }
       setSelectedId(saved.id)
       setEditor(null)
       if (wasLocalRunning) {
         const result = await window.djiApi.media.startLocal()
-        if (result.runtime) updateRuntime(result.runtime)
+        if (result.runtime) onRuntimeChange(result.runtime)
         if (!result.ok) throw new Error(result.error ?? '新配置已保存，但本地 ZLM 重启失败')
       }
       onNotify('媒体服务配置已保存', 'success')
@@ -184,7 +175,7 @@ export function MediaCenter({ onNotify }: MediaCenterProps) {
     setBusyId(server.id)
     try {
       const saved = await window.djiApi.media.saveServer({ ...server, isDefault: true })
-      setServers((current) => current.map((item) => item.id === saved.id
+      onServersChange(servers.map((item) => item.id === saved.id
         ? saved
         : { ...item, isDefault: false }))
       setSelectedId(saved.id)
@@ -203,7 +194,7 @@ export function MediaCenter({ onNotify }: MediaCenterProps) {
       const result = await window.djiApi.media.removeServer(editor.id)
       if (!result.ok) throw new Error(result.error ?? '删除失败')
       const remaining = await window.djiApi.media.listServers()
-      setServers(remaining)
+      onServersChange(remaining)
       setSelectedId(remaining.find((server) => server.isDefault)?.id ?? remaining[0]?.id ?? '')
       setEditor(null)
       onNotify('远程媒体服务已删除', 'success')

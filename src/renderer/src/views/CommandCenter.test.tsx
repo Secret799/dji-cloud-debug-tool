@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import type { ConnectionProfile } from '../../../shared/contracts'
+import type { ConnectionProfile, MediaServerProfile } from '../../../shared/contracts'
 import { DJI_COMMANDS, type DeviceTelemetry } from '../lib/dji'
 import { CommandCenter } from './CommandCenter'
 
@@ -253,6 +253,23 @@ describe('CommandCenter camera category', () => {
         osd: { live_capacity: { device_list: [{ sn: 'DOCK-B', camera_list: [{ camera_index: '165-0-0', video_list: [{ video_index: 'normal-0', video_type: 'normal' }] }] }] } },
       },
     ] satisfies DeviceTelemetry[]
+    const mediaServers = [{
+      id: 'new-cloud-media',
+      name: '华为云服务器测试',
+      kind: 'remote-easymedia',
+      host: 'webrtc.junpzx.cn',
+      apiProtocol: 'https',
+      apiPort: 443,
+      httpProtocol: 'https',
+      httpPort: 443,
+      rtmpPort: 1935,
+      rtspPort: 0,
+      webrtcPort: 8000,
+      secret: '',
+      isDefault: true,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }] satisfies MediaServerProfile[]
 
     const markup = renderToStaticMarkup(
       <CommandCenter
@@ -263,6 +280,7 @@ describe('CommandCenter camera category', () => {
         telemetry={telemetry}
         onPublish={async () => ({ ok: true })}
         allowedCategories={['payload']}
+        mediaServers={mediaServers}
       />,
     )
 
@@ -282,8 +300,9 @@ describe('CommandCenter camera category', () => {
     expect(markup).not.toContain('路视频源 ·')
     expect(markup).not.toContain('camera-detail-header')
     expect(markup).toContain('aria-label="直播设置"')
-    expect(markup).toContain('aria-label="OSD 当前推流"><span>OSD 当前推流</span><strong>1 路</strong>')
-    expect(markup).toContain('OSD 上报最大：2 路')
+    expect(markup).toContain('华为云服务器测试 · webrtc.junpzx.cn')
+    expect(markup).not.toContain('OSD 当前推流')
+    expect(markup).not.toContain('OSD 上报最大')
     expect(markup).not.toContain('最大并发推流')
     expect(markup.indexOf('aria-label="直播设置"')).toBeLessThan(markup.indexOf('class="camera-detail"'))
     expect(markup).toContain('role="separator"')
@@ -292,6 +311,10 @@ describe('CommandCenter camera category', () => {
     expect(markup).toContain('normal-0')
     expect(markup).toContain('class="camera-monitor-select camera-lens-select"')
     expect(markup).toContain('aria-label="normal-0 切换镜头"')
+    expect(markup.match(/camera-position-select/g)).toHaveLength(1)
+    expect(markup).toContain('aria-label="normal-0 切换机场相机"')
+    expect(markup).toContain('>舱内</option>')
+    expect(markup).toContain('>舱外</option>')
     expect(markup.match(/camera-quality-select/g)).toHaveLength(2)
     expect(markup).toContain('aria-label="normal-0 切换清晰度"')
     expect(markup).not.toContain('独立视频源')
@@ -307,6 +330,14 @@ describe('CommandCenter camera category', () => {
     expect(markup).toContain('>播放</button>')
     expect(markup).toContain('获取负载控制权')
     expect(markup).toContain('云台回中')
+  })
+
+  it('defines the Dock 3 live camera change service payload', () => {
+    expect(DJI_COMMANDS.find((command) => command.id === 'live-camera-change')).toMatchObject({
+      category: 'live',
+      method: 'live_camera_change',
+      data: { video_id: '', camera_position: 0 },
+    })
   })
 })
 

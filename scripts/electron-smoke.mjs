@@ -306,6 +306,36 @@ try {
     if (dockTelemetry.includes('drone_battery_maintenance_info') || dockTelemetry.includes('sub_device.device_sn')) {
       errors.push('overview: aircraft-owned relay fields remained on the dock telemetry view')
     }
+
+    await window.locator('.telemetry-category-tabs').getByRole('tab', { name: /设备信息/ }).click()
+    await window.locator('#telemetry-panel-device .telemetry-section-tabs').getByRole('tab', { name: /负载与云台/ }).click()
+    const hierarchyPanel = window.locator('#telemetry-section-panel-device-payload')
+    const deviceListArray = hierarchyPanel.locator('[data-array-path="live_capacity.device_list"]')
+    const cameraListArray = hierarchyPanel.locator('[data-array-path="live_capacity.device_list.0.camera_list"]')
+    const videoListArray = hierarchyPanel.locator('[data-array-path="live_capacity.device_list.0.camera_list.0.video_list"]')
+    if (await deviceListArray.count() !== 1 || await cameraListArray.count() !== 1 || await videoListArray.count() !== 1) {
+      errors.push('overview: nested live-capacity arrays were not rendered once in the payload section')
+    } else {
+      const cameraNestedUnderDevice = await cameraListArray.evaluate((element) =>
+        Boolean(element.parentElement?.closest('[data-array-path="live_capacity.device_list"]')),
+      )
+      const videoNestedUnderCamera = await videoListArray.evaluate((element) =>
+        Boolean(element.parentElement?.closest('[data-array-path="live_capacity.device_list.0.camera_list"]')),
+      )
+      if (!cameraNestedUnderDevice || !videoNestedUnderCamera) {
+        errors.push('overview: live-capacity array hierarchy was flattened in the rendered DOM')
+      }
+    }
+    await inspectLayout('telemetry-hierarchy', [
+      '#telemetry-section-panel-device-payload',
+      '#telemetry-section-panel-device-payload [data-array-path="live_capacity.device_list"]',
+      '#telemetry-section-panel-device-payload [data-array-path="live_capacity.device_list.0.camera_list"]',
+      '#telemetry-section-panel-device-payload [data-array-path="live_capacity.device_list.0.camera_list.0.video_list"]',
+    ])
+    await window.screenshot({ path: `${screenshotBase}-telemetry-hierarchy.png` })
+    await window.locator('.telemetry-category-tabs').getByRole('tab', { name: /运行信息/ }).click()
+    await window.locator('#telemetry-panel-operation .telemetry-section-tabs').getByRole('tab', { name: /运行与任务状态/ }).click()
+
     await window.waitForFunction(async (id) => {
       const profile = (await window.djiApi.profiles.list()).find((item) => item.id === id)
       return Boolean(
@@ -373,13 +403,55 @@ try {
       groupedSubscriptionCount,
     )
 
+    const smokeHmsData = {
+      list: [
+        {
+          args: { component_index: 0, sensor_index: 1 },
+          code: '0x16100016',
+          device_type: '0-67-0',
+          imminent: 1,
+          in_the_sky: 0,
+          level: 2,
+          module: 3,
+        },
+        {
+          args: { component_index: 0, sensor_index: 0 },
+          code: '0x19113414',
+          device_type: '3-2-0',
+          imminent: 1,
+          in_the_sky: 0,
+          level: 1,
+          module: 3,
+        },
+        {
+          args: { component_index: 1, sensor_index: 0 },
+          code: '0x19113800',
+          device_type: '3-2-0',
+          imminent: 0,
+          in_the_sky: 0,
+          level: 1,
+          module: 3,
+        },
+      ],
+    }
     const groupedEvents = [
       { id: 'smoke-event-drc-1', method: 'drc_status_notify', data: { drc_state: 0 } },
-      { id: 'smoke-event-hms', method: 'hms', data: { list: [{ code: '0x16100001' }] } },
+      ...Array.from({ length: 5 }, (_, index) => ({
+        id: `smoke-event-hms-${index + 1}`,
+        method: 'hms',
+        data: smokeHmsData,
+      })),
       { id: 'smoke-event-drc-2', method: 'drc_status_notify', data: { drc_state: 1 } },
     ]
     for (const [index, groupedEvent] of groupedEvents.entries()) {
-      const eventBody = JSON.stringify({ method: groupedEvent.method, data: groupedEvent.data })
+      const eventTimestamp = Date.now() + index
+      const eventBody = JSON.stringify({
+        tid: `smoke-tid-${index + 1}`,
+        bid: `smoke-bid-${index + 1}`,
+        timestamp: eventTimestamp,
+        method: groupedEvent.method,
+        data: groupedEvent.data,
+      })
       await electronApp.evaluate(({ BrowserWindow }, event) => {
         for (const instance of BrowserWindow.getAllWindows()) {
           instance.webContents.send('runtime:event', event)
@@ -395,46 +467,69 @@ try {
           payload: eventBody,
           qos: 1,
           retain: false,
-          timestamp: Date.now() + index,
+          timestamp: eventTimestamp,
           size: Buffer.byteLength(eventBody),
         },
       })
     }
     const eventsWorkbenchTab = window.locator('.device-tabs button').filter({ hasText: '事件' })
     await window.waitForFunction(
-      () => document.querySelector('.device-tabs button:nth-child(2) small')?.textContent === '3',
+      () => document.querySelector('.device-tabs button:nth-child(2) small')?.textContent === '5',
     )
     await eventsWorkbenchTab.click()
     await window.locator('.event-workspace').waitFor({ state: 'visible' })
-    const eventGroups = window.locator('.event-message-group')
-    if (await eventGroups.count() !== 2) {
-      errors.push('events: messages were not grouped by method')
+    const eventTypes = window.locator('.event-type-list button')
+    if (await eventTypes.count() !== 1) {
+      errors.push('events: HMS should be the only event type for now')
     }
-    const drcEventGroup = eventGroups.filter({ hasText: 'DRC 状态通知' })
-    const hmsEventGroup = eventGroups.filter({ hasText: '设备告警' })
-    if (await drcEventGroup.locator('summary > small').innerText() !== '2 条') {
-      errors.push('events: DRC group count is incorrect')
+    const hmsEventType = eventTypes.filter({ hasText: '设备告警' })
+    if (await hmsEventType.locator('small').innerText() !== '5') {
+      errors.push('events: HMS type count is incorrect')
     }
-    if (!await drcEventGroup.evaluate((group) => group.open) || await hmsEventGroup.evaluate((group) => group.open)) {
-      errors.push('events: only the newest message group should initially be expanded')
+    if (!await hmsEventType.evaluate((button) => button.classList.contains('active'))) {
+      errors.push('events: HMS type should be selected initially')
     }
-    await hmsEventGroup.locator('summary').click()
-    if (!await hmsEventGroup.evaluate((group) => group.open)) {
-      errors.push('events: a message group could not be expanded')
+    if (await window.locator('.event-message-list-row').count() !== 5) {
+      errors.push('events: HMS horizontal message list count is incorrect')
     }
-    const eventHeaderText = await window.locator('.event-workspace-header').innerText()
-    if (!eventHeaderText.includes('2 种类型 · 共 3 条')) {
-      errors.push(`events: grouped total is incorrect (${JSON.stringify(eventHeaderText)})`)
+    if (await window.locator('.event-message-detail').count() !== 0) {
+      errors.push('events: message details should remain hidden before selection')
+    }
+    const eventListText = await window.locator('.event-detail-pane').innerText()
+    if (eventListText.includes('消息列表') || !eventListText.includes('最高等级')) {
+      errors.push(`events: HMS list pane is incomplete (${JSON.stringify(eventListText)})`)
     }
     await inspectLayout('events', [
       'body',
       '.app-shell',
       '.workspace-content',
       '.event-workspace',
-      '.event-group-list',
-      '.event-message-group',
+      '.event-type-pane',
+      '.event-detail-pane',
+      '.event-message-list',
+      '.event-message-list-row',
     ])
     await window.screenshot({ path: `${screenshotBase}-events.png` })
+
+    await window.locator('.event-message-detail-button').first().click()
+    await window.locator('.event-message-detail').waitFor({ state: 'visible' })
+    const eventDetailText = await window.locator('.event-detail-pane').innerText()
+    if (!eventDetailText.includes('告警详情')
+      || !eventDetailText.includes('无法起飞:飞行器未激活')
+      || !eventDetailText.includes('电池温度过高')
+      || !eventDetailText.includes('TID')
+      || !eventDetailText.includes('BID')
+      || !eventDetailText.includes('在地上')
+      || !eventDetailText.includes('实时性')
+      || await window.locator('.hms-alarm-item').count() !== 3
+      || !eventDetailText.includes('原始 MQTT 报文')) {
+      errors.push(`events: HMS detail pane is incomplete (${JSON.stringify(eventDetailText)})`)
+    }
+    await inspectLayout('event-detail', [
+      '.event-detail-pane',
+      '.event-message-detail',
+    ])
+    await window.screenshot({ path: `${screenshotBase}-event-detail.png` })
     await window.getByRole('button', { name: '遥测', exact: true }).click()
     await window.locator('.telemetry-workspace').waitFor({ state: 'visible' })
 
@@ -785,6 +880,35 @@ try {
   if (messagesTabIndex < 0 || historyTabIndex !== messagesTabIndex + 1) {
     errors.push(`overview: recent commands should follow MQTT messages (${JSON.stringify(deviceTabLabels)})`)
   }
+  await window.getByRole('button', { name: '固件升级', exact: true }).click()
+  await window.locator('.firmware-workspace').waitFor({ state: 'visible' })
+  if (await window.locator('.firmware-file-picker').count() !== 1) {
+    errors.push('firmware: local package picker was not rendered')
+  }
+  if (await window.locator('.firmware-device-card').count() !== 2) {
+    errors.push('firmware: dock and relayed aircraft upgrade rows were not both rendered')
+  }
+  const upgradeTypes = await window.locator('.firmware-device-card').first().locator('select option').allTextContents()
+  if (!upgradeTypes.includes('普通升级') || !upgradeTypes.includes('一致性升级') || !upgradeTypes.includes('PSDK 升级')) {
+    errors.push(`firmware: upgrade type options are incomplete (${JSON.stringify(upgradeTypes)})`)
+  }
+  if (!(await window.getByRole('button', { name: '上传到 OSS', exact: true }).isDisabled())) {
+    errors.push('firmware: upload action should remain disabled before a local package is selected')
+  }
+  if (!(await window.getByRole('button', { name: '确认并下发升级', exact: true }).isDisabled())) {
+    errors.push('firmware: downlink action should remain disabled before upload and confirmation')
+  }
+  await inspectLayout('firmware', [
+    'body',
+    '.app-shell',
+    '.workspace-content',
+    '.firmware-workspace',
+    '.firmware-status-panel',
+    '.firmware-upload-panel',
+    '.firmware-target-panel',
+    '.firmware-history',
+  ])
+  await window.screenshot({ path: `${screenshotBase}-firmware.png` })
   if (profileId) {
     const commandTimestamp = Date.now()
     const commandMessages = [
@@ -796,7 +920,7 @@ try {
         payload: JSON.stringify({
           tid: 'smoke-command-tid',
           bid: 'smoke-command-bid',
-          method: 'cover_open',
+          method: 'flighttask_prepare',
           data: { target: 'smoke-request-value' },
         }),
         qos: 1,
@@ -811,8 +935,8 @@ try {
         payload: JSON.stringify({
           tid: 'smoke-command-tid',
           bid: 'smoke-command-bid',
-          method: 'cover_open',
-          data: { result: 0, detail: 'smoke-response-value' },
+          method: 'flighttask_prepare',
+          data: { result: 316031, detail: 'smoke-response-value' },
         }),
         qos: 1,
         retain: false,
@@ -848,6 +972,39 @@ try {
       '45 ms',
     ]) {
       if (!commandHistoryText.includes(expected)) errors.push(`history: missing ${expected}`)
+    }
+    if (commandHistoryText.includes('设置返航模式失败')) {
+      errors.push('history: result-code guidance should not be expanded inline')
+    }
+
+    await commandHistoryItem.getByRole('button', { name: '核查', exact: true }).click()
+    const resultCheckPage = window.locator('.command-result-check-page')
+    await resultCheckPage.waitFor({ state: 'visible' })
+    if (await window.locator('.command-history-panel').isVisible()) {
+      errors.push('history: command list should be hidden while the result-code page is open')
+    }
+    const resultCheckText = await resultCheckPage.innerText()
+    for (const expected of [
+      '结果码 316031 核查结果',
+      '设置返航模式失败',
+      '2代机库下发任务需指定返航模式',
+      '机场日志、飞机日志',
+    ]) {
+      if (!resultCheckText.includes(expected)) errors.push(`history check page: missing ${expected}`)
+    }
+    await inspectLayout('history-result-check', [
+      '.history-workspace',
+      '.command-result-check-page',
+      '.command-result-check-header',
+      '.command-result-check-content',
+      '.command-result-check-context',
+      '.command-error-guidance',
+    ])
+    await window.screenshot({ path: `${screenshotBase}-history-result-check.png` })
+    await resultCheckPage.getByRole('button', { name: '返回最近指令', exact: true }).click()
+    await window.locator('.command-history-panel').waitFor({ state: 'visible' })
+    if (await commandHistoryItem.getAttribute('open') === null) {
+      errors.push('history: command details should remain open after returning from the result-code page')
     }
   }
   await inspectLayout('history', [
@@ -1105,6 +1262,14 @@ try {
     '.media-server-panel',
     '.media-service-workspace',
   ])
+  await window.getByRole('button', { name: '添加远程服务' }).click()
+  const mediaServerDialog = window.getByRole('dialog', { name: '媒体服务设置' })
+  await mediaServerDialog.getByLabel('名称').fill('冒烟测试流媒体')
+  await mediaServerDialog.getByLabel('主机或 IP').fill('127.0.0.1')
+  await mediaServerDialog.getByRole('button', { name: '保存服务' }).click()
+  await mediaServerDialog.waitFor({ state: 'hidden' })
+  await window.locator('.media-server-list').getByText('冒烟测试流媒体', { exact: true }).waitFor({ state: 'visible' })
+  await window.locator('.media-server-list').getByRole('button', { name: /本地 ZLMediaKit/ }).click()
   await window.getByRole('button', { name: '启动服务' }).click()
   await window.locator('.media-service-header .server-state-dot.running').waitFor({ state: 'visible', timeout: 15_000 })
   const localMediaRuntime = await window.evaluate(async () => {
@@ -1119,6 +1284,21 @@ try {
 
   await window.getByRole('button', { name: '设备工作台' }).click()
   await window.locator('.overview-view').waitFor({ state: 'visible' })
+  await window.getByRole('button', { name: '控制中心', exact: true }).click()
+  await window.getByRole('button', { name: '相机与云台', exact: true }).click()
+  const mediaServerOptions = await window.locator('.camera-stream-toolbar select').first().locator('option').allTextContents()
+  if (!mediaServerOptions.some((option) => option.includes('冒烟测试流媒体 · 127.0.0.1'))) {
+    errors.push(`media: newly saved server was not synchronized to camera controls (${JSON.stringify(mediaServerOptions)})`)
+  }
+  await window.getByRole('button', { name: '媒体中心' }).click()
+  await window.locator('.media-center').waitFor({ state: 'visible' })
+  const savedServerState = await window.locator('.media-server-row')
+    .filter({ hasText: '冒烟测试流媒体' })
+    .locator('.server-state-dot')
+    .getAttribute('title')
+  if (!savedServerState || savedServerState === '未检测') {
+    errors.push(`media: server state was reset after leaving and returning to media center (${savedServerState ?? 'missing'})`)
+  }
 
   const snapshot = await window.evaluate(() => ({
     title: document.title,

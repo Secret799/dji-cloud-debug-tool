@@ -4,6 +4,7 @@ import type {
   DeviceArchiveCamera,
   DeviceArchiveVideo,
   DjiDevice,
+  FirmwareUploadRequest,
   MqttMessageRecord,
   MqttQos,
   MediaServerProfile,
@@ -316,6 +317,14 @@ export const validateObjectStorageProfile = (value: unknown): ObjectStorageProfi
   requireFiniteNumber(profile.createdAt, '创建时间')
   requireFiniteNumber(profile.updatedAt, '更新时间')
   return { ...profile, id, endpoint } as unknown as ObjectStorageProfile
+}
+
+export const validateFirmwareUploadRequest = (value: unknown): FirmwareUploadRequest => {
+  const request = requireRecord(value, '固件上传请求')
+  const selectionToken = requireString(request.selectionToken, '固件选择令牌', { maxBytes: 256 }).trim()
+  const objectStorageProfileId = validateProfileId(request.objectStorageProfileId)
+  const objectKey = requireString(request.objectKey, '对象 Key', { maxBytes: 2_048 }).trim()
+  return { selectionToken, objectStorageProfileId, objectKey }
 }
 
 const validateDevice = (value: unknown): DjiDevice => {
