@@ -24,7 +24,7 @@ import { WebDavClient } from './webdav-client'
 import { WebDavConfigStore } from './webdav-config-store'
 import {
   fingerprintWebDavData,
-  mergeWebDavData,
+  reconcileWebDavData,
   webDavDataEqual,
   type WebDavSyncData,
 } from './webdav-sync-merge'
@@ -251,7 +251,12 @@ export class WebDavBackupManager {
       if (latest) {
         const encrypted = await client.download(latest.id)
         remoteDocument = this.parseBackupDocument(decryptWebDavBackup(encrypted, config.secret))
-        merged = mergeWebDavData(local, remoteDocument.data, state.baseFingerprint)
+        merged = reconcileWebDavData(
+          local,
+          remoteDocument.data,
+          Boolean(state.baseVersionId),
+          state.baseFingerprint,
+        )
       }
 
       const remoteApplied = !webDavDataEqual(local, merged)

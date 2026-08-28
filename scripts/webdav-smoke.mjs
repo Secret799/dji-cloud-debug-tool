@@ -1,5 +1,5 @@
 import electronPath from 'electron'
-import { mkdtemp } from 'node:fs/promises'
+import { mkdtemp, readFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -7,6 +7,7 @@ import { _electron as electron } from 'playwright-core'
 
 const projectRoot = resolve(import.meta.dirname, '..')
 const userData = await mkdtemp(join(tmpdir(), 'dji-cloud-studio-webdav-'))
+const secondUserData = await mkdtemp(join(tmpdir(), 'dji-cloud-studio-webdav-second-'))
 const screenshotPath = process.env.DJI_STUDIO_WEBDAV_SCREENSHOT || join(tmpdir(), 'dji-cloud-studio-webdav.png')
 const screenshotBase = screenshotPath.replace(/\.png$/i, '')
 const errors = []
@@ -71,6 +72,22 @@ const electronApp = await electron.launch({
   cwd: projectRoot,
   env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: 'true' },
 })
+let firstElectronAppClosed = false
+let secondElectronApp
+
+const waitForJson = async (path, predicate, timeoutMs = 10_000) => {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    try {
+      const value = JSON.parse(await readFile(path, 'utf8'))
+      if (predicate(value)) return value
+    } catch {
+      // The application may still be writing its first document.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200))
+  }
+  throw new Error(`Timed out waiting for ${path}`)
+}
 
 const inspectBounds = async (window, selectors, label) => {
   const results = await window.evaluate((targets) => targets.map((selector) => {
@@ -172,9 +189,46 @@ try {
   if (uploadedBody.includes('本地调试')) errors.push('sync: uploaded version contains unencrypted profile data')
   await window.screenshot({ path: `${screenshotBase}-synced.png` })
 
+  await electronApp.close()
+  firstElectronAppClosed = true
+  const firstProfiles = JSON.parse(await readFile(join(userData, 'connection-profiles.json'), 'utf8'))
+  const firstProfileId = firstProfiles.profiles[0]?.id
+  const versionsBeforeSecondClient = [...files.keys()].filter((name) => name.endsWith('.djibak')).sort()
+  const firstVersionId = versionsBeforeSecondClient.at(-1)
+  secondElectronApp = await electron.launch({
+    executablePath: electronPath,
+    args: [projectRoot, `--user-data-dir=${secondUserData}`],
+    cwd: projectRoot,
+    env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: 'true' },
+  })
+  const secondWindow = await secondElectronApp.firstWindow()
+  secondWindow.on('pageerror', (error) => errors.push(`second client: ${error.message}`))
+  secondWindow.on('console', (message) => { if (message.type() === 'error') errors.push(`second client: ${message.text()}`) })
+  await secondWindow.locator('.app-shell').waitFor({ state: 'visible', timeout: 15_000 })
+  await secondWindow.getByRole('button', { name: '云同步', exact: true }).click()
+  await secondWindow.getByRole('button', { name: 'WebDAV 设置', exact: true }).click()
+  const secondDialog = secondWindow.getByRole('dialog', { name: 'WebDAV 设置' })
+  await secondDialog.getByLabel('端点地址').fill(webDavEndpoint)
+  await secondDialog.getByLabel('用户名').fill('admin')
+  await secondDialog.getByLabel('密码', { exact: true }).fill('example-secret')
+  await secondDialog.getByRole('button', { name: '保存', exact: true }).click()
+  await waitForJson(
+    join(secondUserData, 'webdav-sync-state.json'),
+    (state) => state.baseVersionId === firstVersionId,
+  )
+  const secondProfiles = JSON.parse(await readFile(join(secondUserData, 'connection-profiles.json'), 'utf8'))
+  if (secondProfiles.profiles[0]?.id !== firstProfileId) {
+    errors.push('second client: cloud profiles were not applied as the initial baseline')
+  }
+  const versionFiles = [...files.keys()].filter((name) => name.endsWith('.djibak'))
+  if (versionFiles.length !== versionsBeforeSecondClient.length) {
+    errors.push(`second client: initial synchronization increased version count from ${versionsBeforeSecondClient.length} to ${versionFiles.length}`)
+  }
+
   process.stdout.write(`${JSON.stringify({ screenshotBase, errors }, null, 2)}\n`)
   if (errors.length) process.exitCode = 1
 } finally {
-  await electronApp.close()
+  if (secondElectronApp) await secondElectronApp.close()
+  if (!firstElectronAppClosed) await electronApp.close()
   await new Promise((resolve, reject) => webDavServer.close((error) => error ? reject(error) : resolve()))
 }

@@ -152,5 +152,12 @@ export const mergeWebDavData = (
   }
 }
 
+export const reconcileWebDavData = (
+  local: WebDavSyncData,
+  remote: WebDavSyncData,
+  hasSyncBase: boolean,
+  base?: WebDavSyncFingerprint,
+): WebDavSyncData => hasSyncBase ? mergeWebDavData(local, remote, base) : remote
+
 export const webDavDataEqual = (left: WebDavSyncData, right: WebDavSyncData): boolean =>
   sameValue(left, right)

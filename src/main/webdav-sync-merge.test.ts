@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { ConnectionProfile, DeviceArchive } from '../shared/contracts'
-import { fingerprintWebDavData, mergeWebDavData, type WebDavSyncData } from './webdav-sync-merge'
+import {
+  fingerprintWebDavData,
+  mergeWebDavData,
+  reconcileWebDavData,
+  type WebDavSyncData,
+} from './webdav-sync-merge'
 
 const profile = (id: string, name: string, updatedAt: number): ConnectionProfile => ({
   id, name, updatedAt, createdAt: 1, protocol: 'mqtt', host: 'localhost', port: 1883, path: '/mqtt',
@@ -18,6 +23,32 @@ const data = (profiles: ConnectionProfile[], deviceArchives: DeviceArchive[] = [
 })
 
 describe('WebDAV three-way merge', () => {
+  it('uses the cloud snapshot as the baseline for a new client', () => {
+    const local = data([profile('local-default', 'Local default', 10)])
+    const remote = data([profile('cloud-profile', 'Cloud profile', 5)])
+
+    const reconciled = reconcileWebDavData(local, remote, false)
+
+    expect(reconciled).toBe(remote)
+    expect(reconciled.profiles.map((item) => item.id)).toEqual(['cloud-profile'])
+  })
+
+  it('merges after the client has established a synchronization baseline', () => {
+    const base = data([profile('cloud-profile', 'Cloud profile', 1)])
+    const local = data([
+      profile('cloud-profile', 'Cloud profile', 1),
+      profile('local-profile', 'Local profile', 2),
+    ])
+    const remote = data([profile('cloud-profile', 'Remote edit', 3)])
+
+    const reconciled = reconcileWebDavData(local, remote, true, fingerprintWebDavData(base))
+
+    expect(reconciled.profiles.map(({ id, name }) => ({ id, name }))).toEqual([
+      { id: 'cloud-profile', name: 'Remote edit' },
+      { id: 'local-profile', name: 'Local profile' },
+    ])
+  })
+
   it('keeps independent changes made by two clients', () => {
     const base = data([profile('a', 'A', 1), profile('b', 'B', 1)])
     const local = data([profile('a', 'Local A', 2), profile('b', 'B', 1)])
