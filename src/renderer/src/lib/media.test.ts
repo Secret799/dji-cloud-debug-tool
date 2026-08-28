@@ -28,6 +28,7 @@ describe('media endpoint helpers', () => {
       webrtc: 'webrtc://media.example.com:8000/live/dock-1',
       httpTs: 'http://media.example.com:8080/live/dock-1.live.ts',
       hls: 'http://media.example.com:8080/live/dock-1/hls.m3u8',
+      whep: 'http://media.example.com:8080/index/api/webrtc?app=live&stream=dock-1&type=play',
     })
   })
 
@@ -38,6 +39,7 @@ describe('media endpoint helpers', () => {
       webrtc: 'webrtc://media.example.com:8000/camera/main',
       httpTs: 'http://media.example.com:8080/camera/main.live.ts',
       hls: 'http://media.example.com:8080/camera/main.m3u8',
+      whep: undefined,
     })
   })
 
@@ -45,7 +47,7 @@ describe('media endpoint helpers', () => {
     expect(buildMediaEndpoints(server({ webrtcPort: 0 }), 'live', 'main').webrtc).toBeUndefined()
   })
 
-  it('builds the SecretEMS RTMP, HTTP-TS, WHIP and WHEP endpoints', () => {
+  it('builds the SecretEMS media and SEI event endpoints', () => {
     const secretEms = server({
       kind: 'remote-easymedia',
       apiProtocol: 'https',
@@ -62,6 +64,8 @@ describe('media endpoint helpers', () => {
       httpTs: 'https://media.example.com/live%20feed/camera%2F01.live.ts',
       whip: 'https://media.example.com/easyMedia/api/webrtc/whip?app=live%20feed&stream=camera%2F01',
       whep: 'https://media.example.com/easyMedia/api/webrtc/whep?app=live%20feed&stream=camera%2F01',
+      seiDeviceEvents: 'https://media.example.com/easyMedia/api/sei/devices/camera%2F01/events',
+      seiDiagnostics: 'https://media.example.com/easyMedia/api/sei/events?app=live%20feed&stream=camera%2F01',
     })
     expect(selectMediaPlaybackEndpoint(endpoints, 'rtmp')).toEqual({
       protocol: 'rtmp',
@@ -69,12 +73,16 @@ describe('media endpoint helpers', () => {
     })
   })
 
-  it('uses RTMP playback for RTMP pushes and WHEP playback for WHIP pushes', () => {
+  it('uses RTMP playback for RTMP pushes and WebRTC playback for ZLM or WHIP pushes', () => {
     const zlm = server()
     const endpoints = buildMediaEndpoints(zlm, 'live', 'main')
     expect(selectMediaPlaybackEndpoint(endpoints, 'rtmp')).toEqual({
       protocol: 'rtmp',
       url: endpoints.rtmp,
+    })
+    expect(selectMediaPlaybackEndpoint(endpoints, 'webrtc')).toEqual({
+      protocol: 'webrtc',
+      url: endpoints.whep,
     })
     const secretEmsEndpoints = buildMediaEndpoints(server({ kind: 'remote-easymedia' }), 'live', 'main')
     expect(selectMediaPlaybackEndpoint(secretEmsEndpoints, 'webrtc')).toEqual({

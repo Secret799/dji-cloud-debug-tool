@@ -32,7 +32,14 @@ describe('MediaServerStore', () => {
     const store = new MediaServerStore()
     const profiles = await store.list()
     expect(profiles).toHaveLength(1)
-    expect(profiles[0]).toMatchObject({ id: LOCAL_ZLM_ID, kind: 'local-zlm', isDefault: true, hasStoredSecret: true, secret: '' })
+    expect(profiles[0]).toMatchObject({
+      id: LOCAL_ZLM_ID,
+      kind: 'local-zlm',
+      isDefault: true,
+      hasStoredSecret: true,
+      secret: '',
+      webrtcPort: 8000,
+    })
     const stored = await readFile(join(userDataPath, 'media-servers.json'), 'utf8')
     expect(stored).toContain('encryptedSecret')
     expect((await store.getWithSecret(LOCAL_ZLM_ID))?.secret).not.toBe('')
@@ -74,7 +81,7 @@ describe('MediaServerStore', () => {
 
     const profiles = await new MediaServerStore().list()
     expect(profiles.find((profile) => profile.id === 'remote-zlm-1')?.webrtcPort).toBe(8000)
-    expect(profiles.find((profile) => profile.id === LOCAL_ZLM_ID)?.webrtcPort).toBe(0)
+    expect(profiles.find((profile) => profile.id === LOCAL_ZLM_ID)?.webrtcPort).toBe(8000)
   })
 
   it('stores SecretEMS as a separate type without retaining an API secret', async () => {

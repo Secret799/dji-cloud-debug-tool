@@ -8,6 +8,8 @@ export interface StreamEndpoints {
   hls?: string
   whip?: string
   whep?: string
+  seiDeviceEvents?: string
+  seiDiagnostics?: string
 }
 
 export type MediaPlaybackProtocol = 'http-ts' | 'rtmp' | 'webrtc'
@@ -41,10 +43,13 @@ export const buildMediaEndpoints = (
       httpTs: `${httpBase}/${safeApp}/${safeStream}.live.ts`,
       whip: `${httpBase}/easyMedia/api/webrtc/whip?${query}`,
       whep: `${httpBase}/easyMedia/api/webrtc/whep?${query}`,
+      seiDeviceEvents: `${httpBase}/easyMedia/api/sei/devices/${safeStream}/events`,
+      seiDiagnostics: `${httpBase}/easyMedia/api/sei/events?${query}`,
     }
   }
 
   const rtmp = `rtmp://${serverAuthority(server.host, server.rtmpPort)}/${safeApp}/${safeStream}`
+  const zlmWebRtc = server.kind === 'local-zlm' || server.kind === 'remote-zlm'
   return {
     rtmp,
     rtsp: server.rtspPort > 0
@@ -57,6 +62,9 @@ export const buildMediaEndpoints = (
     hls: server.kind === 'remote-srs'
       ? `${httpBase}/${safeApp}/${safeStream}.m3u8`
       : `${httpBase}/${safeApp}/${safeStream}/hls.m3u8`,
+    whep: zlmWebRtc
+      ? `${httpBase}/index/api/webrtc?app=${safeApp}&stream=${safeStream}&type=play`
+      : undefined,
   }
 }
 

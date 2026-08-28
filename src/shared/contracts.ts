@@ -279,6 +279,11 @@ export interface WebDavOverview {
   error?: string
 }
 
+export interface WebDavSyncEvent {
+  overview: WebDavOverview
+  remoteApplied: boolean
+}
+
 export interface WebDavSyncRequest {
   rendererStorage: Record<string, string>
 }
@@ -415,6 +420,63 @@ export interface RtmpRelayStartResult extends OperationResult {
   playbackUrl?: string
 }
 
+export interface SeiParserStartRequest {
+  streamId: string
+  url: string
+  source: 'local-zlm' | 'secret-ems'
+}
+
+export interface SeiParserStartResult extends OperationResult {
+  sessionId?: string
+}
+
+export interface SeiMessageDetailRequest {
+  sessionId: string
+  messageId: string
+}
+
+export interface SeiMessageDetail {
+  id: string
+  payloadType: number
+  payloadSize: number
+  uuid?: string
+  text?: string
+  hex: string
+  base64: string
+}
+
+export interface SeiMessageDetailResult extends OperationResult {
+  message?: SeiMessageDetail
+}
+
+export type SeiParserState = 'waiting' | 'running' | 'error' | 'stopped'
+
+export interface SeiMessagePreview {
+  id: string
+  at: number
+  codec: 'h264' | 'h265'
+  payloadType: number
+  payloadSize: number
+  uuid?: string
+  textPreview?: string
+  hexPreview: string
+}
+
+export interface SeiParserEvent {
+  sessionId: string
+  streamId: string
+  source: 'local-zlm' | 'secret-ems'
+  state: SeiParserState
+  at: number
+  codec?: 'h264' | 'h265'
+  videoNalUnits: number
+  seiNalUnits: number
+  seiMessages: number
+  malformedMessages: number
+  latestMessages: SeiMessagePreview[]
+  detail?: string
+}
+
 export interface DjiDesktopApi {
   profiles: {
     list: () => Promise<ConnectionProfile[]>
@@ -450,6 +512,10 @@ export interface DjiDesktopApi {
     negotiateWhep: (request: WhepOfferRequest) => Promise<WhepOfferResult>
     startRtmpRelay: (request: RtmpRelayStartRequest) => Promise<RtmpRelayStartResult>
     stopRtmpRelay: (relayId: string) => Promise<OperationResult>
+    startSeiParser: (request: SeiParserStartRequest) => Promise<SeiParserStartResult>
+    stopSeiParser: (sessionId: string) => Promise<OperationResult>
+    getSeiMessageDetail: (request: SeiMessageDetailRequest) => Promise<SeiMessageDetailResult>
+    onSeiParserEvent: (listener: (event: SeiParserEvent) => void) => () => void
     onRuntimeEvent: (listener: (runtime: MediaServerRuntime) => void) => () => void
   }
   objectStorage: {
@@ -479,7 +545,7 @@ export interface DjiDesktopApi {
     changed: (request: WebDavSyncRequest) => Promise<void>
     restore: (versionId: string) => Promise<WebDavRestoreResult>
     removeVersion: (versionId: string) => Promise<WebDavOverview>
-    onRemoteDataApplied: (listener: (rendererStorage: Record<string, string>) => void) => () => void
+    onSyncCompleted: (listener: (event: WebDavSyncEvent) => void) => () => void
   }
   events: {
     onRuntimeEvent: (listener: (event: MqttRuntimeEvent) => void) => () => void

@@ -11,6 +11,8 @@ import type {
   ObjectStorageProfile,
   PublishRequest,
   RtmpRelayStartRequest,
+  SeiMessageDetailRequest,
+  SeiParserStartRequest,
   TopicSubscription,
   WebDavConfig,
   WebDavSyncRequest,
@@ -327,6 +329,66 @@ export const validateRtmpRelayId = (value: unknown): string => {
   return relayId
 }
 
+export const validateSeiParserStartRequest = (value: unknown): SeiParserStartRequest => {
+  const request = requireRecord(value, 'SEI 解析请求')
+  const streamId = requireString(request.streamId, '视频流 ID', { maxBytes: 512 }).trim()
+  if (request.source !== 'local-zlm' && request.source !== 'secret-ems') {
+    throw new IpcValidationError('SEI 来源无效')
+  }
+  const rawUrl = requireString(request.url, 'SEI URL', { maxBytes: 4_096 }).trim()
+  let url: URL
+  try {
+    url = new URL(rawUrl)
+  } catch {
+    throw new IpcValidationError('SEI URL 无效')
+  }
+  if (url.username || url.password) throw new IpcValidationError('SEI URL 不能包含认证信息')
+  if (url.hash) throw new IpcValidationError('SEI URL 不能包含片段')
+  if (request.source === 'local-zlm') {
+    if (url.protocol !== 'rtsp:') throw new IpcValidationError('本地 SEI 解析仅支持 RTSP URL')
+    if (url.hostname !== '127.0.0.1' && url.hostname !== 'localhost' && url.hostname !== '[::1]') {
+      throw new IpcValidationError('本地 SEI 解析仅支持本地 ZLMediaKit')
+    }
+  } else {
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      throw new IpcValidationError('SecretEMS SEI 仅支持 HTTP 或 HTTPS URL')
+    }
+    const diagnosticPath = url.pathname === '/easyMedia/api/sei/events'
+    const deviceMatch = /^\/easyMedia\/api\/sei\/devices\/([^/]+)\/events$/.exec(url.pathname)
+    let devicePath = false
+    if (deviceMatch) {
+      try {
+        devicePath = /^[A-Za-z0-9_.-]{1,128}$/.test(decodeURIComponent(deviceMatch[1]))
+      } catch {
+        devicePath = false
+      }
+    }
+    if (!diagnosticPath && !devicePath) throw new IpcValidationError('SecretEMS SEI 接口路径无效')
+    if (diagnosticPath) {
+      const appName = url.searchParams.get('app') ?? ''
+      const streamName = url.searchParams.get('stream') ?? ''
+      if (!/^[A-Za-z0-9_.-]{1,64}$/.test(appName) || !/^[A-Za-z0-9_.-]{1,128}$/.test(streamName)) {
+        throw new IpcValidationError('SecretEMS SEI app 或 stream 无效')
+      }
+    }
+  }
+  return { streamId, url: url.toString(), source: request.source }
+}
+
+export const validateSeiParserId = (value: unknown): string => {
+  const sessionId = requireString(value, 'SEI parser ID', { maxBytes: 64 }).trim()
+  if (!/^[a-f0-9-]+$/.test(sessionId)) throw new IpcValidationError('SEI parser ID 无效')
+  return sessionId
+}
+
+export const validateSeiMessageDetailRequest = (value: unknown): SeiMessageDetailRequest => {
+  const request = requireRecord(value, 'SEI 消息详情请求')
+  const sessionId = validateSeiParserId(request.sessionId)
+  const messageId = requireString(request.messageId, 'SEI message ID', { maxBytes: 128 }).trim()
+  if (!/^[A-Za-z0-9_.:-]+$/.test(messageId)) throw new IpcValidationError('SEI message ID 无效')
+  return { sessionId, messageId }
+}
+
 export const validateMediaServerProfile = (value: unknown): MediaServerProfile => {
   const profile = requireRecord(value, '媒体服务配置')
   const id = validateProfileId(profile.id)
@@ -341,7 +403,7 @@ export const validateMediaServerProfile = (value: unknown): MediaServerProfile =
   requireInteger(profile.httpPort, 'HTTP 端口', 1, 65_535)
   requireInteger(profile.rtmpPort, 'RTMP 端口', 1, 65_535)
   requireInteger(profile.rtspPort, 'RTSP 端口', 0, 65_535)
-  requireInteger(profile.webrtcPort, 'WebRTC 端口', profile.kind === 'remote-easymedia' ? 1 : 0, 65_535)
+  requireInteger(profile.webrtcPort, 'WebRTC 端口', profile.kind === 'local-zlm' || profile.kind === 'remote-easymedia' ? 1 : 0, 65_535)
   if (profile.kind === 'local-zlm' && profile.apiPort !== profile.httpPort) {
     throw new IpcValidationError('本地 ZLMediaKit 的 API 端口必须与 HTTP 端口一致')
   }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ConnectionProfile } from '../../../shared/contracts'
 import type { DeviceTelemetry } from './dji'
-import { cameraLiveCapacity, cameraStreamName, collectCameraSources } from './camera'
+import { cameraLiveCapacity, cameraStreamName, collectCameraSources, normalizeLiveResultCode } from './camera'
 
 const runtime = (
   sn: string,
@@ -115,5 +115,13 @@ describe('camera source aggregation', () => {
     })]
 
     expect(cameraLiveCapacity(telemetry, 'DOCK')).toMatchObject({ currentVideoNumber: 1 })
+  })
+
+  it('normalizes current DJI live service result codes to the legacy result family', () => {
+    expect(normalizeLiveResultCode(513003)).toBe(13003)
+    expect(normalizeLiveResultCode(513011)).toBe(13011)
+    expect(normalizeLiveResultCode(13003)).toBe(13003)
+    expect(normalizeLiveResultCode(514003)).toBe(514003)
+    expect(normalizeLiveResultCode()).toBeUndefined()
   })
 })

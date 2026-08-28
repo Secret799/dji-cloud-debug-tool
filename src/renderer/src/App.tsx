@@ -86,10 +86,7 @@ import {
   objectStorageConfigIssues,
   objectStorageConfigToProfile,
 } from './lib/object-storage'
-import {
-  applyRendererStorageSnapshot,
-  notifyWebDavChanged,
-} from './lib/webdav-sync'
+import { notifyWebDavChanged } from './lib/webdav-sync'
 
 type WorkspaceView = 'overview' | 'media' | 'dji-config' | 'oss' | 'versions' | 'settings'
 
@@ -224,13 +221,8 @@ export default function App() {
     void window.djiApi.webdav.getOverview().then((overview) => {
       if (!disposed) setWebDavStatus({ configured: overview.configured, connected: overview.connected })
     }).catch(() => undefined)
-    const unsubscribe = window.djiApi.webdav.onRemoteDataApplied((rendererStorage) => {
-      applyRendererStorageSnapshot(rendererStorage)
-      window.location.reload()
-    })
     return () => {
       disposed = true
-      unsubscribe()
     }
   }, [])
 
@@ -355,6 +347,58 @@ export default function App() {
     profilesRef.current = next
     setProfiles(next)
   }
+
+  const refreshSynchronizedState = useCallback(async (): Promise<void> => {
+    const [loadedProfiles, loadedMediaServers, loadedObjectStorageProfiles] = await Promise.all([
+      window.djiApi.profiles.list(),
+      window.djiApi.media.listServers(),
+      window.djiApi.objectStorage.list(),
+    ])
+
+    profilesRef.current = loadedProfiles
+    setProfiles(loadedProfiles)
+    const profileIds = new Set(loadedProfiles.map((profile) => profile.id))
+    setActiveProfileId((current) => profileIds.has(current) ? current : loadedProfiles[0]?.id ?? '')
+
+    const nextStatuses = Object.fromEntries(loadedProfiles.map((profile) => [
+      profile.id,
+      statusesRef.current[profile.id] ?? 'disconnected',
+    ])) as Record<string, ConnectionStatus>
+    statusesRef.current = nextStatuses
+    setStatuses(nextStatuses)
+    statusUpdatedAtRef.current = Object.fromEntries(
+      Object.entries(statusUpdatedAtRef.current).filter(([profileId]) => profileIds.has(profileId)),
+    )
+    setRecordsByProfile((current) => Object.fromEntries(
+      Object.entries(current).filter(([profileId]) => profileIds.has(profileId)),
+    ))
+
+    telemetryByKeyRef.current = Object.fromEntries(
+      Object.entries(telemetryByKeyRef.current).filter(([, telemetry]) => profileIds.has(telemetry.profileId)),
+    )
+    setTelemetryByKey(telemetryByKeyRef.current)
+    deviceArchivesRef.current = deviceArchivesRef.current.filter((archive) => profileIds.has(archive.profileId))
+    setDeviceArchives(deviceArchivesRef.current)
+
+    setMediaServers(loadedMediaServers)
+    const mediaServerIds = new Set(loadedMediaServers.map((server) => server.id))
+    setMediaServerRuntimes((current) => Object.fromEntries(
+      Object.entries(current).filter(([profileId]) => mediaServerIds.has(profileId)),
+    ))
+    setMediaServersLoading(false)
+
+    setObjectStorageProfiles(loadedObjectStorageProfiles)
+    const objectStorageIds = new Set(loadedObjectStorageProfiles.map((profile) => profile.id))
+    setActiveObjectStorageId((current) => objectStorageIds.has(current) ? current : loadedObjectStorageProfiles[0]?.id ?? '')
+  }, [])
+
+  useEffect(() => window.djiApi.webdav.onSyncCompleted((event) => {
+    handleWebDavOverview(event.overview)
+    if (!event.remoteApplied) return
+    void refreshSynchronizedState().catch((error) => {
+      showToast(`刷新云端同步数据失败：${errorMessage(error)}`, 'error')
+    })
+  }), [handleWebDavOverview, refreshSynchronizedState, showToast])
 
   const replaceProfileInState = (profile: ConnectionProfile): void => {
     const current = profilesRef.current

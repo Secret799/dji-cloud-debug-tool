@@ -45,6 +45,9 @@ const numberValue = (value: unknown): number | undefined => {
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
+export const normalizeLiveResultCode = (code?: number): number | undefined =>
+  code !== undefined && code >= 513001 && code <= 513099 ? code - 500000 : code
+
 const recordArray = (value: unknown): Record<string, unknown>[] =>
   Array.isArray(value) ? value.filter(isRecord) : []
 

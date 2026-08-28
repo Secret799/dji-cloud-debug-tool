@@ -44,9 +44,11 @@ DJI Cloud Studio 是一款面向 macOS 和 Windows 的 DJI 上云 API、MQTT、�
 ### 媒体服务
 
 - macOS `arm64/x64` 和 Windows `arm64/x64` 安装包均内置对应平台与架构的 ZLMediaKit。
+- 安装包内置对应平台与架构的 FFmpeg，RTMP 预览无需用户另行安装或配置 `FFMPEG_PATH`。
 - 本地服务提供 RTMP、RTSP、HLS、HTTP API 和 RTP Proxy/GB28181 能力。
 - 可保存多个远程 ZLMediaKit、SRS 或 SecretEMS 服务。
 - 根据应用名和流 ID 生成 RTMP、RTSP、HLS、WHIP 和 WHEP 地址。
+- 本地 ZLMediaKit 和 SecretEMS 支持 DJI 推流的实时 SEI 诊断。
 - 支持使用 HLS.js 直接预览 HLS 流。
 
 ### 错误码与诊断
@@ -181,6 +183,10 @@ npm run dev
 4. 选择媒体服务，输入应用名和流 ID，复制生成的推流/播放地址。
 5. 将推流地址填入 DJI 直播配置，再使用 HLS 地址预览。
 
+在相机监看中选择“本地 ZLMediaKit”和“WebRTC”后，应用会同时从本地 RTSP 轨道旁路读取原始视频码流。选择 SecretEMS 时，应用会自动订阅 `/easyMedia/api/sei/events?app=live&stream={streamId}` SSE 诊断接口；设备事件接口 `/easyMedia/api/sei/devices/{deviceId}/events` 的 `sei` 数据格式也受支持。SecretEMS 的 RTMP 与 WebRTC 推流都会启用该订阅。
+
+SEI 面板显示编码、帧或 NAL 计数、解析异常数以及最近的 `payloadType`、长度、UUID 和受限预览。本地解析只针对标准 H.264/H.265 SEI 语法，客户端不会将未公开的 payload 推断为飞行遥测字段。
+
 内置 ZLMediaKit 默认端口：
 
 | 服务 | 默认端口 |
@@ -188,6 +194,7 @@ npm run dev
 | HTTP / API / HLS | `9090` |
 | RTMP | `1935` |
 | RTSP | `8554` |
+| WebRTC | `8000` |
 
 ### 9. 查询错误码
 
@@ -257,18 +264,25 @@ npm run package:mac:arm64  # Apple Silicon DMG + ZIP
 npm run package:mac:x64    # Intel DMG + ZIP
 ```
 
-安装包和解包应用生成到 `release/`。需要重建内置 ZLMediaKit 时可执行：
+安装包和解包应用生成到 `release/`。本地打包脚本会从固定 commit 动态构建 ZLMediaKit；也可单独执行：
 
 ```bash
 npm run build:zlm -- arm64
 npm run build:zlm -- x64
 ```
 
+打包脚本会自动下载并校验固定版本的 FFmpeg 官方源码，再编译包含 RTMP 预览和 RTSP H.264/H.265 SEI 解析所需能力的 LGPL 版本。也可提前准备：
+
+```bash
+npm run prepare:ffmpeg:mac -- arm64
+npm run prepare:ffmpeg:mac -- x64
+```
+
 ### Windows 打包
 
-Windows `x64` 和 `arm64` 正式安装包仅通过 GitHub Actions 生成。缓存未命中时，Windows Runner 会使用 Visual Studio 2022 和 CMake 编译目标架构的 `MediaServer.exe`，然后执行 Electron 打包。每个安装包只会携带当前平台与架构的 MediaServer。
+Windows `x64` 和 `arm64` 正式安装包仅通过 GitHub Actions 生成。缓存未命中时，Windows Runner 会使用 Visual Studio 2022 和 CMake 编译目标架构的 `MediaServer.exe`，并下载经 SHA-256 校验的对应架构 FFmpeg。每个安装包只会携带当前平台与架构的 MediaServer 和 FFmpeg。
 
-Windows ZLMediaKit 使用 GitHub Actions 缓存加速。默认分支会在构建脚本变化时分别预编译并缓存 `x64` 和 `arm64` 的 `MediaServer.exe`，并通过每周维护任务避免缓存因长期未访问而过期；发布 tag 时优先恢复对应架构缓存，只有首次运行、缓存被清理或构建脚本变化导致缓存未命中时才重新编译。缓存键包含架构和 `scripts/build-zlmediakit-windows.ps1` 的内容哈希，因此修改 ZLMediaKit commit 或编译选项会自动使旧缓存失效。
+ZLMediaKit 不作为二进制资源提交到代码仓库。GitHub Actions 会为 macOS 和 Windows 的 `x64/arm64` 四种目标动态编译，并分平台、架构缓存 MediaServer 与许可证。默认分支推送、每周维护任务和手工触发都可预热缓存；发布 tag 时优先恢复缓存，仅在首次运行、缓存过期或构建脚本变化时重新编译。
 
 ## GitHub Actions Tag 自动发布
 
@@ -308,12 +322,13 @@ git push origin v1.0.1
 
 1. 在 Ubuntu Runner 上执行单元测试和生产构建。
 2. 并行生成 macOS Apple Silicon 和 Intel 产物。
-3. 在 Windows Runner 上恢复对应架构的 ZLMediaKit 缓存，缓存未命中时才编译。
-4. 并行生成 Windows `x64` 和 `arm64` 安装版、便携版和 ZIP。
-5. 对 macOS 应用执行 ad-hoc 签名，并使用 `codesign` 验证签名完整性。
-6. 确认 macOS 应用使用的是 ad-hoc 签名。
-7. 生成 `SHA256SUMS.txt`。
-8. 自动创建或更新 GitHub Release，并上传所有产物。
+3. 恢复或下载对应平台与架构的 FFmpeg，校验后写入安装包资源。
+4. 在 macOS 和 Windows Runner 上恢复对应平台与架构的 ZLMediaKit 缓存，缓存未命中时动态编译。
+5. 并行生成 Windows `x64` 和 `arm64` 安装版、便携版和 ZIP。
+6. 对 macOS 应用执行 ad-hoc 签名，并使用 `codesign` 验证签名完整性。
+7. 确认 macOS 应用使用的是 ad-hoc 签名。
+8. 生成 `SHA256SUMS.txt`。
+9. 自动创建或更新 GitHub Release，并上传所有产物。
 
 在 GitHub Actions 页面手工执行 `workflow_dispatch` 可用于验证构建；只有 tag 触发的工作流会自动创建 GitHub Release。工作流会使用 tag 中的版本号更新安装包版本，无需为每次发布手工修改 `package.json`。
 
@@ -323,4 +338,4 @@ git push origin v1.0.1
 
 ## License
 
-本项目使用 [MIT License](LICENSE)。
+本项目源代码使用 [MIT License](LICENSE)。发布包中的 FFmpeg 和 ZLMediaKit 为独立第三方程序，适用其各自资源目录内附带的许可证。

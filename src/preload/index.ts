@@ -15,8 +15,12 @@ import type {
   ObjectStorageProfile,
   PublishRequest,
   RtmpRelayStartRequest,
+  SeiMessageDetailRequest,
+  SeiParserEvent,
+  SeiParserStartRequest,
   TelemetryLayoutConfig,
   WebDavConfig,
+  WebDavSyncEvent,
   WebDavSyncRequest,
   WhepOfferRequest,
 } from '../shared/contracts'
@@ -62,6 +66,14 @@ const api: DjiDesktopApi = {
     negotiateWhep: (request: WhepOfferRequest) => ipcRenderer.invoke(IPC_CHANNELS.mediaWhepOffer, request),
     startRtmpRelay: (request: RtmpRelayStartRequest) => ipcRenderer.invoke(IPC_CHANNELS.mediaRtmpRelayStart, request),
     stopRtmpRelay: (relayId: string) => ipcRenderer.invoke(IPC_CHANNELS.mediaRtmpRelayStop, relayId),
+    startSeiParser: (request: SeiParserStartRequest) => ipcRenderer.invoke(IPC_CHANNELS.mediaSeiParserStart, request),
+    stopSeiParser: (sessionId: string) => ipcRenderer.invoke(IPC_CHANNELS.mediaSeiParserStop, sessionId),
+    getSeiMessageDetail: (request: SeiMessageDetailRequest) => ipcRenderer.invoke(IPC_CHANNELS.mediaSeiMessageDetail, request),
+    onSeiParserEvent: (listener: (event: SeiParserEvent) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, parserEvent: SeiParserEvent): void => listener(parserEvent)
+      ipcRenderer.on(IPC_CHANNELS.mediaSeiParserEvent, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.mediaSeiParserEvent, handler)
+    },
     onRuntimeEvent: (listener: (runtime: MediaServerRuntime) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, runtime: MediaServerRuntime): void => listener(runtime)
       ipcRenderer.on(IPC_CHANNELS.mediaRuntimeEvent, handler)
@@ -103,10 +115,10 @@ const api: DjiDesktopApi = {
     changed: (request: WebDavSyncRequest) => ipcRenderer.invoke(IPC_CHANNELS.webdavChanged, request),
     restore: (versionId: string) => ipcRenderer.invoke(IPC_CHANNELS.webdavRestore, versionId),
     removeVersion: (versionId: string) => ipcRenderer.invoke(IPC_CHANNELS.webdavRemoveVersion, versionId),
-    onRemoteDataApplied: (listener: (rendererStorage: Record<string, string>) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, rendererStorage: Record<string, string>): void => listener(rendererStorage)
-      ipcRenderer.on(IPC_CHANNELS.webdavRemoteData, handler)
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.webdavRemoteData, handler)
+    onSyncCompleted: (listener: (event: WebDavSyncEvent) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, syncEvent: WebDavSyncEvent): void => listener(syncEvent)
+      ipcRenderer.on(IPC_CHANNELS.webdavSyncEvent, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.webdavSyncEvent, handler)
     },
   },
   events: {

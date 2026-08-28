@@ -113,6 +113,11 @@ export function DataVersions({ onNotify, onOverviewChange }: DataVersionsProps) 
 
   useEffect(() => { void refresh(false) }, [refresh])
 
+  useEffect(() => window.djiApi.webdav.onSyncCompleted((event) => {
+    applyOverview(event.overview)
+    setLoading(false)
+  }), [applyOverview])
+
   useEffect(() => {
     if (!strategyOpen) return
     const closeOnOutsideClick = (event: MouseEvent): void => {

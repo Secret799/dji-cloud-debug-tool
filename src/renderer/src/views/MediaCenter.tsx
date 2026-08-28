@@ -274,6 +274,7 @@ export function MediaCenter({
                 {endpoints.hls && <div><span>HLS 地址</span><code>{endpoints.hls}</code><Tooltip label="复制 HLS 地址"><button className="icon-button small" onClick={() => void copyEndpoint(endpoints.hls!)}><Copy size={13} /></button></Tooltip></div>}
                 {endpoints.whip && <div><span>WHIP 推流</span><code>{endpoints.whip}</code><Tooltip label="复制 WHIP 地址"><button className="icon-button small" onClick={() => void copyEndpoint(endpoints.whip!)}><Copy size={13} /></button></Tooltip></div>}
                 {endpoints.whep && <div><span>WHEP 播放</span><code>{endpoints.whep}</code><Tooltip label="复制 WHEP 地址"><button className="icon-button small" onClick={() => void copyEndpoint(endpoints.whep!)}><Copy size={13} /></button></Tooltip></div>}
+                {endpoints.seiDiagnostics && <div><span>SEI 诊断</span><code>{endpoints.seiDiagnostics}</code><Tooltip label="复制 SEI 诊断地址"><button className="icon-button small" onClick={() => void copyEndpoint(endpoints.seiDiagnostics!)}><Copy size={13} /></button></Tooltip></div>}
               </div>
             </div>
           </section>
@@ -319,7 +320,7 @@ export function MediaCenter({
                 </div>
                 <div className="field-grid two-columns media-secondary-port-grid">
                   {editor.kind !== 'remote-srs' && <label className="field"><span>RTSP 端口</span><input type="number" min={1} max={65535} value={editor.rtspPort} onChange={(event) => setEditor({ ...editor, rtspPort: Number(event.target.value) })} /></label>}
-                  {editor.kind !== 'local-zlm' && <label className="field"><span>WebRTC 端口（0 禁用）</span><input type="number" min={0} max={65535} value={editor.webrtcPort} onChange={(event) => setEditor({ ...editor, webrtcPort: Number(event.target.value) })} /></label>}
+                  {editor.kind !== 'remote-srs' && <label className="field"><span>WebRTC 端口{editor.kind === 'local-zlm' ? '' : '（0 禁用）'}</span><input type="number" min={editor.kind === 'local-zlm' ? 1 : 0} max={65535} value={editor.webrtcPort} onChange={(event) => setEditor({ ...editor, webrtcPort: Number(event.target.value) })} /></label>}
                 </div>
                 {editor.kind !== 'local-zlm' && <div className="field-grid two-columns"><label className="field"><span>API 协议</span><select value={editor.apiProtocol} onChange={(event) => setEditor({ ...editor, apiProtocol: event.target.value as 'http' | 'https' })}><option value="http">HTTP</option><option value="https">HTTPS</option></select></label><label className="field"><span>播放协议</span><select value={editor.httpProtocol} onChange={(event) => setEditor({ ...editor, httpProtocol: event.target.value as 'http' | 'https' })}><option value="http">HTTP</option><option value="https">HTTPS</option></select></label></div>}
                 <label className="field"><span>API Secret{editor.hasStoredSecret && !editor.secret ? '（已保存，留空保持不变）' : ''}</span><input type="password" value={editor.secret} onChange={(event) => setEditor({ ...editor, secret: event.target.value, clearStoredSecret: false })} /></label>

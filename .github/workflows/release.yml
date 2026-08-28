@@ -44,18 +44,26 @@ jobs:
           - label: macOS Apple Silicon
             os: macos-14
             platform: mac
+            ffmpeg_platform: darwin
+            zlm_binary: vendor/zlmediakit/arm64/MediaServer
             arch: arm64
           - label: macOS Intel
             os: macos-14
             platform: mac
+            ffmpeg_platform: darwin
+            zlm_binary: vendor/zlmediakit/x64/MediaServer
             arch: x64
           - label: Windows x64
             os: windows-2022
             platform: win
+            ffmpeg_platform: win32
+            zlm_binary: vendor/zlmediakit/win32-x64/MediaServer.exe
             arch: x64
           - label: Windows ARM64
             os: windows-2022
             platform: win
+            ffmpeg_platform: win32
+            zlm_binary: vendor/zlmediakit/win32-arm64/MediaServer.exe
             arch: arm64
     runs-on: ${{ matrix.os }}
     steps:
@@ -81,13 +89,52 @@ jobs:
       - name: Build application
         run: npm run build
 
-      - name: Restore bundled ZLMediaKit for Windows
-        if: matrix.platform == 'win'
+      - name: Restore bundled FFmpeg
+        id: ffmpeg-cache
+        uses: actions/cache@v5
+        with:
+          path: vendor/ffmpeg/${{ matrix.ffmpeg_platform }}-${{ matrix.arch }}
+          key: ffmpeg-v1-${{ matrix.ffmpeg_platform }}-${{ matrix.arch }}-${{ hashFiles('scripts/prepare-ffmpeg-*') }}
+
+      - name: Prepare bundled FFmpeg for macOS
+        if: matrix.platform == 'mac' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: npm run prepare:ffmpeg:mac -- ${{ matrix.arch }}
+
+      - name: Prepare bundled FFmpeg for Windows
+        if: matrix.platform == 'win' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: npm run ci:prepare:ffmpeg:win -- -Architecture ${{ matrix.arch }}
+
+      - name: Verify bundled FFmpeg
+        shell: bash
+        run: |
+          ffmpeg_dir="vendor/ffmpeg/${{ matrix.ffmpeg_platform }}-${{ matrix.arch }}"
+          if [[ "${{ matrix.platform }}" == "win" ]]; then
+            ffmpeg_binary="$ffmpeg_dir/ffmpeg.exe"
+          else
+            ffmpeg_binary="$ffmpeg_dir/ffmpeg"
+          fi
+          test -f "$ffmpeg_binary"
+          test -f "$ffmpeg_dir/LICENSE"
+          test -f "$ffmpeg_dir/SOURCE.txt"
+          ls -lh "$ffmpeg_binary" "$ffmpeg_dir/LICENSE" "$ffmpeg_dir/SOURCE.txt"
+
+      - name: Restore bundled ZLMediaKit
         id: zlm-cache
         uses: actions/cache@v5
         with:
-          path: vendor/zlmediakit/win32-${{ matrix.arch }}/MediaServer.exe
-          key: zlm-windows-v1-${{ matrix.arch }}-${{ hashFiles('scripts/build-zlmediakit-windows.ps1') }}
+          path: |
+            ${{ matrix.zlm_binary }}
+            vendor/zlmediakit/LICENSE
+          key: zlm-v2-${{ matrix.ffmpeg_platform }}-${{ matrix.arch }}-${{ hashFiles('scripts/build-zlmediakit-*') }}
+
+      - name: Build bundled ZLMediaKit for macOS
+        if: matrix.platform == 'mac' && steps.zlm-cache.outputs.cache-hit != 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: npm run build:zlm -- ${{ matrix.arch }}
 
       - name: Build bundled ZLMediaKit for Windows
         if: matrix.platform == 'win' && steps.zlm-cache.outputs.cache-hit != 'true'
@@ -95,16 +142,17 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: npm run ci:build:zlm:win -- -Architecture ${{ matrix.arch }}
 
-      - name: Verify bundled ZLMediaKit for Windows
-        if: matrix.platform == 'win'
-        shell: pwsh
+      - name: Verify bundled ZLMediaKit
+        shell: bash
         run: |
-          $mediaServer = "vendor/zlmediakit/win32-${{ matrix.arch }}/MediaServer.exe"
-          if (-not (Test-Path -LiteralPath $mediaServer -PathType Leaf)) {
-            throw "Missing cached or compiled ZLMediaKit executable: $mediaServer"
-          }
-          Get-Item -LiteralPath $mediaServer | Select-Object FullName, Length
-          Get-FileHash -Algorithm SHA256 -LiteralPath $mediaServer
+          test -f "${{ matrix.zlm_binary }}"
+          test -f vendor/zlmediakit/LICENSE
+          ls -lh "${{ matrix.zlm_binary }}" vendor/zlmediakit/LICENSE
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "${{ matrix.zlm_binary }}"
+          else
+            shasum -a 256 "${{ matrix.zlm_binary }}"
+          fi
 
       - name: Package macOS
         if: matrix.platform == 'mac'

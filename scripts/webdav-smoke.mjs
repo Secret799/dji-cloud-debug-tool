@@ -223,6 +223,17 @@ try {
       ],
       updatedAt: now,
     })
+    await window.djiApi.profiles.save({
+      ...profile,
+      id: 'sync-mqtt-profile',
+      name: '云端同步连接',
+      clientId: 'sync-mqtt-client',
+      password: '',
+      devices: [],
+      subscriptions: [],
+      createdAt: now,
+      updatedAt: now,
+    })
     await window.djiApi.media.saveServer({
       id: 'sync-media', name: '同步流媒体', kind: 'remote-srs', host: 'media.example.com',
       apiProtocol: 'https', apiPort: 1985, httpProtocol: 'https', httpPort: 443,
@@ -299,6 +310,11 @@ try {
   if (!secondProfiles.profiles[0]?.devices?.some((device) => device.id === 'sync-device')) {
     errors.push('second client: MQTT device configuration was not synchronized')
   }
+  if (!secondProfiles.profiles.some((profile) => profile.id === 'sync-mqtt-profile')) {
+    errors.push('second client: additional MQTT connection was not synchronized')
+  }
+  await secondWindow.locator('.rail-top button').first().click()
+  await secondWindow.getByText('云端同步连接', { exact: true }).waitFor({ state: 'visible', timeout: 10_000 })
   const secondScope = await secondWindow.evaluate(async () => ({
     mediaServers: await window.djiApi.media.listServers(),
     objectStorageProfiles: await window.djiApi.objectStorage.list(),

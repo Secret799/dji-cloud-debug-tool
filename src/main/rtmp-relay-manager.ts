@@ -1,11 +1,9 @@
 import { spawn, type ChildProcessByStdio } from 'node:child_process'
-import { constants } from 'node:fs'
-import { access } from 'node:fs/promises'
 import { createServer, type Server, type ServerResponse } from 'node:http'
-import { delimiter, join } from 'node:path'
 import type { Readable } from 'node:stream'
 import { app } from 'electron'
 import type { OperationResult, RtmpRelayStartResult } from '../shared/contracts'
+import { findFfmpegExecutable } from './ffmpeg-path'
 
 interface RelaySession {
   sourceUrl: string
@@ -140,25 +138,13 @@ export class RtmpRelayManager {
 
   private async resolveFfmpegPath(): Promise<string> {
     if (this.ffmpegPath) return this.ffmpegPath
-    const pathCandidates = (process.env.PATH ?? '').split(delimiter).filter(Boolean).map((path) => join(path, 'ffmpeg'))
-    const candidates = [
-      process.env.FFMPEG_PATH,
-      app.isPackaged ? join(process.resourcesPath, 'ffmpeg', 'ffmpeg') : undefined,
-      ...pathCandidates,
-      '/opt/homebrew/bin/ffmpeg',
-      '/usr/local/bin/ffmpeg',
-      '/opt/homebrew/Caskroom/miniconda/base/bin/ffmpeg',
-    ].filter((path): path is string => Boolean(path))
-
-    for (const candidate of [...new Set(candidates)]) {
-      try {
-        await access(candidate, constants.X_OK)
-        this.ffmpegPath = candidate
-        return candidate
-      } catch {
-        // Continue through the known executable locations.
-      }
-    }
-    throw new Error('未找到 FFmpeg，无法在应用内播放 RTMP；请安装 FFmpeg 或设置 FFMPEG_PATH')
+    this.ffmpegPath = await findFfmpegExecutable({
+      appPath: app.getAppPath(),
+      isPackaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+      overridePath: process.env.FFMPEG_PATH,
+      searchPath: process.env.PATH,
+    })
+    return this.ffmpegPath
   }
 }

@@ -16,6 +16,9 @@ import {
   validateQos,
   validateRtmpRelayId,
   validateRtmpRelayStartRequest,
+  validateSeiMessageDetailRequest,
+  validateSeiParserId,
+  validateSeiParserStartRequest,
   validateSessionPassword,
   validateTopic,
   validateWebDavConfig,
@@ -30,6 +33,7 @@ import { MediaServerManager } from './media-server-manager'
 import { negotiateWhep } from './whep-client'
 import { ObjectStorageStore } from './object-storage-store'
 import { RtmpRelayManager } from './rtmp-relay-manager'
+import { SeiParserManager } from './sei-parser-manager'
 import { DeviceArchiveStore } from './device-archive-store'
 import { FirmwareUploadManager } from './firmware-upload-manager'
 import { AppUpdateManager } from './app-update-manager'
@@ -46,6 +50,7 @@ let mqttManager: MqttConnectionManager
 let mediaServerStore: MediaServerStore
 let mediaServerManager: MediaServerManager
 let rtmpRelayManager: RtmpRelayManager
+let seiParserManager: SeiParserManager
 let objectStorageStore: ObjectStorageStore
 let deviceArchiveStore: DeviceArchiveStore
 let firmwareUploadManager: FirmwareUploadManager
@@ -93,6 +98,7 @@ const createWindow = (): void => {
     void rtmpRelayManager?.close().catch((error) => {
       console.warn('Unable to stop RTMP relays after window close:', error)
     })
+    seiParserManager?.close()
   })
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//.test(url)) void shell.openExternal(url)
@@ -288,6 +294,28 @@ const registerIpc = (): void => {
       return operationFailure(error)
     }
   })
+  ipcMain.handle(IPC_CHANNELS.mediaSeiParserStart, (_event, rawRequest: unknown) => {
+    try {
+      return seiParserManager.start(validateSeiParserStartRequest(rawRequest))
+    } catch (error) {
+      return operationFailure(error)
+    }
+  })
+  ipcMain.handle(IPC_CHANNELS.mediaSeiParserStop, (_event, rawSessionId: unknown) => {
+    try {
+      return seiParserManager.stop(validateSeiParserId(rawSessionId))
+    } catch (error) {
+      return operationFailure(error)
+    }
+  })
+  ipcMain.handle(IPC_CHANNELS.mediaSeiMessageDetail, (_event, rawRequest: unknown) => {
+    try {
+      const request = validateSeiMessageDetailRequest(rawRequest)
+      return seiParserManager.getMessageDetail(request.sessionId, request.messageId)
+    } catch (error) {
+      return operationFailure(error)
+    }
+  })
 
   ipcMain.handle(IPC_CHANNELS.objectStorageList, () => objectStorageStore.list())
   ipcMain.handle(IPC_CHANNELS.objectStorageSave, async (_event, rawProfile: unknown) => {
@@ -368,6 +396,11 @@ app.whenReady().then(() => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC_CHANNELS.mediaRuntimeEvent, runtime)
   })
   rtmpRelayManager = new RtmpRelayManager()
+  seiParserManager = new SeiParserManager((event) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(IPC_CHANNELS.mediaSeiParserEvent, event)
+    }
+  })
   objectStorageStore = new ObjectStorageStore()
   firmwareUploadManager = new FirmwareUploadManager(objectStorageStore, (progress) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -380,10 +413,12 @@ app.whenReady().then(() => {
     profileStore,
     mediaServerStore,
     objectStorageStore,
-    () => mqttManager.disconnectAll(),
-    (rendererStorage) => {
+    async (profileIds) => {
+      await Promise.all(profileIds.map((profileId) => mqttManager.disconnect(profileId)))
+    },
+    (syncEvent) => {
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send(IPC_CHANNELS.webdavRemoteData, rendererStorage)
+        mainWindow.webContents.send(IPC_CHANNELS.webdavSyncEvent, syncEvent)
       }
     },
   )
@@ -414,6 +449,7 @@ app.on('before-quit', (event) => {
     mqttManager ? mqttManager.disconnectAll() : Promise.resolve(),
     mediaServerManager ? mediaServerManager.stopLocal().then(() => undefined) : Promise.resolve(),
     rtmpRelayManager ? rtmpRelayManager.close() : Promise.resolve(),
+    Promise.resolve(seiParserManager?.close()),
   ]).then(() => undefined)
   void cleanup
     .catch((error) => console.warn('Unable to disconnect MQTT connections before quit:', error))

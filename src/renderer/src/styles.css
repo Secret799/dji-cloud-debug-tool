@@ -6353,6 +6353,301 @@ textarea {
   white-space: nowrap;
 }
 
+.camera-sei-panel {
+  min-width: 0;
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--code-bg) 72%, var(--surface));
+}
+
+.camera-sei-panel > header {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+}
+
+.camera-sei-panel > header > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text);
+  font-size: 8px;
+  font-weight: 750;
+}
+
+.camera-sei-panel > header strong,
+.camera-sei-panel > header small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.camera-sei-panel > header strong {
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 650;
+}
+
+.camera-sei-panel > header strong.detected {
+  color: var(--green);
+}
+
+.camera-sei-panel > header small {
+  margin-left: auto;
+  color: var(--muted-2);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 7px;
+}
+
+.camera-sei-panel > header small + small {
+  margin-left: 0;
+}
+
+.camera-sei-panel > header small.warning {
+  color: var(--amber);
+}
+
+.camera-sei-detail-button {
+  margin-left: 0;
+  color: var(--accent);
+}
+
+.camera-sei-panel > p {
+  margin: 0;
+  padding: 0 8px 7px;
+  overflow: hidden;
+  color: var(--muted-2);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.camera-sei-detail-backdrop {
+  padding: 18px;
+}
+
+.modal.camera-sei-detail-modal {
+  width: min(1180px, 100%);
+  height: min(760px, calc(100vh - 36px));
+  max-height: none;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.camera-sei-detail-body {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: minmax(360px, 1.1fr) minmax(420px, 0.9fr);
+}
+
+.camera-sei-detail-video,
+.camera-sei-detail-data {
+  min-width: 0;
+  min-height: 0;
+}
+
+.camera-sei-detail-video {
+  display: grid;
+  grid-template-rows: 42px minmax(0, 1fr);
+  border-right: 1px solid var(--line);
+  background: #121614;
+}
+
+.camera-sei-detail-video > header,
+.camera-sei-detail-data > header,
+.camera-sei-payload > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.camera-sei-detail-video > header {
+  padding: 0 12px;
+  color: #e5ebe7;
+  background: #1b211e;
+}
+
+.camera-sei-detail-video > header strong {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.camera-sei-detail-video > header span {
+  color: #9eaaa3;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 8px;
+}
+
+.camera-sei-detail-video .camera-player {
+  height: 100%;
+  min-height: 0;
+  border-radius: 0;
+}
+
+.camera-sei-detail-data {
+  display: grid;
+  grid-template-rows: 58px minmax(0, 1fr);
+  background: var(--surface);
+}
+
+.camera-sei-detail-data > header {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-soft);
+}
+
+.camera-sei-detail-data > header > div:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.camera-sei-detail-data > header strong {
+  color: var(--text);
+  font-size: 10px;
+}
+
+.camera-sei-detail-data > header span {
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.camera-sei-detail-controls {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.camera-sei-pause-button {
+  flex: 0 0 auto;
+}
+
+.camera-sei-pause-button.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.camera-sei-format-tabs button {
+  min-width: 50px;
+  min-height: 25px;
+  padding: 0 7px;
+  font-size: 9px;
+}
+
+.camera-sei-format-tabs button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.camera-sei-detail-content {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: 190px minmax(0, 1fr);
+}
+
+.camera-sei-detail-list {
+  min-width: 0;
+  overflow: auto;
+  border-right: 1px solid var(--line);
+  background: var(--surface-soft);
+}
+
+.camera-sei-detail-list > button {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 5px;
+  padding: 9px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.camera-sei-detail-list > button:hover {
+  background: var(--surface);
+}
+
+.camera-sei-detail-list > button.selected {
+  box-shadow: inset 3px 0 0 var(--accent);
+  background: var(--accent-soft);
+}
+
+.camera-sei-detail-list > button > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 8px;
+}
+
+.camera-sei-detail-list strong,
+.camera-sei-detail-list code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.camera-sei-detail-list strong {
+  font-size: 9px;
+}
+
+.camera-sei-detail-list code {
+  color: var(--code-text);
+  font-size: 8px;
+}
+
+.camera-sei-payload {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: 38px minmax(0, 1fr);
+  background: var(--code-bg);
+}
+
+.camera-sei-payload > header {
+  padding: 0 9px 0 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.camera-sei-payload > header > span {
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 8px;
+}
+
+.camera-sei-payload pre {
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  overflow: auto;
+  padding: 12px;
+  color: var(--code-text);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.camera-sei-detail-error {
+  margin: 0;
+  padding: 12px;
+  color: var(--red);
+  font-size: 10px;
+}
+
 .camera-monitor-footer {
   min-height: 42px;
   justify-content: space-between;
@@ -10606,4 +10901,28 @@ textarea {
     padding: 0 10px;
   }
 
+}
+
+@media (max-width: 820px) {
+  .camera-sei-detail-backdrop {
+    padding: 8px;
+  }
+
+  .modal.camera-sei-detail-modal {
+    height: calc(100vh - 16px);
+  }
+
+  .camera-sei-detail-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(210px, 42%) minmax(0, 1fr);
+  }
+
+  .camera-sei-detail-video {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .camera-sei-detail-content {
+    grid-template-columns: minmax(140px, 34%) minmax(0, 1fr);
+  }
 }

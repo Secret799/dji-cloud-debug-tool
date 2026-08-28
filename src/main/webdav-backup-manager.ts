@@ -5,6 +5,7 @@ import type {
   WebDavConfig,
   WebDavOverview,
   WebDavRestoreResult,
+  WebDavSyncEvent,
   WebDavSyncRequest,
   WebDavVersion,
 } from '../shared/contracts'
@@ -20,6 +21,7 @@ import { decryptWebDavBackup, encryptWebDavBackup } from './webdav-backup-crypto
 import { WebDavClient } from './webdav-client'
 import { WebDavConfigStore } from './webdav-config-store'
 import {
+  changedMqttRuntimeProfileIds,
   fingerprintWebDavData,
   reconcileWebDavData,
   webDavDataEqual,
@@ -76,8 +78,8 @@ export class WebDavBackupManager {
     private readonly profileStore: ProfileStore,
     private readonly mediaServerStore: MediaServerStore,
     private readonly objectStorageStore: ObjectStorageStore,
-    private readonly beforeRestore: () => Promise<void>,
-    private readonly onRemoteDataApplied: (rendererStorage: Record<string, string>) => void = () => undefined,
+    private readonly beforeRestore: (profileIds: string[]) => Promise<void>,
+    private readonly onSyncCompleted: (event: WebDavSyncEvent) => void = () => undefined,
   ) {}
 
   getOverview(): Promise<WebDavOverview> {
@@ -151,7 +153,8 @@ export class WebDavBackupManager {
         const encrypted = await client.download(versionId)
         const document = this.parseBackupDocument(decryptWebDavBackup(encrypted, config.secret))
         const previous = await this.captureSnapshot()
-        await this.beforeRestore()
+        const affectedProfileIds = changedMqttRuntimeProfileIds(previous.profiles, document.data.profiles)
+        if (affectedProfileIds.length) await this.beforeRestore(affectedProfileIds)
         try {
           await this.applySnapshot(document.data)
         } catch (restoreError) {
@@ -259,7 +262,8 @@ export class WebDavBackupManager {
 
       const remoteApplied = !webDavDataEqual(local, merged)
       if (remoteApplied) {
-        await this.beforeRestore()
+        const affectedProfileIds = changedMqttRuntimeProfileIds(local.profiles, merged.profiles)
+        if (affectedProfileIds.length) await this.beforeRestore(affectedProfileIds)
         try {
           await this.applySnapshot(merged)
         } catch (mergeError) {
@@ -275,8 +279,7 @@ export class WebDavBackupManager {
 
       if (latest && remoteDocument && webDavDataEqual(merged, remoteDocument.data)) {
         await this.recordSyncBase(latest, merged, remoteApplied ? 'restore' : undefined)
-        if (remoteApplied) this.onRemoteDataApplied(merged.rendererStorage)
-        return this.buildOverview(versions, true)
+        return this.completeSync(await this.buildOverview(versions, true), remoteApplied)
       }
 
       const revision = Math.max(0, ...versions.map((version) => version.revision)) + 1
@@ -296,8 +299,7 @@ export class WebDavBackupManager {
       await client.upload(id, encrypted)
       const uploaded = versionFromDocument(id, encrypted.byteLength, document)
       await this.recordSyncBase(uploaded, merged, 'upload')
-      if (remoteApplied) this.onRemoteDataApplied(merged.rendererStorage)
-      return this.buildOverview([uploaded, ...versions], true)
+      return this.completeSync(await this.buildOverview([uploaded, ...versions], true), remoteApplied)
     } finally {
       await client.releaseSyncLock(lock.owner).catch((error) => {
         console.warn('Unable to release WebDAV synchronization lock:', error)
@@ -429,6 +431,15 @@ export class WebDavBackupManager {
 
   private activity(type: WebDavActivity['type'], version: WebDavVersion): WebDavActivity {
     return { id: crypto.randomUUID(), type, revision: version.revision, at: Date.now() }
+  }
+
+  private completeSync(overview: WebDavOverview, remoteApplied: boolean): WebDavOverview {
+    try {
+      this.onSyncCompleted({ overview, remoteApplied })
+    } catch (error) {
+      console.warn('Unable to publish WebDAV synchronization event:', error)
+    }
+    return overview
   }
 
   private async recordSyncBase(

@@ -11,6 +11,9 @@ import {
   validatePublishRequest,
   validateRtmpRelayId,
   validateRtmpRelayStartRequest,
+  validateSeiMessageDetailRequest,
+  validateSeiParserId,
+  validateSeiParserStartRequest,
   validateSessionPassword,
   validateWhepOfferRequest,
 } from './ipc-validation'
@@ -74,6 +77,43 @@ describe('IPC validation', () => {
     expect(() => validateRtmpRelayStartRequest({ url: 'https://media.example.com/live/main' })).toThrow('RTMP 或 RTMPS')
     expect(validateRtmpRelayId('01234567-89ab-cdef-0123-456789abcdef')).toBe('01234567-89ab-cdef-0123-456789abcdef')
     expect(() => validateRtmpRelayId('../relay')).toThrow('无效')
+  })
+
+  it('validates local ZLM and SecretEMS SEI sources', () => {
+    expect(validateSeiParserStartRequest({ source: 'local-zlm', streamId: 'dock-1', url: 'rtsp://127.0.0.1:8554/live/dock-1' })).toEqual({
+      source: 'local-zlm',
+      streamId: 'dock-1',
+      url: 'rtsp://127.0.0.1:8554/live/dock-1',
+    })
+    expect(validateSeiParserStartRequest({
+      source: 'secret-ems',
+      streamId: 'dock-1',
+      url: 'https://webrtc.example.com/easyMedia/api/sei/events?app=live&stream=dock-1',
+    })).toEqual({
+      source: 'secret-ems',
+      streamId: 'dock-1',
+      url: 'https://webrtc.example.com/easyMedia/api/sei/events?app=live&stream=dock-1',
+    })
+    expect(() => validateSeiParserStartRequest({ source: 'local-zlm', streamId: 'dock-1', url: 'rtsp://media.example.com/live/dock-1' }))
+      .toThrow('本地 ZLMediaKit')
+    expect(() => validateSeiParserStartRequest({ source: 'local-zlm', streamId: 'dock-1', url: 'http://127.0.0.1/live/dock-1' }))
+      .toThrow('RTSP URL')
+    expect(() => validateSeiParserStartRequest({ source: 'secret-ems', streamId: 'dock-1', url: 'https://media.example.com/other/events' }))
+      .toThrow('接口路径')
+    expect(() => validateSeiParserStartRequest({ source: 'secret-ems', streamId: 'dock-1', url: 'https://user:pass@media.example.com/easyMedia/api/sei/events?app=live&stream=dock-1' }))
+      .toThrow('认证信息')
+    expect(validateSeiParserId('01234567-89ab-cdef-0123-456789abcdef')).toBe('01234567-89ab-cdef-0123-456789abcdef')
+    expect(validateSeiMessageDetailRequest({
+      sessionId: '01234567-89ab-cdef-0123-456789abcdef',
+      messageId: 'secret-ems:42',
+    })).toEqual({
+      sessionId: '01234567-89ab-cdef-0123-456789abcdef',
+      messageId: 'secret-ems:42',
+    })
+    expect(() => validateSeiMessageDetailRequest({
+      sessionId: '01234567-89ab-cdef-0123-456789abcdef',
+      messageId: '../42',
+    })).toThrow('message ID 无效')
   })
 
   it('rejects invalid QoS and payloads larger than 1 MiB', () => {

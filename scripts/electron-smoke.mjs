@@ -11,6 +11,7 @@ const screenshotBase = screenshotPath.replace(/\.png$/i, '')
 const packagedExecutable = process.env.DJI_STUDIO_EXECUTABLE
   ? resolve(projectRoot, process.env.DJI_STUDIO_EXECUTABLE)
   : undefined
+const skipLocalMediaServerStart = process.env.DJI_STUDIO_SKIP_LOCAL_ZLM_START === 'true'
 const errors = []
 const layouts = []
 
@@ -1342,17 +1343,19 @@ try {
   await mediaServerDialog.waitFor({ state: 'hidden' })
   await window.locator('.media-server-list').getByText('冒烟测试流媒体', { exact: true }).waitFor({ state: 'visible' })
   await window.locator('.media-server-list').getByRole('button', { name: /本地 ZLMediaKit/ }).click()
-  await window.getByRole('button', { name: '启动服务' }).click()
-  await window.locator('.media-service-header .server-state-dot.running').waitFor({ state: 'visible', timeout: 15_000 })
-  const localMediaRuntime = await window.evaluate(async () => {
-    const servers = await window.djiApi.media.listServers()
-    return window.djiApi.media.checkServer(servers.find((server) => server.kind === 'local-zlm').id)
-  })
-  if (!localMediaRuntime.ok || localMediaRuntime.runtime?.state !== 'running') {
-    errors.push(`media: local ZLMediaKit did not become healthy (${localMediaRuntime.error ?? 'unknown error'})`)
+  if (!skipLocalMediaServerStart) {
+    await window.getByRole('button', { name: '启动服务' }).click()
+    await window.locator('.media-service-header .server-state-dot.running').waitFor({ state: 'visible', timeout: 15_000 })
+    const localMediaRuntime = await window.evaluate(async () => {
+      const servers = await window.djiApi.media.listServers()
+      return window.djiApi.media.checkServer(servers.find((server) => server.kind === 'local-zlm').id)
+    })
+    if (!localMediaRuntime.ok || localMediaRuntime.runtime?.state !== 'running') {
+      errors.push(`media: local ZLMediaKit did not become healthy (${localMediaRuntime.error ?? 'unknown error'})`)
+    }
   }
   await window.screenshot({ path: `${screenshotBase}-media.png` })
-  await window.getByRole('button', { name: '停止服务' }).click()
+  if (!skipLocalMediaServerStart) await window.getByRole('button', { name: '停止服务' }).click()
 
   await window.getByRole('button', { name: '设备工作台' }).click()
   await window.locator('.overview-view').waitFor({ state: 'visible' })
@@ -1362,6 +1365,199 @@ try {
   if (!mediaServerOptions.some((option) => option.includes('冒烟测试流媒体 · 127.0.0.1'))) {
     errors.push(`media: newly saved server was not synchronized to camera controls (${JSON.stringify(mediaServerOptions)})`)
   }
+
+  await electronApp.evaluate(({ BrowserWindow, ipcMain }, smokeProfileId) => {
+    ipcMain.removeHandler('mqtt:publish')
+    ipcMain.handle('mqtt:publish', (event, request) => {
+      const payload = JSON.parse(request.payload)
+      setTimeout(() => {
+        event.sender.send('runtime:event', {
+          type: 'message',
+          profileId: request.profileId,
+          message: {
+            id: `smoke-live-reply-${payload.tid}`,
+            profileId: request.profileId,
+            direction: 'in',
+            topic: request.topic.replace(/\/services$/, '/services_reply'),
+            payload: JSON.stringify({
+              tid: payload.tid,
+              bid: payload.bid,
+              method: payload.method,
+              data: { result: 0 },
+            }),
+            qos: 1,
+            retain: false,
+            timestamp: Date.now(),
+            size: 0,
+          },
+        })
+      }, 40)
+      return { ok: true }
+    })
+    ipcMain.removeHandler('mqtt:subscribe')
+    ipcMain.handle('mqtt:subscribe', () => ({ ok: true }))
+    ipcMain.removeHandler('media:sei-parser-start')
+    ipcMain.handle('media:sei-parser-start', () => ({ ok: true, sessionId: 'smoke-sei-session' }))
+    ipcMain.removeHandler('media:sei-message-detail')
+    ipcMain.handle('media:sei-message-detail', (_event, request) => {
+      const text = request.messageId === 'smoke-sei-message-1'
+        ? '{"flightId":"SMOKE-001","lat":31.2304,"lng":121.4737}\n{"height":42,"mode":"mission"}'
+        : undefined
+      const payload = text
+        ? Buffer.concat([Buffer.from('00112233445566778899aabbccddeeff', 'hex'), Buffer.from(text)])
+        : Buffer.from('b5003c000102030405060708', 'hex')
+      return {
+        ok: true,
+        message: {
+          id: request.messageId,
+          payloadType: text ? 5 : 1,
+          payloadSize: payload.length,
+          uuid: text ? '00112233-4455-6677-8899-aabbccddeeff' : undefined,
+          text,
+          hex: [...payload].map((value) => value.toString(16).padStart(2, '0')).join(' '),
+          base64: payload.toString('base64'),
+        },
+      }
+    })
+    for (const instance of BrowserWindow.getAllWindows()) {
+      instance.webContents.send('media:sei-parser-event', {
+        sessionId: 'smoke-sei-session',
+        streamId: 'pending',
+        source: 'local-zlm',
+        state: 'waiting',
+        at: Date.now(),
+        videoNalUnits: 0,
+        seiNalUnits: 0,
+        seiMessages: 0,
+        malformedMessages: 0,
+        latestMessages: [],
+        detail: '等待本地 ZLMediaKit 码流',
+      })
+      instance.webContents.send('runtime:event', {
+        type: 'status',
+        profileId: smokeProfileId,
+        status: 'connected',
+        at: Date.now(),
+      })
+    }
+  }, profileId)
+  const cameraToolbarSelects = window.locator('.camera-stream-toolbar select')
+  await cameraToolbarSelects.nth(1).selectOption('webrtc')
+  const localMediaServerOption = cameraToolbarSelects.first().locator('option').filter({ hasText: '本地 ZLMediaKit' })
+  await cameraToolbarSelects.first().selectOption(await localMediaServerOption.getAttribute('value'))
+  await electronApp.evaluate(({ BrowserWindow }, smokeProfileId) => {
+    for (const instance of BrowserWindow.getAllWindows()) {
+      instance.webContents.send('runtime:event', {
+        type: 'status',
+        profileId: smokeProfileId,
+        status: 'connected',
+        at: Date.now(),
+      })
+    }
+  }, profileId)
+  await window.getByRole('button', { name: '播放', exact: true }).first().waitFor({ state: 'visible' })
+  await window.getByRole('button', { name: '播放', exact: true }).first().click()
+  const seiPanel = window.locator('.camera-sei-panel').first()
+  await seiPanel.waitFor({ state: 'visible', timeout: 5_000 })
+  if (await window.getByRole('button', { name: '查看 SEI 详情' }).count()) {
+    errors.push('sei: detail button is visible before any SEI message exists')
+  }
+  await electronApp.evaluate(({ BrowserWindow }) => {
+    for (const instance of BrowserWindow.getAllWindows()) {
+      instance.webContents.send('media:sei-parser-event', {
+        sessionId: 'smoke-sei-session',
+        streamId: 'DOCK-SMOKE-001/165-0-0/normal-0',
+        source: 'local-zlm',
+        state: 'running',
+        at: Date.now(),
+        codec: 'h265',
+        videoNalUnits: 428,
+        seiNalUnits: 3,
+        seiMessages: 3,
+        malformedMessages: 1,
+        latestMessages: [
+          {
+            id: 'smoke-sei-message-1',
+            at: Date.now(),
+            codec: 'h265',
+            payloadType: 5,
+            payloadSize: 58,
+            uuid: '00112233-4455-6677-8899-aabbccddeeff',
+            textPreview: '{"flightId":"SMOKE-001","lat":31.2304,"lng":121.4737}',
+            hexPreview: '00 11 22 33 44 55 66 77',
+          },
+          {
+            id: 'smoke-sei-message-2',
+            at: Date.now() - 800,
+            codec: 'h265',
+            payloadType: 1,
+            payloadSize: 12,
+            hexPreview: 'b5 00 3c 00 01 02 03 04 05 06 07 08',
+          },
+        ],
+        detail: undefined,
+      })
+    }
+  })
+  await window.getByText('已解析 3 条', { exact: true }).waitFor({ state: 'visible' })
+  const seiPanelText = await seiPanel.innerText()
+  for (const expected of ['SEI', '已解析 3 条', 'H265', 'NAL 428', '异常 1']) {
+    if (!seiPanelText.includes(expected)) errors.push(`sei: missing ${expected} (${JSON.stringify(seiPanelText)})`)
+  }
+  const seiDetailButton = window.getByRole('button', { name: '查看 SEI 详情' }).first()
+  await seiDetailButton.waitFor({ state: 'visible' })
+  await seiDetailButton.click()
+  const seiDetailModal = window.getByRole('dialog', { name: 'SEI 详情' })
+  await seiDetailModal.waitFor({ state: 'visible' })
+  await seiDetailModal.getByText('SMOKE-001', { exact: false }).first().waitFor({ state: 'visible' })
+  const detailText = await seiDetailModal.innerText()
+  for (const expected of ['视频与 SEI 详情', 'SEI 消息', 'user_data_unregistered', '"height":42']) {
+    if (!detailText.includes(expected)) errors.push(`sei detail: missing ${expected} (${JSON.stringify(detailText)})`)
+  }
+  await seiDetailModal.getByRole('tab', { name: 'HEX', exact: true }).click()
+  await seiDetailModal.getByText('00 11 22 33 44 55 66 77', { exact: false }).waitFor({ state: 'visible' })
+  await seiDetailModal.getByRole('tab', { name: 'Base64', exact: true }).click()
+  const expectedBase64Prefix = Buffer.from('0011223344556677', 'hex').toString('base64').slice(0, 8)
+  await seiDetailModal.getByText(expectedBase64Prefix, { exact: false }).waitFor({ state: 'visible' })
+  await inspectLayout('camera-sei-narrow', [
+    '.camera-console',
+    '.camera-console-layout',
+    '.camera-monitor-tile.playing',
+    '.camera-sei-panel',
+    '.camera-monitor-footer',
+    '.camera-sei-detail-modal',
+    '.camera-sei-detail-video',
+    '.camera-sei-detail-data',
+    '.camera-sei-detail-list',
+    '.camera-sei-payload',
+  ])
+  await window.screenshot({ path: `${screenshotBase}-camera-sei-1024.png` })
+
+  await browserWindow.evaluate((instance) => instance.setContentSize(1440, 800))
+  await window.waitForFunction(
+    () => window.innerWidth === 1440 && window.innerHeight === 800,
+    undefined,
+    { timeout: 5_000 },
+  )
+  await inspectLayout('camera-sei-wide', [
+    '.camera-console',
+    '.camera-console-layout',
+    '.camera-monitor-grid',
+    '.camera-monitor-tile.playing',
+    '.camera-sei-panel',
+    '.camera-sei-detail-modal',
+    '.camera-sei-detail-body',
+  ])
+  await window.screenshot({ path: `${screenshotBase}-camera-sei-1440.png` })
+  await browserWindow.evaluate((instance) => instance.setContentSize(1024, 680))
+  await window.waitForFunction(
+    () => window.innerWidth === 1024 && window.innerHeight === 680,
+    undefined,
+    { timeout: 5_000 },
+  )
+  await seiDetailModal.getByRole('button', { name: '关闭 SEI 详情' }).click()
+  await seiDetailModal.waitFor({ state: 'hidden' })
+
   await window.getByRole('button', { name: '媒体中心' }).click()
   await window.locator('.media-center').waitFor({ state: 'visible' })
   const savedServerState = await window.locator('.media-server-row')

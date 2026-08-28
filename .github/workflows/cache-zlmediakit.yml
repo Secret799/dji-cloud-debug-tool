@@ -1,10 +1,11 @@
-name: Cache Windows ZLMediaKit
+name: Cache ZLMediaKit
 
 on:
   push:
     branches:
       - main
     paths:
+      - "scripts/build-zlmediakit-macos.sh"
       - "scripts/build-zlmediakit-windows.ps1"
       - ".github/workflows/cache-zlmediakit.yml"
   schedule:
@@ -15,19 +16,41 @@ permissions:
   contents: read
 
 concurrency:
-  group: cache-zlmediakit-${{ github.ref }}
+  group: cache-zlmediakit-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: false
 
 jobs:
   build:
-    name: Cache Windows ${{ matrix.arch }}
-    runs-on: windows-2022
+    name: Cache ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        arch:
-          - x64
-          - arm64
+        include:
+          - label: macOS Apple Silicon
+            os: macos-14
+            platform: mac
+            platform_key: darwin
+            arch: arm64
+            binary: vendor/zlmediakit/arm64/MediaServer
+          - label: macOS Intel
+            os: macos-14
+            platform: mac
+            platform_key: darwin
+            arch: x64
+            binary: vendor/zlmediakit/x64/MediaServer
+          - label: Windows x64
+            os: windows-2022
+            platform: win
+            platform_key: win32
+            arch: x64
+            binary: vendor/zlmediakit/win32-x64/MediaServer.exe
+          - label: Windows ARM64
+            os: windows-2022
+            platform: win
+            platform_key: win32
+            arch: arm64
+            binary: vendor/zlmediakit/win32-arm64/MediaServer.exe
     steps:
       - name: Check out source
         uses: actions/checkout@v5
@@ -36,22 +59,33 @@ jobs:
         id: zlm-cache
         uses: actions/cache@v5
         with:
-          path: vendor/zlmediakit/win32-${{ matrix.arch }}/MediaServer.exe
-          key: zlm-windows-v1-${{ matrix.arch }}-${{ hashFiles('scripts/build-zlmediakit-windows.ps1') }}
+          path: |
+            ${{ matrix.binary }}
+            vendor/zlmediakit/LICENSE
+          key: zlm-v2-${{ matrix.platform_key }}-${{ matrix.arch }}-${{ hashFiles('scripts/build-zlmediakit-*') }}
 
-      - name: Build ZLMediaKit
-        if: steps.zlm-cache.outputs.cache-hit != 'true'
+      - name: Build ZLMediaKit for macOS
+        if: matrix.platform == 'mac' && steps.zlm-cache.outputs.cache-hit != 'true'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./scripts/build-zlmediakit-macos.sh ${{ matrix.arch }}
+
+      - name: Build ZLMediaKit for Windows
+        if: matrix.platform == 'win' && steps.zlm-cache.outputs.cache-hit != 'true'
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: ./scripts/build-zlmediakit-windows.ps1 -Architecture ${{ matrix.arch }}
 
       - name: Verify ZLMediaKit cache input
-        shell: pwsh
+        shell: bash
         run: |
-          $mediaServer = "vendor/zlmediakit/win32-${{ matrix.arch }}/MediaServer.exe"
-          if (-not (Test-Path -LiteralPath $mediaServer -PathType Leaf)) {
-            throw "Missing cached or compiled ZLMediaKit executable: $mediaServer"
-          }
-          Get-Item -LiteralPath $mediaServer | Select-Object FullName, Length
-          Get-FileHash -Algorithm SHA256 -LiteralPath $mediaServer
+          test -f "${{ matrix.binary }}"
+          test -f vendor/zlmediakit/LICENSE
+          ls -lh "${{ matrix.binary }}" vendor/zlmediakit/LICENSE
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "${{ matrix.binary }}"
+          else
+            shasum -a 256 "${{ matrix.binary }}"
+          fi

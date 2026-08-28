@@ -38,7 +38,7 @@ const createLocalProfile = (): MediaServerProfile => {
     httpPort: 9090,
     rtmpPort: 1935,
     rtspPort: 8554,
-    webrtcPort: 0,
+    webrtcPort: 8000,
     secret: crypto.randomUUID(),
     isDefault: true,
     createdAt: now,
@@ -137,8 +137,8 @@ export class MediaServerStore {
       }
       let migrated = false
       for (const server of parsed.servers) {
-        if (server.webrtcPort === undefined) {
-          server.webrtcPort = server.kind === 'local-zlm' ? 0 : 8000
+        if (server.webrtcPort === undefined || (server.kind === 'local-zlm' && server.webrtcPort === 0)) {
+          server.webrtcPort = 8000
           migrated = true
         }
       }
@@ -185,7 +185,7 @@ export class MediaServerStore {
     const { encryptedSecret, ...plain } = profile
     return {
       ...plain,
-      webrtcPort: profile.webrtcPort ?? (profile.kind === 'local-zlm' ? 0 : 8000),
+      webrtcPort: profile.webrtcPort ?? 8000,
       secret: '',
       hasStoredSecret: Boolean(encryptedSecret),
     }

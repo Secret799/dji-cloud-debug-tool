@@ -28,11 +28,13 @@
     "smoke:webdav": "npm run build && node scripts/webdav-smoke.mjs",
     "build:zlm": "bash scripts/build-zlmediakit-macos.sh",
     "ci:build:zlm:win": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/build-zlmediakit-windows.ps1",
+    "prepare:ffmpeg:mac": "bash scripts/prepare-ffmpeg-macos.sh",
+    "ci:prepare:ffmpeg:win": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-ffmpeg-windows.ps1",
     "release:verify": "npm test && npm run build",
     "release:tag": "bash scripts/create-release-tag.sh",
     "package:mac": "npm run package:mac:arm64",
-    "package:mac:arm64": "npm run release:verify && electron-builder --mac dmg zip --arm64",
-    "package:mac:x64": "npm run release:verify && electron-builder --mac dmg zip --x64"
+    "package:mac:arm64": "npm run release:verify && npm run build:zlm -- arm64 && npm run prepare:ffmpeg:mac -- arm64 && electron-builder --mac dmg zip --arm64",
+    "package:mac:x64": "npm run release:verify && npm run build:zlm -- x64 && npm run prepare:ffmpeg:mac -- x64 && electron-builder --mac dmg zip --x64"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1119.0",
@@ -95,6 +97,15 @@
         {
           "from": "vendor/zlmediakit/LICENSE",
           "to": "zlmediakit/LICENSE"
+        },
+        {
+          "from": "vendor/ffmpeg/darwin-${arch}",
+          "to": "ffmpeg",
+          "filter": [
+            "ffmpeg",
+            "LICENSE",
+            "SOURCE.txt"
+          ]
         }
       ]
     },
@@ -124,6 +135,15 @@
         {
           "from": "vendor/zlmediakit/LICENSE",
           "to": "zlmediakit/LICENSE"
+        },
+        {
+          "from": "vendor/ffmpeg/win32-${arch}",
+          "to": "ffmpeg",
+          "filter": [
+            "ffmpeg.exe",
+            "LICENSE",
+            "SOURCE.txt"
+          ]
         }
       ]
     },

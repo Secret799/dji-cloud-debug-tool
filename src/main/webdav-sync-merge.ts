@@ -171,3 +171,31 @@ export const reconcileWebDavData = (
 
 export const webDavDataEqual = (left: WebDavSyncData, right: WebDavSyncData): boolean =>
   sameValue(left, right)
+
+const mqttRuntimeProfileValue = (profile: ConnectionProfile): unknown => {
+  const {
+    name: _name,
+    createdAt: _createdAt,
+    updatedAt: _updatedAt,
+    hasStoredPassword: _hasStoredPassword,
+    clearStoredPassword: _clearStoredPassword,
+    ...runtimeValue
+  } = profile
+  return runtimeValue
+}
+
+export const changedMqttRuntimeProfileIds = (
+  current: ConnectionProfile[],
+  next: ConnectionProfile[],
+): string[] => {
+  const currentById = new Map(current.map((profile) => [profile.id, profile]))
+  const nextById = new Map(next.map((profile) => [profile.id, profile]))
+  const profileIds = new Set([...currentById.keys(), ...nextById.keys()])
+  return [...profileIds].filter((profileId) => {
+    const currentProfile = currentById.get(profileId)
+    const nextProfile = nextById.get(profileId)
+    return !currentProfile
+      || !nextProfile
+      || !sameValue(mqttRuntimeProfileValue(currentProfile), mqttRuntimeProfileValue(nextProfile))
+  })
+}

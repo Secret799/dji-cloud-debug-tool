@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { ConnectionProfile, DeviceArchive } from '../shared/contracts'
 import {
+  changedMqttRuntimeProfileIds,
   fingerprintWebDavData,
   mergeWebDavData,
   reconcileWebDavData,
+  webDavDataEqual,
   type WebDavSyncData,
 } from './webdav-sync-merge'
 
@@ -112,5 +114,28 @@ describe('WebDAV three-way merge', () => {
     const base = data([profile('a', 'A', 1)], [archive('a', 'SN1', 'Dock', 1)])
     const merged = mergeWebDavData(data([], []), data([], []), fingerprintWebDavData(base))
     expect(merged.deviceArchives).toEqual([])
+  })
+
+  it('only marks profiles whose live MQTT behavior changed', () => {
+    const original = profile('a', 'Original name', 1)
+    const renamed = { ...original, name: 'Renamed', updatedAt: 2 }
+    const connectionChanged = { ...profile('b', 'B', 1), host: 'other.example.com' }
+
+    expect(changedMqttRuntimeProfileIds(
+      [original, profile('b', 'B', 1), profile('removed', 'Removed', 1)],
+      [renamed, connectionChanged, profile('added', 'Added', 1)],
+    )).toEqual(['b', 'removed', 'added'])
+  })
+
+  it('does not mark MQTT profiles when another synchronized data category changes', () => {
+    const original = profile('a', 'A', 1)
+    const local = data([original])
+    const remote = {
+      ...data([{ ...original }]),
+      rendererStorage: { theme: 'dark' },
+    }
+
+    expect(webDavDataEqual(local, remote)).toBe(false)
+    expect(changedMqttRuntimeProfileIds(local.profiles, remote.profiles)).toEqual([])
   })
 })
