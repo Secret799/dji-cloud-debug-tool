@@ -71,16 +71,22 @@ Windows 安装版可选择安装目录；便携版可直接运行。发布页同
 
 ### macOS 提示应用“已损坏”
 
-从浏览器下载的 macOS 应用必须经过 Developer ID 签名和 Apple 公证才能直接通过 Gatekeeper。`v1.0.0` 的 macOS 产物没有签名和公证，需要配置下文的 GitHub Actions Secrets 后发布新版本。
+macOS 发布包使用免费的 ad-hoc 签名，不需要 Apple Developer 证书。签名可以保证应用包内容完整，但无法获得 Apple 公证，因此首次安装时需要手工允许应用运行。
 
-对于确认来源可信的自己构建产物，可临时在终端执行：
+1. 将 `DJI Cloud Studio.app` 拖入“应用程序”。
+2. 双击应用并关闭系统拦截提示。
+3. 打开“系统设置 > 隐私与安全性”。
+4. 在“安全性”区域找到 DJI Cloud Studio，点击“仍要打开”。
+5. 使用登录密码或 Touch ID 确认。以后可正常双击运行当前版本。
+
+也可以在 Finder 中按住 `Control` 点击应用，选择“打开”。如果系统仍然显示“已损坏”，确认安装包来自本项目发布页后，可在终端执行：
 
 ```bash
-codesign --force --deep --sign - "/Applications/DJI Cloud Studio.app"
 xattr -dr com.apple.quarantine "/Applications/DJI Cloud Studio.app"
+open "/Applications/DJI Cloud Studio.app"
 ```
 
-这只是本机临时处理，不能代替发布包的 Developer ID 签名和 Apple 公证。
+每次下载新版本时，macOS 都可能要求重新确认。公开发布且希望用户直接双击运行时，仍然只能使用 Developer ID 签名和 Apple 公证。
 
 ### 本地开发运行
 
@@ -239,27 +245,9 @@ Windows `x64` 和 `arm64` 正式安装包仅通过 GitHub Actions 生成。Windo
 - 正式版：`v1.0.1`
 - 预发布版：`v1.0.1-beta.1`
 
-### 配置 macOS 签名和公证
+### macOS 无证书签名
 
-需要先加入 Apple Developer Program，创建 `Developer ID Application` 证书，并在钥匙串中将证书和私钥导出为带密码的 `.p12` 文件。
-
-在 macOS 终端将证书转为 Base64：
-
-```bash
-base64 -i DeveloperIDApplication.p12 | pbcopy
-```
-
-在 GitHub 仓库的 `Settings > Secrets and variables > Actions` 中创建以下 Repository Secrets：
-
-| Secret | 内容 |
-| --- | --- |
-| `MACOS_CERTIFICATE` | `.p12` 文件的 Base64 内容 |
-| `MACOS_CERTIFICATE_PASSWORD` | 导出 `.p12` 时设置的密码 |
-| `APPLE_ID` | Apple Developer 账号邮箱 |
-| `APPLE_APP_SPECIFIC_PASSWORD` | Apple ID 页面生成的 App-specific password |
-| `APPLE_TEAM_ID` | Apple Developer Membership 页面中的 Team ID |
-
-macOS 任务会先检查这些 Secrets。任何一项缺失都会终止发布，避免再次上传无法通过 Gatekeeper 的 macOS 安装包。
+macOS 构建使用 electron-builder 的 `identity: "-"` 执行 ad-hoc 签名，并在上传产物前通过 `codesign --verify --deep --strict` 检查签名完整性。该流程不需要配置 GitHub Actions Secrets，也不会向 Apple 提交公证。
 
 ### 使用项目脚本发布
 
@@ -290,8 +278,8 @@ git push origin v1.0.1
 2. 并行生成 macOS Apple Silicon 和 Intel 产物。
 3. 在 Windows Runner 上分别编译 `x64` 和 `ARM64` ZLMediaKit。
 4. 并行生成 Windows `x64` 和 `arm64` 安装版、便携版和 ZIP。
-5. 使用 Developer ID 签名 macOS 应用并提交 Apple 公证。
-6. 使用 `codesign`、`spctl` 和 `stapler` 验证 macOS 产物。
+5. 对 macOS 应用执行 ad-hoc 签名，并使用 `codesign` 验证签名完整性。
+6. 确认 macOS 应用使用的是 ad-hoc 签名。
 7. 生成 `SHA256SUMS.txt`。
 8. 自动创建或更新 GitHub Release，并上传所有产物。
 

@@ -79,7 +79,8 @@
       ],
       "hardenedRuntime": true,
       "forceCodeSigning": true,
-      "notarize": true,
+      "identity": "-",
+      "notarize": false,
       "extraResources": [
         {
           "from": "vendor/zlmediakit/${arch}",

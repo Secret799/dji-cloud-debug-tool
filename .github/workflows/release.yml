@@ -87,40 +87,12 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: npm run ci:build:zlm:win -- -Architecture ${{ matrix.arch }}
 
-      - name: Validate macOS signing secrets
-        if: matrix.platform == 'mac'
-        shell: bash
-        env:
-          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
-          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          missing=()
-          for name in MACOS_CERTIFICATE MACOS_CERTIFICATE_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
-            if [[ -z "${!name}" ]]; then
-              missing+=("$name")
-            fi
-          done
-          if (( ${#missing[@]} > 0 )); then
-            echo "Missing required macOS signing secrets: ${missing[*]}" >&2
-            echo "Configure them in Settings > Secrets and variables > Actions before publishing a tag." >&2
-            exit 1
-          fi
-
       - name: Package macOS
         if: matrix.platform == 'mac'
         shell: bash
-        env:
-          CSC_LINK: ${{ secrets.MACOS_CERTIFICATE }}
-          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npx electron-builder --mac dmg zip --${{ matrix.arch }} --publish never
 
-      - name: Verify macOS signature and notarization
+      - name: Verify macOS ad-hoc signature
         if: matrix.platform == 'mac'
         shell: bash
         run: |
@@ -132,9 +104,12 @@ jobs:
           fi
           app_path="$(find release -mindepth 2 -maxdepth 2 -type d -name 'DJI Cloud Studio.app' -print -quit)"
           codesign --verify --deep --strict --verbose=2 "$app_path"
-          codesign --display --verbose=4 "$app_path"
-          spctl --assess --type execute --verbose=4 "$app_path"
-          xcrun stapler validate "$app_path"
+          signature_details="$(codesign --display --verbose=4 "$app_path" 2>&1)"
+          printf '%s\n' "$signature_details"
+          if ! grep -q '^Signature=adhoc$' <<< "$signature_details"; then
+            echo "Expected an ad-hoc signature." >&2
+            exit 1
+          fi
 
       - name: Package Windows
         if: matrix.platform == 'win'
