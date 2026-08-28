@@ -266,7 +266,9 @@ npm run build:zlm -- x64
 
 ### Windows 打包
 
-Windows `x64` 和 `arm64` 正式安装包仅通过 GitHub Actions 生成。Windows Runner 会使用 Visual Studio 2022 和 CMake 编译目标架构的 `MediaServer.exe`，然后执行 Electron 打包。每个安装包只会携带当前平台与架构的 MediaServer。
+Windows `x64` 和 `arm64` 正式安装包仅通过 GitHub Actions 生成。缓存未命中时，Windows Runner 会使用 Visual Studio 2022 和 CMake 编译目标架构的 `MediaServer.exe`，然后执行 Electron 打包。每个安装包只会携带当前平台与架构的 MediaServer。
+
+Windows ZLMediaKit 使用 GitHub Actions 缓存加速。默认分支会在构建脚本变化时分别预编译并缓存 `x64` 和 `arm64` 的 `MediaServer.exe`，并通过每周维护任务避免缓存因长期未访问而过期；发布 tag 时优先恢复对应架构缓存，只有首次运行、缓存被清理或构建脚本变化导致缓存未命中时才重新编译。缓存键包含架构和 `scripts/build-zlmediakit-windows.ps1` 的内容哈希，因此修改 ZLMediaKit commit 或编译选项会自动使旧缓存失效。
 
 ## GitHub Actions Tag 自动发布
 
@@ -306,7 +308,7 @@ git push origin v1.0.1
 
 1. 在 Ubuntu Runner 上执行单元测试和生产构建。
 2. 并行生成 macOS Apple Silicon 和 Intel 产物。
-3. 在 Windows Runner 上分别编译 `x64` 和 `ARM64` ZLMediaKit。
+3. 在 Windows Runner 上恢复对应架构的 ZLMediaKit 缓存，缓存未命中时才编译。
 4. 并行生成 Windows `x64` 和 `arm64` 安装版、便携版和 ZIP。
 5. 对 macOS 应用执行 ad-hoc 签名，并使用 `codesign` 验证签名完整性。
 6. 确认 macOS 应用使用的是 ad-hoc 签名。

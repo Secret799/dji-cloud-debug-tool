@@ -81,11 +81,30 @@ jobs:
       - name: Build application
         run: npm run build
 
-      - name: Build bundled ZLMediaKit for Windows
+      - name: Restore bundled ZLMediaKit for Windows
         if: matrix.platform == 'win'
+        id: zlm-cache
+        uses: actions/cache@v4
+        with:
+          path: vendor/zlmediakit/win32-${{ matrix.arch }}/MediaServer.exe
+          key: zlm-windows-v1-${{ matrix.arch }}-${{ hashFiles('scripts/build-zlmediakit-windows.ps1') }}
+
+      - name: Build bundled ZLMediaKit for Windows
+        if: matrix.platform == 'win' && steps.zlm-cache.outputs.cache-hit != 'true'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: npm run ci:build:zlm:win -- -Architecture ${{ matrix.arch }}
+
+      - name: Verify bundled ZLMediaKit for Windows
+        if: matrix.platform == 'win'
+        shell: pwsh
+        run: |
+          $mediaServer = "vendor/zlmediakit/win32-${{ matrix.arch }}/MediaServer.exe"
+          if (-not (Test-Path -LiteralPath $mediaServer -PathType Leaf)) {
+            throw "Missing cached or compiled ZLMediaKit executable: $mediaServer"
+          }
+          Get-Item -LiteralPath $mediaServer | Select-Object FullName, Length
+          Get-FileHash -Algorithm SHA256 -LiteralPath $mediaServer
 
       - name: Package macOS
         if: matrix.platform == 'mac'

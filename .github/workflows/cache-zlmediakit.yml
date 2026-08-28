@@ -1,0 +1,57 @@
+name: Cache Windows ZLMediaKit
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/build-zlmediakit-windows.ps1"
+      - ".github/workflows/cache-zlmediakit.yml"
+  schedule:
+    - cron: "17 3 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cache-zlmediakit-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Cache Windows ${{ matrix.arch }}
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - x64
+          - arm64
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Restore ZLMediaKit cache
+        id: zlm-cache
+        uses: actions/cache@v4
+        with:
+          path: vendor/zlmediakit/win32-${{ matrix.arch }}/MediaServer.exe
+          key: zlm-windows-v1-${{ matrix.arch }}-${{ hashFiles('scripts/build-zlmediakit-windows.ps1') }}
+
+      - name: Build ZLMediaKit
+        if: steps.zlm-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./scripts/build-zlmediakit-windows.ps1 -Architecture ${{ matrix.arch }}
+
+      - name: Verify ZLMediaKit cache input
+        shell: pwsh
+        run: |
+          $mediaServer = "vendor/zlmediakit/win32-${{ matrix.arch }}/MediaServer.exe"
+          if (-not (Test-Path -LiteralPath $mediaServer -PathType Leaf)) {
+            throw "Missing cached or compiled ZLMediaKit executable: $mediaServer"
+          }
+          Get-Item -LiteralPath $mediaServer | Select-Object FullName, Length
+          Get-FileHash -Algorithm SHA256 -LiteralPath $mediaServer
