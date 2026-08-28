@@ -54,18 +54,13 @@ npm run typecheck    # TypeScript 检查
 npm run build        # Electron 生产构建
 npm run smoke:ui     # 在 1024x680 启动真实窗口并检查核心页面与内部溢出
 npm run smoke:mqtt   # 手工公网集成测试：通过 broker.emqx.io 做订阅/发布回环
-npm run build:zlm    # 为当前 macOS/Windows 架构重建内置 ZLMediaKit
-npm run build:zlm -- arm64
-npm run build:zlm -- x64
+npm run build:zlm    # 为当前 Mac 架构重建内置 ZLMediaKit
 npm run package:mac  # 先执行单测与构建，再生成 arm64 DMG 与 ZIP
 npm run package:mac:arm64
 npm run package:mac:x64
-npm run package:win        # 默认生成 Windows x64 安装版、便携版与 ZIP
-npm run package:win:x64
-npm run package:win:arm64
 ```
 
-`npm run build` 的生产文件位于 `out/`；`package:mac*` 和 `package:win*` 的安装包及解包应用位于 `release/`。Windows 打包命令会先为目标架构编译 ZLMediaKit。公网 MQTT smoke 会真实发布消息，不属于默认发布门禁。
+`npm run build` 的生产文件位于 `out/`。正式 Windows 安装包仅由 GitHub Actions 的 Windows Runner 生成：Runner 会先编译对应架构的 `MediaServer.exe`，再执行 Electron 打包。公网 MQTT smoke 会真实发布消息，不属于默认发布门禁。
 
 打包完成后可直接对解包应用执行 UI smoke：
 
@@ -105,7 +100,7 @@ npm run build:zlm -- arm64
 npm run build:zlm -- x64
 ```
 
-Windows 本地编译需要 Visual Studio 2022 的“使用 C++ 的桌面开发”工作负载、CMake 和系统 `tar.exe`。GitHub Actions 的 `windows-2022` Runner 已提供这些工具；它会在 `x64` Runner 上分别构建 `x64` 和 `ARM64` 目标。
+Windows ZLMediaKit 不需要在本地编译。GitHub Actions 的 `windows-2022` Runner 使用 Visual Studio 2022 和 CMake，在 `x64` Runner 上分别构建 `x64` 和 `ARM64` 目标，产物仅用于当次对应架构的 Electron 打包。
 
 ## 工具链兼容性
 

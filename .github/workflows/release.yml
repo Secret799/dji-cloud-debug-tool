@@ -85,7 +85,7 @@ jobs:
         if: matrix.platform == 'win'
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: npm run build:zlm -- ${{ matrix.arch }}
+        run: npm run ci:build:zlm:win -- -Architecture ${{ matrix.arch }}
 
       - name: Package macOS
         if: matrix.platform == 'mac'

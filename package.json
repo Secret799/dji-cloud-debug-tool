@@ -24,17 +24,13 @@
     "smoke:toast": "npm run build && node scripts/toast-smoke.mjs",
     "smoke:logs": "npm run build && node scripts/remote-log-smoke.mjs",
     "smoke:mqtt": "npm run build && node scripts/mqtt-smoke.mjs",
-    "build:zlm": "node scripts/build-zlmediakit.mjs",
-    "build:zlm:mac": "bash scripts/build-zlmediakit-macos.sh",
-    "build:zlm:win": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/build-zlmediakit-windows.ps1",
+    "build:zlm": "bash scripts/build-zlmediakit-macos.sh",
+    "ci:build:zlm:win": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/build-zlmediakit-windows.ps1",
     "release:verify": "npm test && npm run build",
     "release:tag": "bash scripts/create-release-tag.sh",
     "package:mac": "npm run package:mac:arm64",
     "package:mac:arm64": "npm run release:verify && electron-builder --mac dmg zip --arm64",
-    "package:mac:x64": "npm run release:verify && electron-builder --mac dmg zip --x64",
-    "package:win": "npm run package:win:x64",
-    "package:win:x64": "npm run release:verify && npm run build:zlm -- x64 && electron-builder --win nsis portable zip --x64",
-    "package:win:arm64": "npm run release:verify && npm run build:zlm -- arm64 && electron-builder --win nsis portable zip --arm64"
+    "package:mac:x64": "npm run release:verify && electron-builder --mac dmg zip --x64"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1119.0",
