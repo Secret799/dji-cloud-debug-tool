@@ -1514,11 +1514,48 @@ try {
   for (const expected of ['视频与 SEI 详情', 'SEI 消息', 'user_data_unregistered', '"height":42']) {
     if (!detailText.includes(expected)) errors.push(`sei detail: missing ${expected} (${JSON.stringify(detailText)})`)
   }
+  await seiDetailModal.getByRole('tab', { name: 'JSON', exact: true }).click()
+  const formattedJson = await seiDetailModal.locator('.camera-sei-payload pre').innerText()
+  if (!formattedJson.includes('\n  "flightId": "SMOKE-001"') || !formattedJson.includes('\n  "height": 42')) {
+    errors.push(`sei detail: JSON payload was not formatted (${JSON.stringify(formattedJson)})`)
+  }
   await seiDetailModal.getByRole('tab', { name: 'HEX', exact: true }).click()
   await seiDetailModal.getByText('00 11 22 33 44 55 66 77', { exact: false }).waitFor({ state: 'visible' })
   await seiDetailModal.getByRole('tab', { name: 'Base64', exact: true }).click()
   const expectedBase64Prefix = Buffer.from('0011223344556677', 'hex').toString('base64').slice(0, 8)
   await seiDetailModal.getByText(expectedBase64Prefix, { exact: false }).waitFor({ state: 'visible' })
+  await seiDetailModal.getByRole('button', { name: '暂停 SEI 消息刷新' }).click()
+  await seiDetailModal.getByText('H265 · 共 3 条 · 已暂停', { exact: true }).waitFor({ state: 'visible' })
+  await electronApp.evaluate(({ BrowserWindow }) => {
+    for (const instance of BrowserWindow.getAllWindows()) {
+      instance.webContents.send('media:sei-parser-event', {
+        sessionId: 'smoke-sei-session',
+        streamId: 'DOCK-SMOKE-001/165-0-0/normal-0',
+        source: 'local-zlm',
+        state: 'running',
+        at: Date.now(),
+        codec: 'h265',
+        videoNalUnits: 999,
+        seiNalUnits: 99,
+        seiMessages: 99,
+        malformedMessages: 1,
+        latestMessages: [{
+          id: 'smoke-sei-message-3',
+          at: Date.now(),
+          codec: 'h265',
+          payloadType: 1,
+          payloadSize: 12,
+          hexPreview: 'b5 00 3c 00 01 02 03 04 05 06 07 08',
+        }],
+      })
+    }
+  })
+  await window.waitForTimeout(100)
+  if (await seiDetailModal.getByText('H265 · 共 99 条', { exact: true }).count()) {
+    errors.push('sei detail: paused message snapshot continued updating')
+  }
+  await seiDetailModal.getByRole('button', { name: '继续 SEI 消息刷新' }).click()
+  await seiDetailModal.getByText('H265 · 共 99 条', { exact: true }).waitFor({ state: 'visible' })
   await inspectLayout('camera-sei-narrow', [
     '.camera-console',
     '.camera-console-layout',
