@@ -30,11 +30,11 @@ jobs:
           - arm64
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Restore ZLMediaKit cache
         id: zlm-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: vendor/zlmediakit/win32-${{ matrix.arch }}/MediaServer.exe
           key: zlm-windows-v1-${{ matrix.arch }}-${{ hashFiles('scripts/build-zlmediakit-windows.ps1') }}
