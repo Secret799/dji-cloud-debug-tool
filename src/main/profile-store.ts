@@ -158,7 +158,7 @@ export class ProfileStore {
       encryptedPassword = undefined
     } else if (password) {
       if (!safeStorage.isEncryptionAvailable()) {
-        throw new Error('macOS 安全存储当前不可用，密码未被保存。请清空密码后保存，并在连接时临时输入。')
+        throw new Error('系统安全存储当前不可用，密码未被保存。请清空密码后保存，并在连接时临时输入。')
       }
       encryptedPassword = safeStorage.encryptString(password).toString('base64')
     }
@@ -222,7 +222,7 @@ export class ProfileStore {
 
   private decryptPassword(profile: StoredProfile): string {
     if (!profile.encryptedPassword) return ''
-    if (!safeStorage.isEncryptionAvailable()) throw new Error('macOS 安全存储当前不可用，无法读取已保存密码')
+    if (!safeStorage.isEncryptionAvailable()) throw new Error('系统安全存储当前不可用，无法读取已保存密码')
     return safeStorage.decryptString(Buffer.from(profile.encryptedPassword, 'base64'))
   }
 

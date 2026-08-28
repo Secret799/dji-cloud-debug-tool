@@ -151,7 +151,7 @@ export function OssManager({ profiles, selectedId, onSelect, onSave, onRemove, o
           </div>
 
           <footer className="oss-config-footer">
-            <span><ShieldCheck size={14} />密钥由 macOS 安全存储加密保存</span>
+            <span><ShieldCheck size={14} />密钥由系统安全存储加密保存</span>
             <div className="oss-config-actions">
               {!isNew && <button className="button danger-ghost" type="button" disabled={saving} onClick={() => void handleRemove()}><Trash2 size={14} />删除</button>}
               <button className="button primary" type="submit" disabled={saving}><Save size={14} />{saving ? '保存中' : '保存配置'}</button>

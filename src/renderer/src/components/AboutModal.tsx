@@ -40,7 +40,7 @@ export function AboutModal({ onClose }: AboutModalProps) {
           </div>
 
           <p className="about-description">
-            一款面向 macOS 的大疆上云 API 与 MQTT 调试工具，提供多连接管理、设备遥测、DJI 指令调试和媒体流预览能力。
+            一款面向 macOS 和 Windows 的大疆上云 API 与 MQTT 调试工具，提供多连接管理、设备遥测、DJI 指令调试和媒体流预览能力。
           </p>
 
           <dl className="about-details">

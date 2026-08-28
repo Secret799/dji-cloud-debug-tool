@@ -142,7 +142,7 @@ export class MediaServerStore {
     let encryptedSecret = existing?.encryptedSecret
     if (profile.kind === 'remote-easymedia' || clearStoredSecret) encryptedSecret = undefined
     else if (secret) {
-      if (!safeStorage.isEncryptionAvailable()) throw new Error('macOS 安全存储当前不可用，API 密钥无法保存')
+      if (!safeStorage.isEncryptionAvailable()) throw new Error('系统安全存储当前不可用，API 密钥无法保存')
       encryptedSecret = safeStorage.encryptString(secret).toString('base64')
     }
     return {
@@ -166,7 +166,7 @@ export class MediaServerStore {
 
   private decryptSecret(profile: StoredMediaServerProfile): string {
     if (!profile.encryptedSecret) return ''
-    if (!safeStorage.isEncryptionAvailable()) throw new Error('macOS 安全存储当前不可用，无法读取 API 密钥')
+    if (!safeStorage.isEncryptionAvailable()) throw new Error('系统安全存储当前不可用，无法读取 API 密钥')
     return safeStorage.decryptString(Buffer.from(profile.encryptedSecret, 'base64'))
   }
 

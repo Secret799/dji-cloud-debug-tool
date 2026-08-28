@@ -81,6 +81,12 @@ jobs:
       - name: Build application
         run: npm run build
 
+      - name: Build bundled ZLMediaKit for Windows
+        if: matrix.platform == 'win'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: npm run build:zlm -- ${{ matrix.arch }}
+
       - name: Package macOS
         if: matrix.platform == 'mac'
         shell: bash

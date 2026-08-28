@@ -125,13 +125,13 @@ export class ObjectStorageStore {
   }
 
   private encrypt(value: string, label: string): string {
-    if (!safeStorage.isEncryptionAvailable()) throw new Error(`macOS 安全存储当前不可用，${label} 无法保存`)
+    if (!safeStorage.isEncryptionAvailable()) throw new Error(`系统安全存储当前不可用，${label} 无法保存`)
     return safeStorage.encryptString(value).toString('base64')
   }
 
   private decrypt(value: string | undefined, label: string): string {
     if (!value) return ''
-    if (!safeStorage.isEncryptionAvailable()) throw new Error(`macOS 安全存储当前不可用，无法读取 ${label}`)
+    if (!safeStorage.isEncryptionAvailable()) throw new Error(`系统安全存储当前不可用，无法读取 ${label}`)
     return safeStorage.decryptString(Buffer.from(value, 'base64'))
   }
 

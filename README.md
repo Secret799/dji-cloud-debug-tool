@@ -21,7 +21,7 @@
 - 遥测中的 Dock 2、Dock 3 与飞机可读写属性可直接通过 `property/set` 设置，并关联 `property/set_reply` 结果；遥测项管理可查看官方权限、类型、约束和来源，也可为自定义字段配置安全关闭的属性设置能力。
 - 机场、飞行、负载、PSDK 喊话器和直播控制模板，Payload 发送前可编辑。
 - Dock 固件升级工作台：选择本地固件包并上传到指定 OSS，核对访问 URL、MD5、大小、目标设备与版本后下发 `ota_create`，跟踪 `ota_progress` 并自动回复 `events_reply`。
-- 内置 ZLMediaKit，可由用户按需启动或停止；本地服务提供 RTMP 推流、RTSP、HLS、HTTP API 和 RTP Proxy/GB28181 能力。
+- macOS `arm64/x64` 和 Windows `arm64/x64` 安装包均内置对应平台与架构的 ZLMediaKit，可由用户按需启动或停止；本地服务提供 RTMP 推流、RTSP、HLS、HTTP API 和 RTP Proxy/GB28181 能力。
 - 媒体中心可保存多个远程 ZLMediaKit / SRS / SecretEMS 服务：ZLMediaKit 和 SRS 按应用名、流 ID 生成 RTMP、RTSP、WebRTC 与 HLS 地址；SecretEMS 则生成 RTMP 推流地址，并按其标准网关规范生成 WHIP 推流和 WHEP 播放地址。
 - HLS.js 直接预览所选媒体服务中的 HLS 流；API Secret 通过 Electron `safeStorage` 加密，Renderer 不读取已保存明文。
 - `services` / `services_reply` 按 `tid` 自动关联，展示成功、失败和 10 秒超时。
@@ -54,7 +54,9 @@ npm run typecheck    # TypeScript 检查
 npm run build        # Electron 生产构建
 npm run smoke:ui     # 在 1024x680 启动真实窗口并检查核心页面与内部溢出
 npm run smoke:mqtt   # 手工公网集成测试：通过 broker.emqx.io 做订阅/发布回环
-npm run build:zlm    # 为当前 Mac 架构重建内置 ZLMediaKit
+npm run build:zlm    # 为当前 macOS/Windows 架构重建内置 ZLMediaKit
+npm run build:zlm -- arm64
+npm run build:zlm -- x64
 npm run package:mac  # 先执行单测与构建，再生成 arm64 DMG 与 ZIP
 npm run package:mac:arm64
 npm run package:mac:x64
@@ -63,7 +65,7 @@ npm run package:win:x64
 npm run package:win:arm64
 ```
 
-`npm run build` 的生产文件位于 `out/`；`package:mac*` 的安装包和解包应用位于 `release/`。公网 MQTT smoke 会真实发布消息，不属于默认发布门禁。
+`npm run build` 的生产文件位于 `out/`；`package:mac*` 和 `package:win*` 的安装包及解包应用位于 `release/`。Windows 打包命令会先为目标架构编译 ZLMediaKit。公网 MQTT smoke 会真实发布消息，不属于默认发布门禁。
 
 打包完成后可直接对解包应用执行 UI smoke：
 
@@ -79,8 +81,8 @@ DJI_STUDIO_EXECUTABLE="release/mac-arm64/DJI Cloud Studio.app/Contents/MacOS/DJI
 
 - macOS Apple Silicon (`arm64`)：DMG 和 ZIP。
 - macOS Intel (`x64`)：DMG 和 ZIP。
-- Windows `x64`：NSIS 安装版、便携版和 ZIP。
-- Windows `arm64`：NSIS 安装版、便携版和 ZIP。
+- Windows `x64`：内置 `x64` MediaServer 的 NSIS 安装版、便携版和 ZIP。
+- Windows `arm64`：内置 `arm64` MediaServer 的 NSIS 安装版、便携版和 ZIP。
 
 可以用项目内置脚本创建并推送 tag。脚本会在工作区有未提交修改时拒绝创建 tag，避免发布内容与本地代码不一致：
 
@@ -92,7 +94,7 @@ npm run release:tag -- 1.2.0
 
 ## 媒体服务
 
-macOS 安装包随应用提供 ZLMediaKit `fdaec260` 的 `arm64` 和 `x64` 原生二进制。媒体中心始终显示一个不可删除的“本地 ZLMediaKit”配置，但是否启动完全由用户决定；应用退出时会停止由本应用启动的子进程。Windows 包不会嵌入这两个 macOS 二进制，因此 Windows 上需使用远程 ZLMediaKit / SRS / SecretEMS，或后续单独补充 Windows 版 MediaServer。
+macOS 和 Windows 安装包均随应用提供 ZLMediaKit `fdaec260` 的对应原生二进制。macOS 使用 `MediaServer`，Windows 使用 `MediaServer.exe`；每个安装包只包含当前目标平台和架构的文件。媒体中心始终显示一个不可删除的“本地 ZLMediaKit”配置，但是启动完全由用户决定；应用退出时会停止由本应用启动的子进程。
 
 本地默认端口为 HTTP/API `9090`、RTMP `1935`、RTSP `8554`，均可在媒体服务设置中修改。界面中的推流地址使用检测到的局域网 IPv4，方便 DJI 设备访问；应用自身的健康检查固定访问 `127.0.0.1`。远程服务可选择 ZLMediaKit、SRS 或 SecretEMS。SecretEMS 默认使用 RTMP `1935` 接收 DJI 推流、HTTPS `443` 提供 WHIP/WHEP 信令，并使用 `8000/tcp+udp` 传输 WebRTC 媒体；该类型不生成 RTSP 或 HLS 地址。目标 SecretEMS 部署需要开启 RTMP listener 并放行对应端口。
 
@@ -102,6 +104,8 @@ macOS 安装包随应用提供 ZLMediaKit `fdaec260` 的 `arm64` 和 `x64` 原�
 npm run build:zlm -- arm64
 npm run build:zlm -- x64
 ```
+
+Windows 本地编译需要 Visual Studio 2022 的“使用 C++ 的桌面开发”工作负载、CMake 和系统 `tar.exe`。GitHub Actions 的 `windows-2022` Runner 已提供这些工具；它会在 `x64` Runner 上分别构建 `x64` 和 `ARM64` 目标。
 
 ## 工具链兼容性
 

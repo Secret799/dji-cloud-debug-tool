@@ -9,6 +9,7 @@ import type {
   MediaServerProfile,
   MediaServerRuntime,
 } from '../shared/contracts'
+import { resolveMediaServerBinaryPath } from './media-server-path'
 import { LOCAL_ZLM_ID, MediaServerStore } from './media-server-store'
 import { probeMediaServer } from './media-server-probe'
 
@@ -132,9 +133,11 @@ export class MediaServerManager {
   }
 
   private binaryPath(): string {
-    return app.isPackaged
-      ? join(process.resourcesPath, 'zlmediakit', 'MediaServer')
-      : join(app.getAppPath(), 'vendor', 'zlmediakit', process.arch, 'MediaServer')
+    return resolveMediaServerBinaryPath({
+      appPath: app.getAppPath(),
+      isPackaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+    })
   }
 
   private async hasBinary(): Promise<boolean> {

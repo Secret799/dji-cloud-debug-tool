@@ -11,3 +11,4 @@ build/icon.iconset/
 !.env.example
 
 .idea
+vendor/zlmediakit/win32-*/MediaServer.exe
