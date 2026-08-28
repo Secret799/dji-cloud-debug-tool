@@ -26,6 +26,14 @@ describe('app update helpers', () => {
     )).toBe(hash)
   })
 
+  it('matches legacy checksum paths to GitHub-normalized asset names', () => {
+    const hash = 'b'.repeat(64)
+    const checksums = parseChecksums(`${hash}  release/DJI Cloud Studio-1.2.0-mac-arm64.dmg\n`)
+    expect(checksums.get('DJI Cloud Studio-1.2.0-mac-arm64.dmg')).toBe(hash)
+    expect(checksums.get('DJI.Cloud.Studio-1.2.0-mac-arm64.dmg')).toBe(hash)
+    expect(checksums.has('release/DJI Cloud Studio-1.2.0-mac-arm64.dmg')).toBe(false)
+  })
+
   it('turns basic markdown release notes into readable text', () => {
     expect(plainTextReleaseNotes('**Full Changelog**: [compare](https://example.com)')).toBe(
       'Full Changelog: compare: https://example.com',

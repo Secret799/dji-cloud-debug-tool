@@ -167,7 +167,7 @@ jobs:
 
       - name: Generate SHA-256 checksums
         shell: bash
-        run: sha256sum release/* > release/SHA256SUMS.txt
+        run: cd release && sha256sum -- DJI.Cloud.Studio-* > SHA256SUMS.txt
 
       - name: Create or update GitHub Release
         shell: bash

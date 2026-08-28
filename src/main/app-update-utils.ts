@@ -70,7 +70,12 @@ export const parseChecksums = (content: string): Map<string, string> => {
   const checksums = new Map<string, string>()
   for (const line of content.split(/\r?\n/)) {
     const match = line.trim().match(/^([a-fA-F0-9]{64})\s+\*?(.+)$/)
-    if (match) checksums.set(match[2], match[1].toLowerCase())
+    if (!match) continue
+    const hash = match[1].toLowerCase()
+    const fileName = match[2].replace(/\\/g, '/').split('/').pop()
+    if (!fileName) continue
+    checksums.set(fileName, hash)
+    checksums.set(fileName.replaceAll(' ', '.'), hash)
   }
   return checksums
 }

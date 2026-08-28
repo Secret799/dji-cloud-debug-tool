@@ -64,7 +64,7 @@
   "build": {
     "appId": "com.dji-cloud-studio.desktop",
     "productName": "DJI Cloud Studio",
-    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "artifactName": "DJI.Cloud.Studio-${version}-${arch}.${ext}",
     "directories": {
       "output": "release"
     },
@@ -75,7 +75,7 @@
     "mac": {
       "category": "public.app-category.developer-tools",
       "icon": "build/icon.png",
-      "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
+      "artifactName": "DJI.Cloud.Studio-${version}-mac-${arch}.${ext}",
       "target": [
         "dmg",
         "zip"
@@ -107,7 +107,7 @@
     },
     "win": {
       "icon": "build/icon.png",
-      "artifactName": "${productName}-${version}-windows-${arch}.${ext}",
+      "artifactName": "DJI.Cloud.Studio-${version}-windows-${arch}.${ext}",
       "target": [
         "nsis",
         "portable",
@@ -128,12 +128,12 @@
       ]
     },
     "nsis": {
-      "artifactName": "${productName}-${version}-windows-${arch}-setup.${ext}",
+      "artifactName": "DJI.Cloud.Studio-${version}-windows-${arch}-setup.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     },
     "portable": {
-      "artifactName": "${productName}-${version}-windows-${arch}-portable.${ext}"
+      "artifactName": "DJI.Cloud.Studio-${version}-windows-${arch}-portable.${ext}"
     }
   }
 }
