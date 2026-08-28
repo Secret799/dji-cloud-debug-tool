@@ -8,13 +8,10 @@ import type {
   WebDavSyncRequest,
   WebDavVersion,
 } from '../shared/contracts'
-import { DeviceArchiveStore } from './device-archive-store'
 import {
   validateConnectionProfile,
-  validateDeviceArchives,
   validateMediaServerProfile,
   validateObjectStorageProfile,
-  validateWebDavSyncRequest,
 } from './ipc-validation'
 import { MediaServerStore } from './media-server-store'
 import { ObjectStorageStore } from './object-storage-store'
@@ -77,7 +74,6 @@ export class WebDavBackupManager {
   constructor(
     private readonly configStore: WebDavConfigStore,
     private readonly profileStore: ProfileStore,
-    private readonly deviceArchiveStore: DeviceArchiveStore,
     private readonly mediaServerStore: MediaServerStore,
     private readonly objectStorageStore: ObjectStorageStore,
     private readonly beforeRestore: () => Promise<void>,
@@ -233,7 +229,8 @@ export class WebDavBackupManager {
   }
 
   private async performAutomaticSync(): Promise<void> {
-    if (!await this.configStore.get()) return
+    const config = await this.configStore.get()
+    if (!config?.autoSync) return
     await this.performSync()
   }
 
@@ -256,6 +253,7 @@ export class WebDavBackupManager {
           remoteDocument.data,
           Boolean(state.baseVersionId),
           state.baseFingerprint,
+          config.syncStrategy,
         )
       }
 
@@ -377,18 +375,17 @@ export class WebDavBackupManager {
   }
 
   private async captureSnapshot(): Promise<WebDavSyncData> {
-    const [profiles, deviceArchives, mediaServers, objectStorageProfiles] = await Promise.all([
+    const [profiles, mediaServers, objectStorageProfiles] = await Promise.all([
       this.profileStore.exportAll(),
-      this.deviceArchiveStore.list(),
       this.mediaServerStore.exportAll(),
       this.objectStorageStore.exportAll(),
     ])
     return {
       profiles,
-      deviceArchives,
+      deviceArchives: [],
       mediaServers,
       objectStorageProfiles,
-      rendererStorage: { ...this.rendererStorage },
+      rendererStorage: {},
     }
   }
 
@@ -405,23 +402,12 @@ export class WebDavBackupManager {
       throw new Error('WebDAV 数据版本内容不完整')
     }
     const profiles = raw.profiles.map(validateConnectionProfile)
-    const profileIds = new Set(profiles.map((profile) => profile.id))
-    const rawArchives = raw.deviceArchives as unknown[]
-    const archiveProfileIds = new Set(rawArchives.map((archive) => {
-      if (!isRecord(archive) || typeof archive.profileId !== 'string') throw new Error('设备档案的连接 ID 无效')
-      return archive.profileId
-    }))
-    for (const profileId of archiveProfileIds) {
-      if (!profileIds.has(profileId)) throw new Error('设备档案引用了不存在的连接配置')
-    }
     const data: WebDavSyncData = {
       profiles,
-      deviceArchives: [...archiveProfileIds].flatMap((profileId) =>
-        validateDeviceArchives(profileId, rawArchives.filter((archive) => isRecord(archive) && archive.profileId === profileId)),
-      ),
+      deviceArchives: [],
       mediaServers: raw.mediaServers.map(validateMediaServerProfile),
       objectStorageProfiles: raw.objectStorageProfiles.map(validateObjectStorageProfile),
-      rendererStorage: validateWebDavSyncRequest({ rendererStorage: raw.rendererStorage }).rendererStorage,
+      rendererStorage: {},
     }
     return {
       format: 'dji-cloud-studio-backup',
@@ -437,7 +423,6 @@ export class WebDavBackupManager {
 
   private async applySnapshot(data: WebDavSyncData): Promise<void> {
     await this.profileStore.replaceAll(data.profiles)
-    await this.deviceArchiveStore.replaceAll(data.deviceArchives)
     await this.mediaServerStore.replaceAll(data.mediaServers)
     await this.objectStorageStore.replaceAll(data.objectStorageProfiles)
   }

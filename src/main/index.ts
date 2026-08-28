@@ -132,7 +132,6 @@ const registerIpc = (): void => {
     const profileId = validateProfileId(rawProfileId)
     if (!await profileStore.get(profileId)) throw new Error('设备档案对应的连接配置不存在')
     const archives = await deviceArchiveStore.replaceProfile(profileId, validateDeviceArchives(profileId, rawArchives))
-    webDavBackupManager.notifyLocalChange()
     return archives
   })
   ipcMain.handle(IPC_CHANNELS.mqttRuntime, () => mqttManager.getRuntime())
@@ -379,7 +378,6 @@ app.whenReady().then(() => {
   webDavBackupManager = new WebDavBackupManager(
     new WebDavConfigStore(),
     profileStore,
-    deviceArchiveStore,
     mediaServerStore,
     objectStorageStore,
     () => mqttManager.disconnectAll(),

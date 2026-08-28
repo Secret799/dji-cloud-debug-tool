@@ -17,6 +17,8 @@ const createConfig = (): WebDavConfig => ({
   username: '',
   secret: '',
   rejectUnauthorized: true,
+  autoSync: true,
+  syncStrategy: 'smart-merge',
   updatedAt: Date.now(),
 })
 

@@ -213,7 +213,6 @@ export default function App() {
   useEffect(() => {
     try {
       window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth))
-      notifyWebDavChanged()
     } catch {
       // The current window can still use the resized width when storage is unavailable.
     }

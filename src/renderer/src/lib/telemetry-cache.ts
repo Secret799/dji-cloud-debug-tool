@@ -1,6 +1,5 @@
 import type { DeviceType, DjiDeviceIdentity } from '../../../shared/contracts'
 import type { DeviceTelemetry } from './dji'
-import { notifyWebDavChanged } from './webdav-sync'
 
 const STORAGE_KEY = 'dji-cloud-studio.telemetry-cache.v1'
 const MAX_CACHE_DEVICES = 1_000
@@ -126,7 +125,6 @@ export const saveTelemetryCache = (telemetry: Record<string, DeviceTelemetry>): 
   if (typeof window === 'undefined') return false
   try {
     window.localStorage.setItem(STORAGE_KEY, serializeTelemetryCache(telemetry))
-    notifyWebDavChanged()
     return true
   } catch {
     return false

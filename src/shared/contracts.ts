@@ -238,6 +238,7 @@ export interface AppUpdateState {
 }
 
 export type WebDavAuthType = 'basic' | 'digest' | 'token'
+export type WebDavSyncStrategy = 'smart-merge' | 'cloud-first' | 'local-first'
 
 export interface WebDavConfig {
   endpoint: string
@@ -247,6 +248,8 @@ export interface WebDavConfig {
   hasStoredSecret?: boolean
   clearStoredSecret?: boolean
   rejectUnauthorized: boolean
+  autoSync: boolean
+  syncStrategy: WebDavSyncStrategy
   updatedAt: number
 }
 

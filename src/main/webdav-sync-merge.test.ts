@@ -72,6 +72,36 @@ describe('WebDAV three-way merge', () => {
     expect(merged.profiles[0].name).toBe('Remote')
   })
 
+  it('uses the cloud snapshot when both sides changed under cloud-first strategy', () => {
+    const base = data([profile('a', 'A', 1)])
+    const local = data([profile('a', 'Local', 2)])
+    const remote = data([profile('a', 'Remote', 3)])
+
+    const reconciled = reconcileWebDavData(local, remote, true, fingerprintWebDavData(base), 'cloud-first')
+
+    expect(reconciled).toBe(remote)
+  })
+
+  it('uses the local snapshot when both sides changed under local-first strategy', () => {
+    const base = data([profile('a', 'A', 1)])
+    const local = data([profile('a', 'Local', 2)])
+    const remote = data([profile('a', 'Remote', 3)])
+
+    const reconciled = reconcileWebDavData(local, remote, true, fingerprintWebDavData(base), 'local-first')
+
+    expect(reconciled).toBe(local)
+  })
+
+  it('applies a one-sided remote change even under local-first strategy', () => {
+    const base = data([profile('a', 'A', 1)])
+    const local = data([profile('a', 'A', 1)])
+    const remote = data([profile('a', 'Remote', 2)])
+
+    const reconciled = reconcileWebDavData(local, remote, true, fingerprintWebDavData(base), 'local-first')
+
+    expect(reconciled.profiles[0].name).toBe('Remote')
+  })
+
   it('preserves a concurrent modification instead of applying a deletion', () => {
     const base = data([profile('a', 'A', 1)])
     const merged = mergeWebDavData(data([]), data([profile('a', 'Remote', 2)]), fingerprintWebDavData(base))

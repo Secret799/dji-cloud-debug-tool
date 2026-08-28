@@ -102,6 +102,8 @@ describe('WebDAV client', () => {
       username: 'admin',
       secret: 'secret',
       rejectUnauthorized: true,
+      autoSync: true,
+      syncStrategy: 'smart-merge',
       updatedAt: Date.now(),
     }
     const client = new WebDavClient(config)

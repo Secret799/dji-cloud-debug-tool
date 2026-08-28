@@ -8438,11 +8438,11 @@ textarea {
 
 .webdav-account-band {
   display: grid;
-  grid-template-columns: 54px minmax(0, 1fr) 34px;
-  min-height: 90px;
+  grid-template-columns: 50px minmax(0, 1fr) auto;
+  min-height: 82px;
   align-items: center;
   gap: 14px;
-  padding: 15px 17px;
+  padding: 14px 16px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--surface);
@@ -8459,11 +8459,16 @@ textarea {
 }
 
 .webdav-account-band.connected .webdav-account-icon {
-  color: var(--blue);
-  background: var(--blue-soft);
+  color: var(--green);
+  background: var(--green-soft);
 }
 
-.webdav-account-band > div {
+.webdav-account-band.unavailable .webdav-account-icon {
+  color: var(--red);
+  background: var(--red-soft);
+}
+
+.webdav-account-copy {
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -8494,12 +8499,30 @@ textarea {
   background: var(--green);
 }
 
+.webdav-account-band.unavailable strong i {
+  background: var(--red);
+}
+
 .webdav-account-band small {
   overflow: hidden;
   color: var(--muted);
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.webdav-account-band > .button {
+  white-space: nowrap;
+}
+
+.webdav-page-tabs {
+  display: grid;
+  width: 100%;
+  margin-top: 12px;
+}
+
+.webdav-page-tabs button {
+  min-height: 34px;
 }
 
 .webdav-overview-error {
@@ -8512,16 +8535,435 @@ textarea {
   font-size: 10px;
 }
 
+.webdav-service-view,
+.webdav-status-view {
+  margin-top: 12px;
+}
+
+.webdav-provider-section {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+}
+
+.webdav-provider-section > header {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-soft);
+}
+
+.webdav-provider-section > header > div,
+.webdav-provider-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.webdav-provider-section > header > div {
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 680;
+}
+
+.webdav-provider-state {
+  color: var(--red);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.webdav-provider-state::before {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  content: '';
+}
+
+.webdav-provider-state.connected {
+  color: var(--green);
+}
+
+.webdav-provider-main {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  min-height: 84px;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+}
+
+.webdav-provider-logo {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 7px;
+  color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.webdav-provider-main > div:not(.webdav-provider-actions) {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.webdav-provider-main strong {
+  font-size: 13px;
+}
+
+.webdav-provider-main small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webdav-provider-actions {
+  display: flex;
+  gap: 7px;
+}
+
+.webdav-provider-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid var(--line);
+}
+
+.webdav-provider-facts > div {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  min-width: 0;
+  min-height: 64px;
+  align-content: center;
+  gap: 2px 7px;
+  padding: 10px 14px;
+  border-right: 1px solid var(--line);
+}
+
+.webdav-provider-facts > div:last-child {
+  border-right: 0;
+}
+
+.webdav-provider-facts svg {
+  grid-row: 1 / 3;
+  align-self: center;
+  color: var(--muted);
+}
+
+.webdav-provider-facts span {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.webdav-provider-facts strong {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webdav-service-empty {
+  display: flex;
+  min-height: 240px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 9px;
+  padding: 24px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 7px;
+  color: var(--muted);
+  background: var(--surface);
+  text-align: center;
+}
+
+.webdav-service-empty strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.webdav-service-empty span {
+  max-width: 460px;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.webdav-service-empty .button {
+  margin-top: 5px;
+}
+
+.sync-capability-row,
+.sync-setting-row,
+.sync-strategy-section {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+}
+
+.sync-capability-row {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 22px;
+  min-height: 70px;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 14px;
+}
+
+.sync-capability-icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 7px;
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.sync-capability-row > div,
+.sync-setting-row > div,
+.sync-strategy-section > div:first-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sync-capability-row strong,
+.sync-setting-row strong,
+.sync-strategy-section strong {
+  font-size: 12px;
+}
+
+.sync-capability-row strong em {
+  display: inline-flex;
+  min-height: 20px;
+  align-items: center;
+  margin-left: 6px;
+  padding: 0 7px;
+  border-radius: 4px;
+  color: var(--green);
+  background: var(--green-soft);
+  font-size: 9px;
+  font-style: normal;
+  vertical-align: 1px;
+}
+
+.sync-capability-row small,
+.sync-setting-row small,
+.sync-strategy-section small {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.sync-capability-check {
+  color: var(--green);
+}
+
+.sync-setting-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 64px;
+  align-items: center;
+  gap: 16px;
+  margin-top: 10px;
+  padding: 11px 14px;
+}
+
+.webdav-switch {
+  position: relative;
+  width: 42px;
+  height: 24px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--fill);
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.webdav-switch span {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(41, 37, 36, 0.25);
+  transition: transform 140ms ease;
+}
+
+.webdav-switch.enabled {
+  border-color: var(--green);
+  background: var(--green);
+}
+
+.webdav-switch.enabled span {
+  transform: translateX(18px);
+}
+
+.webdav-switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.sync-strategy-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.65fr);
+  align-items: center;
+  gap: 18px;
+  min-height: 78px;
+  margin-top: 10px;
+  padding: 12px 14px;
+}
+
+.sync-strategy-control {
+  position: relative;
+  min-width: 0;
+}
+
+.sync-strategy-trigger {
+  display: grid;
+  width: 100%;
+  min-height: 50px;
+  grid-template-columns: 20px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sync-strategy-trigger:hover:not(:disabled),
+.sync-strategy-control.open .sync-strategy-trigger {
+  border-color: var(--line-strong);
+  background: var(--surface);
+}
+
+.sync-strategy-trigger > svg:first-child {
+  color: var(--green);
+}
+
+.sync-strategy-trigger > svg:last-child {
+  color: var(--muted);
+  transition: transform 140ms ease;
+}
+
+.sync-strategy-control.open .sync-strategy-trigger > svg:last-child {
+  transform: rotate(180deg);
+}
+
+.sync-strategy-trigger > span,
+.sync-strategy-menu button > span:last-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sync-strategy-trigger strong,
+.sync-strategy-menu strong {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sync-strategy-trigger small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sync-strategy-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.sync-strategy-menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  right: 0;
+  width: min(520px, calc(100vw - 180px));
+  min-width: 100%;
+  overflow: hidden;
+  padding: 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--surface);
+  box-shadow: 0 14px 34px rgba(41, 37, 36, 0.18);
+}
+
+.sync-strategy-menu button {
+  display: grid;
+  width: 100%;
+  min-height: 48px;
+  grid-template-columns: 18px 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  color: var(--text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sync-strategy-menu button:hover,
+.sync-strategy-menu button.selected {
+  background: var(--surface-soft);
+}
+
+.sync-strategy-menu button.selected {
+  color: var(--text);
+}
+
+.sync-strategy-check {
+  display: grid;
+  width: 18px;
+  place-items: center;
+  color: var(--green);
+}
+
+.sync-strategy-option-icon {
+  color: var(--muted);
+}
+
+.sync-strategy-menu button.selected .sync-strategy-option-icon {
+  color: var(--green);
+}
+
+.sync-strategy-menu small {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
 .version-summary-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .version-summary-item {
   display: grid;
-  min-height: 92px;
+  min-height: 78px;
   align-content: center;
   gap: 3px;
   padding: 14px 16px;
@@ -8546,8 +8988,8 @@ textarea {
   grid-template-columns: minmax(0, 1fr) 34px auto;
   align-items: center;
   gap: 8px;
-  min-height: 68px;
-  margin-top: 14px;
+  min-height: 60px;
+  margin-top: 10px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -8572,7 +9014,7 @@ textarea {
   grid-template-columns: minmax(0, 1.7fr) minmax(250px, 0.8fr);
   align-items: start;
   gap: 12px;
-  padding-top: 12px;
+  padding-top: 10px;
 }
 
 .version-history-section,
@@ -8766,6 +9208,11 @@ textarea {
 }
 
 @media (max-width: 820px) {
+  .sync-strategy-section {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
   .data-version-layout {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -8783,6 +9230,55 @@ textarea {
 
   .version-summary-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .webdav-account-band {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .webdav-account-icon {
+    width: 42px;
+    height: 42px;
+  }
+
+  .webdav-account-band > .button {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+  }
+
+  .webdav-provider-main {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .webdav-provider-actions {
+    grid-column: 1 / -1;
+  }
+
+  .webdav-provider-actions .button {
+    flex: 1;
+  }
+
+  .webdav-provider-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .webdav-provider-facts > div {
+    min-height: 54px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .webdav-provider-facts > div:last-child {
+    border-bottom: 0;
+  }
+
+  .sync-capability-row {
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+
+  .sync-capability-check {
+    display: none;
   }
 
   .version-history-row {

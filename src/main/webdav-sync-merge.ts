@@ -4,6 +4,7 @@ import type {
   DeviceArchive,
   MediaServerProfile,
   ObjectStorageProfile,
+  WebDavSyncStrategy,
 } from '../shared/contracts'
 
 export interface WebDavSyncData {
@@ -157,7 +158,16 @@ export const reconcileWebDavData = (
   remote: WebDavSyncData,
   hasSyncBase: boolean,
   base?: WebDavSyncFingerprint,
-): WebDavSyncData => hasSyncBase ? mergeWebDavData(local, remote, base) : remote
+  strategy: WebDavSyncStrategy = 'smart-merge',
+): WebDavSyncData => {
+  if (!hasSyncBase) return remote
+  if (strategy === 'smart-merge' || !base) return mergeWebDavData(local, remote, base)
+
+  const localChanged = !sameValue(fingerprintWebDavData(local), base)
+  const remoteChanged = !sameValue(fingerprintWebDavData(remote), base)
+  if (!localChanged || !remoteChanged) return mergeWebDavData(local, remote, base)
+  return strategy === 'cloud-first' ? remote : local
+}
 
 export const webDavDataEqual = (left: WebDavSyncData, right: WebDavSyncData): boolean =>
   sameValue(left, right)

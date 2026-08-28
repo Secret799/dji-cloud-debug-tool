@@ -89,7 +89,7 @@ const waitForJson = async (path, predicate, timeoutMs = 10_000) => {
   throw new Error(`Timed out waiting for ${path}`)
 }
 
-const inspectBounds = async (window, selectors, label) => {
+const inspectBounds = async (window, selectors, label, allowVerticalOverflow = false) => {
   const results = await window.evaluate((targets) => targets.map((selector) => {
     const element = document.querySelector(selector)
     if (!(element instanceof HTMLElement)) return { selector, missing: true }
@@ -113,7 +113,9 @@ const inspectBounds = async (window, selectors, label) => {
       errors.push(`${label}: missing ${result.selector}`)
       continue
     }
-    if (result.left < -1 || result.right > result.viewportWidth + 1 || result.top < -1 || result.bottom > result.viewportHeight + 1) {
+    const outsideHorizontally = result.left < -1 || result.right > result.viewportWidth + 1
+    const outsideVertically = result.top < -1 || result.bottom > result.viewportHeight + 1
+    if (outsideHorizontally || (!allowVerticalOverflow && outsideVertically)) {
       errors.push(`${label}: ${result.selector} is outside viewport`)
     }
     if (['hidden', 'clip'].includes(result.overflowX) && result.scrollWidth > result.clientWidth + 1) {
@@ -135,16 +137,23 @@ try {
   await window.getByRole('button', { name: '云同步', exact: true }).click()
   await window.locator('.data-versions-page').waitFor({ state: 'visible' })
   await window.locator('.version-empty').waitFor({ state: 'visible' })
+  const statusTab = window.getByRole('tab', { name: '同步状态', exact: true })
+  const serviceTab = window.getByRole('tab', { name: '云服务', exact: true })
+  if (await statusTab.getAttribute('aria-selected') !== 'true') errors.push('page: sync status tab is not selected by default')
   await inspectBounds(window, [
     '.data-versions-page',
     '.webdav-account-band',
+    '.webdav-page-tabs',
+    '.sync-capability-row',
+    '.sync-setting-row',
+    '.sync-strategy-section',
     '.version-summary-grid',
     '.data-version-actions',
     '.data-version-layout',
-  ], 'page')
+  ], 'page', true)
   await window.screenshot({ path: `${screenshotBase}-page.png` })
 
-  await window.getByRole('button', { name: 'WebDAV 设置', exact: true }).click()
+  await window.locator('.webdav-account-band').getByRole('button', { name: '配置 WebDAV', exact: true }).click()
   const dialog = window.getByRole('dialog', { name: 'WebDAV 设置' })
   await dialog.waitFor({ state: 'visible' })
   await dialog.getByLabel('端点地址').fill(webDavEndpoint)
@@ -165,7 +174,7 @@ try {
   await dialog.getByText('连接成功，备份目录可以使用', { exact: true }).waitFor({ state: 'visible' })
   await dialog.getByRole('button', { name: '保存', exact: true }).click()
   await dialog.waitFor({ state: 'hidden' })
-  await window.getByText('云同步已启用', { exact: true }).waitFor({ state: 'visible' })
+  await window.getByText('WebDAV 已就绪', { exact: true }).waitFor({ state: 'visible' })
   const syncRailButton = window.getByRole('button', { name: '云同步', exact: true })
   await syncRailButton.waitFor({ state: 'visible' })
   if (!(await syncRailButton.evaluate((element) => element.classList.contains('sync-enabled')))) {
@@ -182,6 +191,73 @@ try {
   }
   await window.mouse.move(500, 350)
   await syncTooltip.waitFor({ state: 'hidden' })
+
+  const autoSyncSwitch = window.getByRole('switch', { name: '自动同步', exact: true })
+  if (await autoSyncSwitch.getAttribute('aria-checked') !== 'true') errors.push('sync: automatic synchronization is not enabled by default')
+  await autoSyncSwitch.click()
+  await window.waitForFunction(() => document.querySelector('[role="switch"][aria-label="自动同步"]')?.getAttribute('aria-checked') === 'false')
+  await autoSyncSwitch.click()
+  await window.waitForFunction(() => document.querySelector('[role="switch"][aria-label="自动同步"]')?.getAttribute('aria-checked') === 'true')
+
+  const strategyTrigger = window.locator('.sync-strategy-trigger')
+  await strategyTrigger.click()
+  await window.locator('.sync-strategy-menu').waitFor({ state: 'visible' })
+  await inspectBounds(window, ['.sync-strategy-menu'], 'strategy')
+  await window.screenshot({ path: `${screenshotBase}-strategy.png` })
+  await window.getByRole('option', { name: /云端优先/ }).click()
+  await window.waitForFunction(async () => (await window.djiApi.webdav.getOverview()).config?.syncStrategy === 'cloud-first')
+  await strategyTrigger.click()
+  await window.getByRole('option', { name: /智能合并/ }).click()
+  await window.waitForFunction(async () => (await window.djiApi.webdav.getOverview()).config?.syncStrategy === 'smart-merge')
+
+  await window.evaluate(async () => {
+    const now = Date.now()
+    const profiles = await window.djiApi.profiles.list()
+    const profile = profiles[0]
+    if (!profile) throw new Error('Missing smoke-test MQTT profile')
+    await window.djiApi.profiles.save({
+      ...profile,
+      devices: [
+        ...profile.devices,
+        { id: 'sync-device', name: '同步设备', sn: 'SYNC-DEVICE', type: 'dock', enabled: true },
+      ],
+      updatedAt: now,
+    })
+    await window.djiApi.media.saveServer({
+      id: 'sync-media', name: '同步流媒体', kind: 'remote-srs', host: 'media.example.com',
+      apiProtocol: 'https', apiPort: 1985, httpProtocol: 'https', httpPort: 443,
+      rtmpPort: 1935, rtspPort: 554, webrtcPort: 8000, secret: 'media-secret',
+      createdAt: now, updatedAt: now,
+    })
+    await window.djiApi.objectStorage.save({
+      id: 'sync-oss', name: '同步 OSS', provider: 'ali', bucket: 'sync-bucket', region: 'cn-hangzhou',
+      endpoint: 'https://oss-cn-hangzhou.aliyuncs.com', accessKeyId: 'sync-key',
+      accessKeySecret: 'sync-secret', securityToken: '', expire: now + 86_400_000,
+      createdAt: now, updatedAt: now,
+    })
+    await window.djiApi.deviceArchives.replaceProfile(profile.id, [{
+      profileId: profile.id,
+      sn: 'CACHE-ONLY-DEVICE',
+      type: 'dock',
+      name: '仅本地设备档案',
+      modelKey: 'WEBDAV-RUNTIME-CACHE',
+      cameras: [],
+      updatedAt: now,
+      lastReportedAt: now,
+    }])
+    window.localStorage.setItem('dji-cloud-studio.telemetry-cache.v1', JSON.stringify({
+      version: 1,
+      devices: [{ profileId: profile.id, sn: 'CACHE-ONLY-TELEMETRY', marker: 'WEBDAV-RUNTIME-CACHE' }],
+    }))
+  })
+
+  await serviceTab.click()
+  await window.locator('.webdav-provider-section').waitFor({ state: 'visible' })
+  await window.getByText(webDavEndpoint, { exact: true }).waitFor({ state: 'visible' })
+  await inspectBounds(window, ['.webdav-provider-section', '.webdav-provider-main', '.webdav-provider-facts'], 'service')
+  await statusTab.click()
+  await window.locator('.sync-capability-row').waitFor({ state: 'visible' })
+
   await window.getByRole('button', { name: '立即同步', exact: true }).click()
   await window.locator('.version-history-row').getByText('v1', { exact: true }).waitFor({ state: 'visible' })
   if (files.size !== 1) errors.push(`sync: expected one uploaded version, received ${files.size}`)
@@ -206,7 +282,7 @@ try {
   secondWindow.on('console', (message) => { if (message.type() === 'error') errors.push(`second client: ${message.text()}`) })
   await secondWindow.locator('.app-shell').waitFor({ state: 'visible', timeout: 15_000 })
   await secondWindow.getByRole('button', { name: '云同步', exact: true }).click()
-  await secondWindow.getByRole('button', { name: 'WebDAV 设置', exact: true }).click()
+  await secondWindow.locator('.webdav-account-band').getByRole('button', { name: '配置 WebDAV', exact: true }).click()
   const secondDialog = secondWindow.getByRole('dialog', { name: 'WebDAV 设置' })
   await secondDialog.getByLabel('端点地址').fill(webDavEndpoint)
   await secondDialog.getByLabel('用户名').fill('admin')
@@ -219,6 +295,27 @@ try {
   const secondProfiles = JSON.parse(await readFile(join(secondUserData, 'connection-profiles.json'), 'utf8'))
   if (secondProfiles.profiles[0]?.id !== firstProfileId) {
     errors.push('second client: cloud profiles were not applied as the initial baseline')
+  }
+  if (!secondProfiles.profiles[0]?.devices?.some((device) => device.id === 'sync-device')) {
+    errors.push('second client: MQTT device configuration was not synchronized')
+  }
+  const secondScope = await secondWindow.evaluate(async () => ({
+    mediaServers: await window.djiApi.media.listServers(),
+    objectStorageProfiles: await window.djiApi.objectStorage.list(),
+    deviceArchives: await window.djiApi.deviceArchives.list(),
+    telemetryCache: window.localStorage.getItem('dji-cloud-studio.telemetry-cache.v1'),
+  }))
+  if (!secondScope.mediaServers.some((profile) => profile.id === 'sync-media')) {
+    errors.push('second client: media server configuration was not synchronized')
+  }
+  if (!secondScope.objectStorageProfiles.some((profile) => profile.id === 'sync-oss')) {
+    errors.push('second client: OSS configuration was not synchronized')
+  }
+  if (secondScope.deviceArchives.some((archive) => archive.sn === 'CACHE-ONLY-DEVICE')) {
+    errors.push('second client: runtime device archive cache was synchronized')
+  }
+  if (secondScope.telemetryCache?.includes('WEBDAV-RUNTIME-CACHE')) {
+    errors.push('second client: telemetry cache was synchronized')
   }
   const versionFiles = [...files.keys()].filter((name) => name.endsWith('.djibak'))
   if (versionFiles.length !== versionsBeforeSecondClient.length) {

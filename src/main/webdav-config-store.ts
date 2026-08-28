@@ -174,6 +174,8 @@ export class WebDavConfigStore {
     const { encryptedSecret, ...plain } = config
     return {
       ...plain,
+      autoSync: config.autoSync !== false,
+      syncStrategy: config.syncStrategy ?? 'smart-merge',
       secret: '',
       hasStoredSecret: Boolean(encryptedSecret),
     }

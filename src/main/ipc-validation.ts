@@ -234,6 +234,13 @@ export const validateWebDavConfig = (value: unknown): WebDavConfig => {
   requireOptionalBoolean(config.hasStoredSecret, '已保存 WebDAV 密钥标记')
   requireOptionalBoolean(config.clearStoredSecret, '清除 WebDAV 密钥标记')
   const rejectUnauthorized = requireBoolean(config.rejectUnauthorized, 'WebDAV 证书校验')
+  const autoSync = config.autoSync === undefined
+    ? true
+    : requireBoolean(config.autoSync, 'WebDAV 自动同步')
+  const syncStrategy = config.syncStrategy === undefined ? 'smart-merge' : config.syncStrategy
+  if (syncStrategy !== 'smart-merge' && syncStrategy !== 'cloud-first' && syncStrategy !== 'local-first') {
+    throw new IpcValidationError('WebDAV 同步策略无效')
+  }
   const updatedAt = requireFiniteNumber(config.updatedAt, 'WebDAV 配置更新时间')
   return {
     endpoint: url.toString(),
@@ -243,6 +250,8 @@ export const validateWebDavConfig = (value: unknown): WebDavConfig => {
     hasStoredSecret: config.hasStoredSecret as boolean | undefined,
     clearStoredSecret: config.clearStoredSecret as boolean | undefined,
     rejectUnauthorized,
+    autoSync,
+    syncStrategy,
     updatedAt,
   }
 }

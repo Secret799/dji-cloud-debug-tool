@@ -1,6 +1,6 @@
 # DJI Cloud Studio
 
-DJI Cloud Studio 是一款面向 macOS 和 Windows 的 DJI 上云 API、MQTT、设备控制与媒体流调试工具。项目参考了 [Dji-cloud-api-tool](https://github.com/damon-liu/Dji-cloud-api-tool) 的设备与控制工作流，以及 [MQTTX](https://github.com/emqx/MQTTX) 的连接配置、消息检查和发布交互。
+DJI Cloud Studio 是一款面向 macOS 和 Windows 的 DJI 上云 API、MQTT、设备控制与媒体流调试工具。
 
 > 本项目不是 DJI 官方产品。飞行、机场、负载和固件升级指令会直接发送到配置的 Broker。连接真实设备前，请先在隔离环境验证 Topic、Payload、设备 SN 和账号权限。
 
