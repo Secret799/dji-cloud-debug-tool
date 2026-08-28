@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
-import { ExternalLink, RadioTower, X } from 'lucide-react'
+import { ExternalLink, X } from 'lucide-react'
 import packageMetadata from '../../../../package.json'
+import { AppUpdatePanel } from './AppUpdatePanel'
+import { BrandLogo } from './BrandLogo'
 import { Tooltip } from './Tooltip'
 
 interface AboutModalProps {
@@ -32,7 +34,7 @@ export function AboutModal({ onClose }: AboutModalProps) {
 
         <div className="modal-body about-body">
           <div className="about-product">
-            <span className="about-product-mark"><RadioTower size={26} /></span>
+            <BrandLogo className="about-product-mark" />
             <div>
               <h3>大疆云调试台</h3>
               <p>DJI Cloud Studio</p>
@@ -55,6 +57,8 @@ export function AboutModal({ onClose }: AboutModalProps) {
             </div>
             <div><dt>许可证</dt><dd>{packageMetadata.license}</dd></div>
           </dl>
+
+          <AppUpdatePanel />
 
           <p className="about-notice">
             本项目不是 DJI 官方产品。连接真实设备前，请先在隔离环境中验证 Topic、参数和权限。

@@ -8,6 +8,7 @@ import type {
   TelemetrySectionKind,
 } from '../../../shared/contracts'
 import { parseTelemetryLayoutConfig } from '../../../shared/telemetry-layout'
+import { notifyWebDavChanged } from './webdav-sync'
 import { DJI_AIRCRAFT_FIELDS, getDjiAircraftFieldMetadata } from './dji-aircraft-field-metadata'
 import {
   buildDjiFieldMetadata,
@@ -288,6 +289,7 @@ export const loadTelemetryLayout = (): TelemetryLayoutConfig => {
 export const saveTelemetryLayout = (config: TelemetryLayoutConfig): void => {
   if (typeof window === 'undefined') return
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
+  notifyWebDavChanged()
 }
 
 export const updateTelemetryLayoutTimestamp = (config: TelemetryLayoutConfig): TelemetryLayoutConfig => ({

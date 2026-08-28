@@ -16,6 +16,12 @@ export class DeviceArchiveStore {
     return this.runExclusive(async () => (await this.readDocument()).archives)
   }
 
+  replaceAll(archives: DeviceArchive[]): Promise<void> {
+    return this.runExclusive(async () => {
+      await this.writeDocument({ version: 1, archives })
+    })
+  }
+
   replaceProfile(profileId: string, archives: DeviceArchive[]): Promise<DeviceArchive[]> {
     return this.runExclusive(async () => {
       const document = await this.readDocument()

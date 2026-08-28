@@ -12,6 +12,8 @@ import type {
   PublishRequest,
   RtmpRelayStartRequest,
   TopicSubscription,
+  WebDavConfig,
+  WebDavSyncRequest,
   WhepOfferRequest,
 } from '../shared/contracts'
 import {
@@ -30,6 +32,12 @@ const MAX_ARCHIVE_CAMERAS = 64
 const MAX_ARCHIVE_VIDEOS = 64
 const MAX_SUBSCRIPTIONS = 5_000
 const MAX_WHEP_SDP_BYTES = 256 * 1024
+const MAX_WEBDAV_BACKUP_BYTES = 16 * 1024 * 1024
+const ALLOWED_RENDERER_STORAGE_KEYS = new Set([
+  'dji-cloud-studio.sidebar-width',
+  'dji-cloud-studio.telemetry-cache.v1',
+  'dji-cloud-studio.telemetry-layout.v1',
+])
 
 export class IpcValidationError extends Error {
   constructor(message: string) {
@@ -196,6 +204,71 @@ export const validateSessionPassword = (value: unknown): string | undefined => {
     allowNullCharacter: true,
     maxBytes: MAX_TOPIC_BYTES,
   })
+}
+
+export const validateWebDavConfig = (value: unknown): WebDavConfig => {
+  const config = requireRecord(value, 'WebDAV 配置')
+  const endpoint = requireString(config.endpoint, 'WebDAV 端点地址').trim()
+  let url: URL
+  try {
+    url = new URL(endpoint)
+  } catch {
+    throw new IpcValidationError('WebDAV 端点地址无效')
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new IpcValidationError('WebDAV 端点仅支持 HTTP 或 HTTPS')
+  }
+  if (url.username || url.password) throw new IpcValidationError('请勿在 WebDAV 地址中包含用户名或密码')
+  if (config.authType !== 'basic' && config.authType !== 'digest' && config.authType !== 'token') {
+    throw new IpcValidationError('WebDAV 认证方式无效')
+  }
+  const username = requireString(config.username, 'WebDAV 用户名', {
+    allowEmpty: config.authType === 'token',
+    maxBytes: 1_024,
+  }).trim()
+  const secret = requireString(config.secret, config.authType === 'token' ? 'Token' : '密码', {
+    allowEmpty: true,
+    allowNullCharacter: true,
+    maxBytes: 65_535,
+  })
+  requireOptionalBoolean(config.hasStoredSecret, '已保存 WebDAV 密钥标记')
+  requireOptionalBoolean(config.clearStoredSecret, '清除 WebDAV 密钥标记')
+  const rejectUnauthorized = requireBoolean(config.rejectUnauthorized, 'WebDAV 证书校验')
+  const updatedAt = requireFiniteNumber(config.updatedAt, 'WebDAV 配置更新时间')
+  return {
+    endpoint: url.toString(),
+    authType: config.authType,
+    username,
+    secret,
+    hasStoredSecret: config.hasStoredSecret as boolean | undefined,
+    clearStoredSecret: config.clearStoredSecret as boolean | undefined,
+    rejectUnauthorized,
+    updatedAt,
+  }
+}
+
+export const validateWebDavSyncRequest = (value: unknown): WebDavSyncRequest => {
+  requireSerializedSize(value, 'WebDAV 备份数据', MAX_WEBDAV_BACKUP_BYTES)
+  const request = requireRecord(value, 'WebDAV 同步请求')
+  const rawStorage = requireRecord(request.rendererStorage, '渲染进程数据')
+  const rendererStorage: Record<string, string> = {}
+  for (const [key, rawValue] of Object.entries(rawStorage)) {
+    if (!ALLOWED_RENDERER_STORAGE_KEYS.has(key)) throw new IpcValidationError(`不支持备份本地数据项：${key}`)
+    rendererStorage[key] = requireString(rawValue, key, {
+      allowEmpty: true,
+      allowNullCharacter: true,
+      maxBytes: MAX_WEBDAV_BACKUP_BYTES,
+    })
+  }
+  return { rendererStorage }
+}
+
+export const validateWebDavVersionId = (value: unknown): string => {
+  const id = requireString(value, 'WebDAV 版本 ID', { maxBytes: 256 }).trim()
+  if (!/^v\d{6}-\d{13}-[a-f0-9-]{36}\.djibak$/i.test(id)) {
+    throw new IpcValidationError('WebDAV 版本 ID 无效')
+  }
+  return id
 }
 
 export const validateTopic = (value: unknown, label = 'Topic'): string => {

@@ -57,6 +57,33 @@ export class MediaServerStore {
     })
   }
 
+  exportAll(): Promise<MediaServerProfile[]> {
+    return this.runExclusive(async () => {
+      const document = await this.readDocument()
+      return document.servers.map((server) => ({
+        ...this.toPublicProfile(server),
+        secret: this.decryptSecret(server),
+      }))
+    })
+  }
+
+  replaceAll(profiles: MediaServerProfile[]): Promise<void> {
+    return this.runExclusive(async () => {
+      const source = profiles.some((profile) => profile.id === LOCAL_ZLM_ID)
+        ? profiles
+        : [createLocalProfile(), ...profiles]
+      const stored = source.map((profile) => ({
+        ...this.toStoredProfile(profile),
+        updatedAt: profile.updatedAt,
+      }))
+      const defaultIndex = stored.findIndex((server) => server.isDefault)
+      stored.forEach((server, index) => {
+        server.isDefault = index === (defaultIndex >= 0 ? defaultIndex : 0)
+      })
+      await this.writeDocument({ version: 1, servers: stored })
+    })
+  }
+
   getWithSecret(profileId: string): Promise<MediaServerProfile | undefined> {
     return this.runExclusive(async () => {
       const document = await this.readDocument()

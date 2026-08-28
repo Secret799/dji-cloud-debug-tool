@@ -54,6 +54,73 @@ try {
 
   await assertTooltip('设备工作台')
   await assertTooltip('添加设备')
+  await assertTooltip('云同步')
+
+  const railOrder = await window.locator('.app-rail').evaluate((rail) => ({
+    top: [...rail.querySelectorAll('.rail-top button')].map((button) => button.getAttribute('aria-label')),
+    bottom: [...rail.querySelectorAll('.rail-bottom button')].map((button) => button.getAttribute('aria-label')),
+  }))
+  if (railOrder.top.join('|') !== '设备工作台|媒体中心|OSS 管理|大疆配置') {
+    errors.push(`navigation: unexpected top rail order (${railOrder.top.join(', ')})`)
+  }
+  if (railOrder.bottom.join('|') !== '云同步|设置|关于') {
+    errors.push(`navigation: unexpected bottom rail order (${railOrder.bottom.join(', ')})`)
+  }
+
+  if (await window.locator('.titlebar').getByRole('button', { name: '连接设置', exact: true }).count()) {
+    errors.push('settings: legacy titlebar connection settings button is still visible')
+  }
+  await window.getByRole('button', { name: '设置', exact: true }).click()
+  const settingsPage = window.locator('.settings-center')
+  await settingsPage.waitFor({ state: 'visible' })
+  if (!(await settingsPage.getByRole('navigation', { name: '设置分类' }).isVisible())) {
+    errors.push('settings: category navigation is missing')
+  }
+  if (!(await settingsPage.getByRole('slider', { name: '设备侧栏宽度' }).isVisible())) {
+    errors.push('settings: sidebar width control is missing')
+  }
+  const settingsRailButton = window.getByRole('button', { name: '设置', exact: true })
+  if (!(await settingsRailButton.evaluate((element) => element.classList.contains('active')))) {
+    errors.push('settings: rail button is not active')
+  }
+  const settingsLayout = await settingsPage.evaluate((element) => {
+    const navigation = element.querySelector('.settings-navigation')
+    const detail = element.querySelector('.settings-detail')
+    const rectFor = (target) => {
+      if (!(target instanceof HTMLElement)) return undefined
+      const rect = target.getBoundingClientRect()
+      return {
+        left: Math.round(rect.left),
+        right: Math.round(rect.right),
+        clientWidth: target.clientWidth,
+        scrollWidth: target.scrollWidth,
+      }
+    }
+    return {
+      page: rectFor(element),
+      navigation: rectFor(navigation),
+      detail: rectFor(detail),
+    }
+  })
+  for (const [name, layout] of Object.entries(settingsLayout)) {
+    if (!layout) {
+      errors.push(`settings: missing ${name} layout region`)
+      continue
+    }
+    if (layout.left < 0 || layout.right > 1024) {
+      errors.push(`settings: ${name} is outside the viewport (${layout.left}px..${layout.right}px)`)
+    }
+    if (layout.scrollWidth > layout.clientWidth + 1) {
+      errors.push(`settings: ${name} overflows horizontally (${layout.scrollWidth}px in ${layout.clientWidth}px)`)
+    }
+  }
+  await settingsPage.getByRole('button', { name: /\u8f6f件更新/ }).click()
+  if (!(await settingsPage.getByText('在线版本更新', { exact: true }).isVisible())) {
+    errors.push('settings: update section did not render')
+  }
+  await window.screenshot({ path: `${screenshotBase}-settings.png` })
+  await window.getByRole('button', { name: '设备工作台', exact: true }).click()
+  await settingsPage.waitFor({ state: 'hidden' })
 
   await window.getByRole('button', { name: '关于', exact: true }).click()
   const aboutDialog = window.getByRole('dialog', { name: '关于' })
@@ -1206,7 +1273,9 @@ try {
     { timeout: 5_000 },
   )
 
-  await window.getByRole('button', { name: '错误码管理' }).click()
+  await window.getByRole('button', { name: '大疆配置', exact: true }).click()
+  await window.locator('.dji-config-center').waitFor({ state: 'visible' })
+  await window.getByRole('button', { name: /错误码管理/ }).click()
   await window.locator('.error-code-manager').waitFor({ state: 'visible' })
   if (await window.locator('.error-code-row').count() !== 551) {
     errors.push('error-codes: cloud error rows were not loaded')
@@ -1237,13 +1306,16 @@ try {
   ])
   await window.screenshot({ path: `${screenshotBase}-error-codes.png` })
 
-  await window.getByRole('button', { name: '遥测项管理' }).click()
+  await window.getByRole('button', { name: /遥测项管理/ }).click()
   await window.locator('.telemetry-manager').waitFor({ state: 'visible' })
   await window.locator('.telemetry-field-editor-form').waitFor({ state: 'visible' })
   await inspectLayout('telemetry-manager', [
     'body',
     '.app-shell',
     '.workspace-content',
+    '.dji-config-center',
+    '.dji-config-tabs',
+    '.dji-config-panel',
     '.telemetry-manager',
     '.telemetry-manager-layout',
     '.telemetry-manager-hierarchy',

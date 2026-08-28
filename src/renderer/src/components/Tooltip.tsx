@@ -43,6 +43,8 @@ export function Tooltip({ label, children }: TooltipProps) {
       ref={triggerRef}
       onPointerEnter={show}
       onPointerLeave={() => setPosition(null)}
+      onMouseEnter={show}
+      onMouseLeave={() => setPosition(null)}
       onFocusCapture={show}
       onBlurCapture={() => setPosition(null)}
     >

@@ -58,6 +58,26 @@ export class ProfileStore {
     })
   }
 
+  exportAll(): Promise<ConnectionProfile[]> {
+    return this.runExclusive(async () => {
+      const document = await this.readDocument()
+      return document.profiles.map((profile) => ({
+        ...this.toPublicProfile(profile),
+        password: this.decryptPassword(profile),
+      }))
+    })
+  }
+
+  replaceAll(profiles: ConnectionProfile[]): Promise<void> {
+    return this.runExclusive(async () => {
+      const stored = profiles.map((profile) => ({
+        ...this.toStoredProfile(profile),
+        updatedAt: profile.updatedAt,
+      }))
+      await this.writeDocument({ version: 1, profiles: stored })
+    })
+  }
+
   async get(profileId: string): Promise<ConnectionProfile | undefined> {
     return this.runExclusive(async () => {
       const document = await this.readDocument()

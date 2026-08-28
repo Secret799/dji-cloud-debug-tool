@@ -216,6 +216,75 @@ export interface OperationResult {
   error?: string
 }
 
+export type AppUpdateStatus =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'not-available'
+  | 'downloading'
+  | 'downloaded'
+  | 'error'
+  | 'unsupported'
+
+export interface AppUpdateState {
+  status: AppUpdateStatus
+  currentVersion: string
+  availableVersion?: string
+  releaseName?: string
+  releaseNotes?: string
+  releaseUrl?: string
+  progress?: number
+  error?: string
+}
+
+export type WebDavAuthType = 'basic' | 'digest' | 'token'
+
+export interface WebDavConfig {
+  endpoint: string
+  authType: WebDavAuthType
+  username: string
+  secret: string
+  hasStoredSecret?: boolean
+  clearStoredSecret?: boolean
+  rejectUnauthorized: boolean
+  updatedAt: number
+}
+
+export interface WebDavVersion {
+  id: string
+  revision: number
+  createdAt: number
+  size: number
+  appVersion?: string
+}
+
+export interface WebDavActivity {
+  id: string
+  type: 'upload' | 'restore' | 'delete'
+  revision: number
+  at: number
+}
+
+export interface WebDavOverview {
+  configured: boolean
+  connected: boolean
+  config?: WebDavConfig
+  localVersion?: WebDavVersion
+  cloudVersion?: WebDavVersion
+  versions: WebDavVersion[]
+  activities: WebDavActivity[]
+  error?: string
+}
+
+export interface WebDavSyncRequest {
+  rendererStorage: Record<string, string>
+}
+
+export interface WebDavRestoreResult extends OperationResult {
+  rendererStorage?: Record<string, string>
+  overview?: WebDavOverview
+}
+
 export interface ExportMessageOptions {
   profileName: string
   records: MqttMessageRecord[]
@@ -390,6 +459,24 @@ export interface DjiDesktopApi {
     pickPackage: () => Promise<FirmwarePackagePickResult>
     uploadPackage: (request: FirmwareUploadRequest) => Promise<FirmwareUploadResult>
     onUploadProgress: (listener: (progress: FirmwareUploadProgress) => void) => () => void
+  }
+  updates: {
+    getState: () => Promise<AppUpdateState>
+    check: () => Promise<AppUpdateState>
+    download: () => Promise<OperationResult>
+    openInstaller: () => Promise<OperationResult>
+    onStateChange: (listener: (state: AppUpdateState) => void) => () => void
+  }
+  webdav: {
+    getOverview: () => Promise<WebDavOverview>
+    saveConfig: (config: WebDavConfig) => Promise<WebDavOverview>
+    removeConfig: () => Promise<OperationResult>
+    test: (config?: WebDavConfig) => Promise<OperationResult>
+    sync: (request: WebDavSyncRequest) => Promise<WebDavOverview>
+    changed: (request: WebDavSyncRequest) => Promise<void>
+    restore: (versionId: string) => Promise<WebDavRestoreResult>
+    removeVersion: (versionId: string) => Promise<WebDavOverview>
+    onRemoteDataApplied: (listener: (rendererStorage: Record<string, string>) => void) => () => void
   }
   events: {
     onRuntimeEvent: (listener: (event: MqttRuntimeEvent) => void) => () => void

@@ -32,6 +32,30 @@ export class ObjectStorageStore {
     })
   }
 
+  exportAll(): Promise<ObjectStorageProfile[]> {
+    return this.runExclusive(async () => {
+      const document = await this.readDocument()
+      return document.profiles.map((profile) => ({
+        ...this.toPublicProfile(profile),
+        accessKeySecret: this.decrypt(profile.encryptedAccessKeySecret, 'Access Key Secret'),
+        securityToken: this.decrypt(profile.encryptedSecurityToken, 'Security Token'),
+      }))
+    })
+  }
+
+  replaceAll(profiles: ObjectStorageProfile[]): Promise<void> {
+    return this.runExclusive(async () => {
+      const stored = profiles.map((profile) => ({
+        ...this.toStoredProfile(profile),
+        updatedAt: profile.updatedAt,
+      }))
+      if (stored.some((profile) => !profile.encryptedAccessKeySecret)) {
+        throw new Error('备份中的对象存储配置缺少 Access Key Secret')
+      }
+      await this.writeDocument({ version: 1, profiles: stored })
+    })
+  }
+
   resolve(profileId: string): Promise<ObjectStorageProfile | undefined> {
     return this.runExclusive(async () => {
       const document = await this.readDocument()

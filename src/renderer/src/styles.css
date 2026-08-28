@@ -199,14 +199,10 @@ textarea {
 }
 
 .brand-mark {
-  display: grid;
   width: 30px;
   height: 30px;
-  place-items: center;
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
-  color: var(--accent);
-  background: var(--surface-soft);
+  flex: 0 0 30px;
+  object-fit: contain;
 }
 
 .brand-block > div {
@@ -415,6 +411,29 @@ textarea {
   color: var(--accent);
   background: var(--accent-soft);
   box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.app-rail button.sync-enabled:not(.active) {
+  color: var(--green);
+}
+
+.app-rail button.sync-enabled.sync-unavailable:not(.active) {
+  color: var(--amber);
+}
+
+.rail-sync-indicator {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--rail);
+  border-radius: 50%;
+  background: var(--green);
+}
+
+.sync-unavailable .rail-sync-indicator {
+  background: var(--amber);
 }
 
 .rail-badge {
@@ -1152,6 +1171,12 @@ textarea {
   color: var(--muted);
   background: var(--bg);
   font-size: 13px;
+}
+
+.app-loading-mark {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
 }
 
 /* Overview */
@@ -3943,6 +3968,86 @@ textarea {
   margin: 0;
   font-size: 12px;
   line-height: 1.6;
+}
+
+/* DJI configuration */
+.dji-config-content {
+  overflow: hidden;
+}
+
+.dji-config-center {
+  display: grid;
+  grid-template-rows: 58px minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.dji-config-tabs {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--surface);
+}
+
+.dji-config-tabs button {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  min-width: 210px;
+  min-height: 40px;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dji-config-tabs button:hover {
+  color: var(--text);
+  background: var(--surface-soft);
+}
+
+.dji-config-tabs button.active {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--line));
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.dji-config-tabs button > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dji-config-tabs strong,
+.dji-config-tabs small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dji-config-tabs strong {
+  font-size: 10px;
+}
+
+.dji-config-tabs small {
+  color: var(--muted-2);
+  font-size: 8px;
+}
+
+.dji-config-panel {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* Error code manager */
@@ -7034,15 +7139,10 @@ textarea {
 }
 
 .about-product-mark {
-  display: grid;
   width: 50px;
   height: 50px;
   flex: 0 0 50px;
-  place-items: center;
-  border: 1px solid var(--line-strong);
-  border-radius: 8px;
-  color: var(--accent);
-  background: var(--accent-soft);
+  object-fit: contain;
 }
 
 .about-product h3 {
@@ -7108,9 +7208,344 @@ textarea {
   color: var(--muted);
 }
 
+.about-update {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-soft);
+}
+
+.about-update.available,
+.about-update.downloaded {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+}
+
+.about-update-heading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.about-update-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.about-update.error .about-update-icon,
+.about-update.unsupported .about-update-icon {
+  color: var(--red);
+  background: var(--red-soft);
+}
+
+.about-update-heading > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.about-update-heading strong {
+  font-size: 11px;
+}
+
+.about-update-heading span,
+.about-update-notes,
+.about-update-error {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.about-update-progress {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--line);
+}
+
+.about-update-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 180ms ease;
+}
+
+.about-update-notes,
+.about-update-error {
+  max-height: 92px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+.about-update-error {
+  color: var(--red);
+}
+
+.about-update-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.about-update-actions > span {
+  flex: 1;
+}
+
+.about-update-actions a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  font-size: 10px;
+  text-decoration: none;
+}
+
+.about-update-actions a:hover {
+  text-decoration: underline;
+}
+
 .about-footer span {
   color: var(--muted);
   font-size: 10px;
+}
+
+.settings-content {
+  overflow: hidden;
+}
+
+.settings-center {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg);
+}
+
+.settings-navigation {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 14px;
+  border-right: 1px solid var(--line);
+  background: var(--rail);
+}
+
+.settings-search {
+  display: flex;
+  height: 36px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--muted);
+  background: var(--surface);
+}
+
+.settings-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.settings-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 11px;
+}
+
+.settings-navigation nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-navigation nav button {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  min-height: 50px;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-navigation nav button:hover {
+  color: var(--text);
+  background: var(--surface-soft);
+}
+
+.settings-navigation nav button.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.settings-navigation nav button > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-navigation nav strong,
+.settings-navigation nav small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-navigation nav strong {
+  color: inherit;
+  font-size: 11px;
+}
+
+.settings-navigation nav small {
+  color: var(--muted-2);
+  font-size: 9px;
+}
+
+.settings-search-empty {
+  padding: 14px 9px;
+  color: var(--muted);
+  font-size: 10px;
+  text-align: center;
+}
+
+.settings-detail {
+  min-width: 0;
+  overflow: auto;
+  padding: 22px 26px 36px;
+}
+
+.settings-detail-header,
+.settings-group-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+.settings-detail-header {
+  width: min(820px, 100%);
+  margin: 0 auto 24px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-detail-header > span {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  border-radius: 7px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.settings-detail h2,
+.settings-detail h3,
+.settings-detail p {
+  margin: 0;
+}
+
+.settings-detail h2 {
+  font-size: 18px;
+}
+
+.settings-detail-header p,
+.settings-group-heading p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.settings-group {
+  display: flex;
+  width: min(820px, 100%);
+  margin: 0 auto;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.settings-group-heading {
+  padding: 0 2px;
+}
+
+.settings-group-heading > svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--accent);
+}
+
+.settings-group-heading h3 {
+  font-size: 12px;
+}
+
+.settings-control-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(280px, 1.4fr);
+  min-height: 72px;
+  align-items: center;
+  gap: 22px;
+  padding: 13px 15px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.settings-control-row > div:first-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-control-row strong {
+  font-size: 11px;
+}
+
+.settings-control-row span {
+  color: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-range-control {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.settings-range-control input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.settings-update-group .about-update {
+  border-radius: 7px;
 }
 
 .modal-header {
@@ -7987,6 +8422,386 @@ textarea {
   border-color: #b91c1c;
   color: #fff;
   background: #7f1d1d;
+}
+
+/* WebDAV data versions */
+.versions-content {
+  overflow: auto;
+}
+
+.data-versions-page {
+  width: min(1120px, 100%);
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 18px;
+}
+
+.webdav-account-band {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) 34px;
+  min-height: 90px;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 17px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+}
+
+.webdav-account-icon {
+  display: grid;
+  width: 50px;
+  height: 50px;
+  place-items: center;
+  border-radius: 7px;
+  color: var(--muted);
+  background: var(--surface-soft);
+}
+
+.webdav-account-band.connected .webdav-account-icon {
+  color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.webdav-account-band > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.webdav-state-label {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.webdav-account-band strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+}
+
+.webdav-account-band strong i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted-2);
+}
+
+.webdav-account-band.connected strong i {
+  background: var(--green);
+}
+
+.webdav-account-band small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webdav-overview-error {
+  margin-top: 10px;
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--red) 25%, var(--line));
+  border-radius: 6px;
+  color: var(--red);
+  background: var(--red-soft);
+  font-size: 10px;
+}
+
+.version-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.version-summary-item {
+  display: grid;
+  min-height: 92px;
+  align-content: center;
+  gap: 3px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+}
+
+.version-summary-item span,
+.version-summary-item time {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.version-summary-item strong {
+  font-size: 19px;
+  font-weight: 680;
+}
+
+.data-version-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 68px;
+  margin-top: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.data-version-actions > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.data-version-actions strong {
+  font-size: 13px;
+}
+
+.data-version-actions span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.data-version-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(250px, 0.8fr);
+  align-items: start;
+  gap: 12px;
+  padding-top: 12px;
+}
+
+.version-history-section,
+.version-activity-section {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+}
+
+.version-history-section > header,
+.version-activity-section > header {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 13px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-soft);
+  background: var(--surface-soft);
+  font-size: 11px;
+  font-weight: 680;
+}
+
+.version-history-list,
+.version-activity-list {
+  max-height: min(480px, calc(100vh - 390px));
+  min-height: 180px;
+  overflow: auto;
+}
+
+.version-history-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 70px 26px 26px;
+  min-height: 58px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 11px;
+  border-bottom: 1px solid var(--line);
+}
+
+.version-history-row:last-child {
+  border-bottom: 0;
+}
+
+.version-upload-icon,
+.version-activity-row > span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.version-history-row > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.version-history-row strong {
+  font-size: 11px;
+}
+
+.version-history-row small,
+.version-size {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.version-size {
+  text-align: right;
+}
+
+.danger-icon-button:hover:not(:disabled) {
+  color: var(--red);
+  background: var(--red-soft);
+}
+
+.version-empty {
+  display: flex;
+  min-height: 180px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--muted);
+}
+
+.version-empty strong {
+  color: var(--text-soft);
+  font-size: 11px;
+}
+
+.version-empty span,
+.activity-empty {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.version-activity-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  min-height: 54px;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  border-bottom: 1px solid var(--line);
+}
+
+.version-activity-row.restore > span {
+  color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.version-activity-row.delete > span {
+  color: var(--red);
+  background: var(--red-soft);
+}
+
+.version-activity-row > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.version-activity-row strong {
+  font-size: 10px;
+}
+
+.version-activity-row time {
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.activity-empty {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+}
+
+.webdav-settings-modal {
+  width: min(650px, 100%);
+}
+
+.webdav-settings-modal .modal-header > div {
+  min-width: 0;
+}
+
+.webdav-settings-modal .modal-header p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.webdav-secret-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  gap: 6px;
+}
+
+.webdav-secret-input .icon-button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line-strong);
+}
+
+.webdav-insecure-field {
+  min-height: 34px;
+}
+
+.webdav-test-result {
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--green) 25%, var(--line));
+  border-radius: 6px;
+  color: var(--green);
+  background: var(--green-soft);
+  font-size: 11px;
+}
+
+.webdav-settings-footer > div:first-child:empty {
+  display: none;
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+@media (max-width: 820px) {
+  .data-version-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .version-history-list,
+  .version-activity-list {
+    max-height: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .data-versions-page {
+    padding: 12px;
+  }
+
+  .version-summary-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .version-history-row {
+    grid-template-columns: 30px minmax(0, 1fr) 26px 26px;
+  }
+
+  .version-size {
+    display: none;
+  }
+
+  .webdav-settings-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .webdav-settings-footer .footer-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @keyframes toast-enter {

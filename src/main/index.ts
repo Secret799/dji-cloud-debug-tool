@@ -18,6 +18,9 @@ import {
   validateRtmpRelayStartRequest,
   validateSessionPassword,
   validateTopic,
+  validateWebDavConfig,
+  validateWebDavSyncRequest,
+  validateWebDavVersionId,
   validateWhepOfferRequest,
 } from './ipc-validation'
 import { MqttConnectionManager } from './mqtt-manager'
@@ -29,6 +32,13 @@ import { ObjectStorageStore } from './object-storage-store'
 import { RtmpRelayManager } from './rtmp-relay-manager'
 import { DeviceArchiveStore } from './device-archive-store'
 import { FirmwareUploadManager } from './firmware-upload-manager'
+import { AppUpdateManager } from './app-update-manager'
+import { WebDavConfigStore } from './webdav-config-store'
+import { WebDavBackupManager } from './webdav-backup-manager'
+
+const PRODUCT_NAME = 'DJI Cloud Studio'
+
+app.setName(PRODUCT_NAME)
 
 let mainWindow: BrowserWindow | null = null
 let profileStore: ProfileStore
@@ -39,8 +49,12 @@ let rtmpRelayManager: RtmpRelayManager
 let objectStorageStore: ObjectStorageStore
 let deviceArchiveStore: DeviceArchiveStore
 let firmwareUploadManager: FirmwareUploadManager
+let appUpdateManager: AppUpdateManager
+let webDavBackupManager: WebDavBackupManager
 let quitCleanupStarted = false
 let quitCleanupComplete = false
+
+const developmentIconPath = app.isPackaged ? undefined : join(__dirname, '../../build/icon.png')
 
 const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error))
 const operationFailure = (error: unknown): OperationResult => ({ ok: false, error: errorMessage(error) })
@@ -53,6 +67,7 @@ const createWindow = (): void => {
     minHeight: 680,
     show: false,
     backgroundColor: '#f4f5f2',
+    icon: developmentIconPath,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 18 },
     webPreferences: {
@@ -94,15 +109,18 @@ const createWindow = (): void => {
 
 const registerIpc = (): void => {
   ipcMain.handle(IPC_CHANNELS.profilesList, () => profileStore.list())
-  ipcMain.handle(IPC_CHANNELS.profilesSave, (_event, profile: unknown) =>
-    profileStore.save(validateConnectionProfile(profile)),
-  )
+  ipcMain.handle(IPC_CHANNELS.profilesSave, async (_event, profile: unknown) => {
+    const saved = await profileStore.save(validateConnectionProfile(profile))
+    webDavBackupManager.notifyLocalChange()
+    return saved
+  })
   ipcMain.handle(IPC_CHANNELS.profilesRemove, async (_event, rawProfileId: unknown) => {
     try {
       const profileId = validateProfileId(rawProfileId)
       await mqttManager.disconnect(profileId)
       const removed = await profileStore.remove(profileId)
       if (removed) await deviceArchiveStore.removeProfile(profileId)
+      if (removed) webDavBackupManager.notifyLocalChange()
       return removed ? { ok: true } : { ok: false, error: '未找到连接配置' }
     } catch (error) {
       return operationFailure(error)
@@ -113,7 +131,9 @@ const registerIpc = (): void => {
   ipcMain.handle(IPC_CHANNELS.deviceArchivesReplaceProfile, async (_event, rawProfileId: unknown, rawArchives: unknown) => {
     const profileId = validateProfileId(rawProfileId)
     if (!await profileStore.get(profileId)) throw new Error('设备档案对应的连接配置不存在')
-    return deviceArchiveStore.replaceProfile(profileId, validateDeviceArchives(profileId, rawArchives))
+    const archives = await deviceArchiveStore.replaceProfile(profileId, validateDeviceArchives(profileId, rawArchives))
+    webDavBackupManager.notifyLocalChange()
+    return archives
   })
   ipcMain.handle(IPC_CHANNELS.mqttRuntime, () => mqttManager.getRuntime())
   ipcMain.handle(IPC_CHANNELS.mqttConnect, async (_event, rawProfileId: unknown, rawSessionPassword?: unknown) => {
@@ -228,12 +248,15 @@ const registerIpc = (): void => {
   })
 
   ipcMain.handle(IPC_CHANNELS.mediaServersList, () => mediaServerStore.list())
-  ipcMain.handle(IPC_CHANNELS.mediaServersSave, (_event, rawProfile: unknown) =>
-    mediaServerStore.save(validateMediaServerProfile(rawProfile)),
-  )
+  ipcMain.handle(IPC_CHANNELS.mediaServersSave, async (_event, rawProfile: unknown) => {
+    const saved = await mediaServerStore.save(validateMediaServerProfile(rawProfile))
+    webDavBackupManager.notifyLocalChange()
+    return saved
+  })
   ipcMain.handle(IPC_CHANNELS.mediaServersRemove, async (_event, rawProfileId: unknown) => {
     try {
       const removed = await mediaServerStore.remove(validateProfileId(rawProfileId))
+      if (removed) webDavBackupManager.notifyLocalChange()
       return removed ? { ok: true } : { ok: false, error: '媒体服务配置不存在' }
     } catch (error) {
       return operationFailure(error)
@@ -268,12 +291,15 @@ const registerIpc = (): void => {
   })
 
   ipcMain.handle(IPC_CHANNELS.objectStorageList, () => objectStorageStore.list())
-  ipcMain.handle(IPC_CHANNELS.objectStorageSave, (_event, rawProfile: unknown) =>
-    objectStorageStore.save(validateObjectStorageProfile(rawProfile)),
-  )
+  ipcMain.handle(IPC_CHANNELS.objectStorageSave, async (_event, rawProfile: unknown) => {
+    const saved = await objectStorageStore.save(validateObjectStorageProfile(rawProfile))
+    webDavBackupManager.notifyLocalChange()
+    return saved
+  })
   ipcMain.handle(IPC_CHANNELS.objectStorageRemove, async (_event, rawProfileId: unknown) => {
     try {
       const removed = await objectStorageStore.remove(validateProfileId(rawProfileId))
+      if (removed) webDavBackupManager.notifyLocalChange()
       return removed ? { ok: true } : { ok: false, error: '对象存储配置不存在' }
     } catch (error) {
       return operationFailure(error)
@@ -301,9 +327,37 @@ const registerIpc = (): void => {
   ipcMain.handle(IPC_CHANNELS.firmwareUploadPackage, (_event, rawRequest: unknown) =>
     firmwareUploadManager.upload(validateFirmwareUploadRequest(rawRequest)),
   )
+  ipcMain.handle(IPC_CHANNELS.appUpdateState, () => appUpdateManager.getState())
+  ipcMain.handle(IPC_CHANNELS.appUpdateCheck, () => appUpdateManager.check())
+  ipcMain.handle(IPC_CHANNELS.appUpdateDownload, () => appUpdateManager.download())
+  ipcMain.handle(IPC_CHANNELS.appUpdateOpenInstaller, () => appUpdateManager.openInstaller())
+  ipcMain.handle(IPC_CHANNELS.webdavOverview, () => webDavBackupManager.getOverview())
+  ipcMain.handle(IPC_CHANNELS.webdavSaveConfig, (_event, rawConfig: unknown) =>
+    webDavBackupManager.saveConfig(validateWebDavConfig(rawConfig)),
+  )
+  ipcMain.handle(IPC_CHANNELS.webdavRemoveConfig, () => webDavBackupManager.removeConfig())
+  ipcMain.handle(IPC_CHANNELS.webdavTest, (_event, rawConfig?: unknown) =>
+    webDavBackupManager.test(rawConfig === undefined ? undefined : validateWebDavConfig(rawConfig)),
+  )
+  ipcMain.handle(IPC_CHANNELS.webdavSync, (_event, rawRequest: unknown) =>
+    webDavBackupManager.sync(validateWebDavSyncRequest(rawRequest)),
+  )
+  ipcMain.handle(IPC_CHANNELS.webdavChanged, (_event, rawRequest: unknown) => {
+    webDavBackupManager.notifyLocalChange(validateWebDavSyncRequest(rawRequest))
+  })
+  ipcMain.handle(IPC_CHANNELS.webdavRestore, (_event, rawVersionId: unknown) =>
+    webDavBackupManager.restore(validateWebDavVersionId(rawVersionId)),
+  )
+  ipcMain.handle(IPC_CHANNELS.webdavRemoveVersion, (_event, rawVersionId: unknown) =>
+    webDavBackupManager.removeVersion(validateWebDavVersionId(rawVersionId)),
+  )
 }
 
 app.whenReady().then(() => {
+  if (process.platform === 'darwin' && developmentIconPath) {
+    app.dock?.setIcon(developmentIconPath)
+  }
+
   profileStore = new ProfileStore()
   mqttManager = new MqttConnectionManager((event) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -322,8 +376,25 @@ app.whenReady().then(() => {
     }
   })
   deviceArchiveStore = new DeviceArchiveStore()
+  webDavBackupManager = new WebDavBackupManager(
+    new WebDavConfigStore(),
+    profileStore,
+    deviceArchiveStore,
+    mediaServerStore,
+    objectStorageStore,
+    () => mqttManager.disconnectAll(),
+    (rendererStorage) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(IPC_CHANNELS.webdavRemoteData, rendererStorage)
+      }
+    },
+  )
+  appUpdateManager = new AppUpdateManager((state) => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC_CHANNELS.appUpdateEvent, state)
+  })
   registerIpc()
   createWindow()
+  setTimeout(() => void appUpdateManager.check(), 5_000)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -341,6 +412,7 @@ app.on('before-quit', (event) => {
   quitCleanupStarted = true
 
   const cleanup = Promise.all([
+    webDavBackupManager ? webDavBackupManager.flushPending() : Promise.resolve(),
     mqttManager ? mqttManager.disconnectAll() : Promise.resolve(),
     mediaServerManager ? mediaServerManager.stopLocal().then(() => undefined) : Promise.resolve(),
     rtmpRelayManager ? rtmpRelayManager.close() : Promise.resolve(),

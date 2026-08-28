@@ -13,15 +13,15 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleAlert,
+  Cloud,
   Database,
   Download,
   Info,
   LayoutDashboard,
-  ListTree,
   MonitorPlay,
   Power,
-  RadioTower,
   Settings,
+  SlidersHorizontal,
   Unplug,
 } from 'lucide-react'
 import type {
@@ -37,9 +37,11 @@ import type {
   OperationResult,
   TopicSubscription,
   TelemetryLayoutConfig,
+  WebDavOverview,
 } from '../../shared/contracts'
 import { ConnectionModal } from './components/ConnectionModal'
 import { AboutModal } from './components/AboutModal'
+import { BrandLogo } from './components/BrandLogo'
 import { DeviceModal } from './components/DeviceModal'
 import { Sidebar } from './components/Sidebar'
 import { Tooltip } from './components/Tooltip'
@@ -61,9 +63,10 @@ import {
 } from './lib/dji'
 import { MediaCenter } from './views/MediaCenter'
 import { Overview } from './views/Overview'
-import { TelemetryManager } from './views/TelemetryManager'
-import { ErrorCodeManager } from './views/ErrorCodeManager'
+import { DjiConfigCenter } from './views/DjiConfigCenter'
 import { OssManager } from './views/OssManager'
+import { DataVersions } from './views/DataVersions'
+import { SettingsCenter } from './views/SettingsCenter'
 import { errorCodeStats, formatServiceError } from './lib/dji-error-codes'
 import { buildFirmwareEventReply } from './lib/dji-firmware'
 import {
@@ -83,15 +86,20 @@ import {
   objectStorageConfigIssues,
   objectStorageConfigToProfile,
 } from './lib/object-storage'
+import {
+  applyRendererStorageSnapshot,
+  notifyWebDavChanged,
+} from './lib/webdav-sync'
 
-type WorkspaceView = 'overview' | 'media' | 'oss' | 'errors' | 'telemetry'
+type WorkspaceView = 'overview' | 'media' | 'dji-config' | 'oss' | 'versions' | 'settings'
 
 const viewMeta: Record<WorkspaceView, { label: string; description: string }> = {
   overview: { label: '设备工作台', description: '设备状态与调试功能' },
   media: { label: '媒体中心', description: '外部视频源与本地流媒体' },
+  'dji-config': { label: '大疆配置', description: '遥测布局、物模型字段与错误码资料' },
   oss: { label: 'OSS 管理', description: '多个远程日志存储目标与临时凭证' },
-  errors: { label: '错误码管理', description: '上云回复码、机场 HMS 与常见问题' },
-  telemetry: { label: '遥测项管理', description: '遥测页签、指标顺序与字段说明' },
+  versions: { label: '云同步', description: 'WebDAV 加密同步与历史恢复' },
+  settings: { label: '设置', description: '应用偏好与版本管理' },
 }
 
 const statusCopy: Record<ConnectionStatus, string> = {
@@ -188,6 +196,7 @@ export default function App() {
   const [connectionEditor, setConnectionEditor] = useState<{ profile: ConnectionProfile; isNew: boolean } | null>(null)
   const [deviceEditor, setDeviceEditor] = useState<{ device: DjiDevice; isNew: boolean } | null>(null)
   const [aboutOpen, setAboutOpen] = useState(false)
+  const [webDavStatus, setWebDavStatus] = useState({ configured: false, connected: false })
   const [toast, setToast] = useState<{ id: number; text: string; tone: 'info' | 'success' | 'error' } | null>(null)
   const toastIdRef = useRef(0)
   const [loading, setLoading] = useState(true)
@@ -204,10 +213,31 @@ export default function App() {
   useEffect(() => {
     try {
       window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth))
+      notifyWebDavChanged()
     } catch {
       // The current window can still use the resized width when storage is unavailable.
     }
   }, [sidebarWidth])
+
+  useEffect(() => {
+    let disposed = false
+    notifyWebDavChanged()
+    void window.djiApi.webdav.getOverview().then((overview) => {
+      if (!disposed) setWebDavStatus({ configured: overview.configured, connected: overview.connected })
+    }).catch(() => undefined)
+    const unsubscribe = window.djiApi.webdav.onRemoteDataApplied((rendererStorage) => {
+      applyRendererStorageSnapshot(rendererStorage)
+      window.location.reload()
+    })
+    return () => {
+      disposed = true
+      unsubscribe()
+    }
+  }, [])
+
+  const handleWebDavOverview = useCallback((overview: WebDavOverview): void => {
+    setWebDavStatus({ configured: overview.configured, connected: overview.connected })
+  }, [])
 
   useEffect(() => {
     const fitSidebarToViewport = (): void => setSidebarWidth((current) => clampSidebarWidth(current))
@@ -1239,7 +1269,7 @@ export default function App() {
   }
 
   if (loading) {
-    return <div className="app-loading"><RadioTower size={28} /><span>正在加载工作台…</span></div>
+    return <div className="app-loading"><BrandLogo className="app-loading-mark" /><span>正在加载工作台…</span></div>
   }
 
   if (!activeProfile) {
@@ -1261,7 +1291,7 @@ export default function App() {
     <div className="app-shell">
       <header className="titlebar">
         <div className="brand-block">
-          <span className="brand-mark"><RadioTower size={18} /></span>
+          <BrandLogo className="brand-mark" />
           <div><strong>大疆云调试台</strong><small>DJI Cloud Studio</small></div>
         </div>
         <div className="titlebar-context">
@@ -1272,9 +1302,6 @@ export default function App() {
         <div className="titlebar-actions">
           <Tooltip label="导出全部消息">
             <button className="icon-button" onClick={() => void handleExport()}><Download size={16} /></button>
-          </Tooltip>
-          <Tooltip label="连接设置">
-            <button className="icon-button" onClick={() => setConnectionEditor({ profile: activeProfile, isNew: false })}><Settings size={16} /></button>
           </Tooltip>
           <button className={`button connection-button ${connected ? 'connected' : ''}`} disabled={profileMutationBusy} onClick={() => void handleConnectToggle()}>
             {connected ? <Unplug size={15} /> : <Power size={15} />}
@@ -1298,13 +1325,23 @@ export default function App() {
             <Tooltip label="OSS 管理">
               <button className={activeView === 'oss' ? 'active' : ''} onClick={() => setActiveView('oss')}><Database size={20} /></button>
             </Tooltip>
+            <Tooltip label="大疆配置">
+              <button className={activeView === 'dji-config' ? 'active' : ''} onClick={() => setActiveView('dji-config')}><SlidersHorizontal size={20} /></button>
+            </Tooltip>
           </div>
           <div className="rail-bottom">
-            <Tooltip label="错误码管理">
-              <button className={activeView === 'errors' ? 'active' : ''} onClick={() => setActiveView('errors')}><CircleAlert size={20} /></button>
+            <Tooltip label={webDavStatus.configured ? webDavStatus.connected ? '云同步已启用' : '云同步已启用，连接异常' : '云同步'}>
+              <button
+                aria-label="云同步"
+                className={`${activeView === 'versions' ? 'active' : ''} ${webDavStatus.configured ? `sync-enabled ${webDavStatus.connected ? '' : 'sync-unavailable'}` : ''}`.trim()}
+                onClick={() => setActiveView('versions')}
+              >
+                <Cloud size={20} />
+                {webDavStatus.configured && <span className="rail-sync-indicator" aria-hidden="true" />}
+              </button>
             </Tooltip>
-            <Tooltip label="遥测项管理">
-              <button className={activeView === 'telemetry' ? 'active' : ''} onClick={() => setActiveView('telemetry')}><ListTree size={20} /></button>
+            <Tooltip label="设置">
+              <button className={activeView === 'settings' ? 'active' : ''} onClick={() => setActiveView('settings')}><Settings size={20} /></button>
             </Tooltip>
             <Tooltip label="关于">
               <button onClick={() => setAboutOpen(true)}><Info size={20} /></button>
@@ -1385,16 +1422,20 @@ export default function App() {
                   <span>{activeRecords.length.toLocaleString()} 条消息</span>
                   <span>{activeTelemetry.length} 台已发现设备</span>
                 </div>
-              ) : activeView === 'errors' ? (
-                <div className="workspace-status">
-                  <span>{errorCodeStats.cloud} 条上云错误码</span>
-                  <span>{errorCodeStats.hms} 条 HMS 告警</span>
-                  <span>{errorCodeStats.faq} 条常见问题</span>
-                </div>
-              ) : activeView === 'telemetry' ? (
+              ) : activeView === 'dji-config' ? (
                 <div className="workspace-status">
                   <span>{Object.values(effectiveTelemetryLayout.devices).reduce((count, layout) => count + layout.fields.length, 0)} 个配置字段</span>
+                  <span>{errorCodeStats.cloud + errorCodeStats.hms + errorCodeStats.faq} 条错误码资料</span>
+                </div>
+              ) : activeView === 'versions' ? (
+                <div className="workspace-status">
+                  <span>AES-256-GCM 加密</span>
+                  <span>WebDAV 历史版本</span>
+                </div>
+              ) : activeView === 'settings' ? (
+                <div className="workspace-status">
                   <span>本地自动保存</span>
+                  <span>软件级配置</span>
                 </div>
               ) : (
                 <div className="workspace-status">
@@ -1447,12 +1488,21 @@ export default function App() {
                 onNotify={showToast}
               />
             )}
-            {activeView === 'errors' && <ErrorCodeManager />}
-            {activeView === 'telemetry' && (
-              <TelemetryManager
+            {activeView === 'versions' && <DataVersions onNotify={showToast} onOverviewChange={handleWebDavOverview} />}
+            {activeView === 'dji-config' && (
+              <DjiConfigCenter
                 config={effectiveTelemetryLayout}
                 onChange={handleTelemetryLayoutChange}
                 onNotify={showToast}
+              />
+            )}
+            {activeView === 'settings' && (
+              <SettingsCenter
+                sidebarWidth={sidebarWidth}
+                defaultSidebarWidth={DEFAULT_SIDEBAR_WIDTH}
+                minSidebarWidth={MIN_SIDEBAR_WIDTH}
+                maxSidebarWidth={MAX_SIDEBAR_WIDTH}
+                onSidebarWidthChange={setSidebarWidth}
               />
             )}
           </div>

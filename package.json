@@ -16,6 +16,7 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "npm run typecheck && electron-vite build",
+    "render:icon": "electron scripts/render-icon.cjs",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -24,6 +25,7 @@
     "smoke:toast": "npm run build && node scripts/toast-smoke.mjs",
     "smoke:logs": "npm run build && node scripts/remote-log-smoke.mjs",
     "smoke:mqtt": "npm run build && node scripts/mqtt-smoke.mjs",
+    "smoke:webdav": "npm run build && node scripts/webdav-smoke.mjs",
     "build:zlm": "bash scripts/build-zlmediakit-macos.sh",
     "ci:build:zlm:win": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/build-zlmediakit-windows.ps1",
     "release:verify": "npm test && npm run build",
@@ -37,6 +39,7 @@
     "@aws-sdk/lib-storage": "^3.1119.0",
     "@aws-sdk/s3-request-presigner": "^3.1119.0",
     "ali-oss": "^6.23.0",
+    "fast-xml-parser": "^5.11.1",
     "hls.js": "^1.7.1",
     "lucide-react": "^0.468.0",
     "mpegts.js": "^1.8.2",

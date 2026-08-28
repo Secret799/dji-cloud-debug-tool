@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title description">
+  <title id="title">DJI Cloud Studio logo</title>
+  <desc id="description">Four connected device nodes surrounding a terminal core.</desc>
+
+  <rect x="62" y="62" width="900" height="900" rx="218" fill="#20201e" stroke="#3b3b37" stroke-width="18"/>
+
+  <g fill="none" stroke="#f56a00" stroke-linecap="round" stroke-width="54">
+    <path d="M356 356 448 448"/>
+    <path d="m668 356-92 92"/>
+    <path d="m356 668 92-92"/>
+    <path d="m668 668-92-92"/>
+  </g>
+
+  <g fill="#20201e" stroke="#fff8f2" stroke-width="38">
+    <circle cx="296" cy="296" r="92"/>
+    <circle cx="728" cy="296" r="92"/>
+    <circle cx="296" cy="728" r="92"/>
+    <circle cx="728" cy="728" r="92"/>
+  </g>
+  <g fill="#f56a00">
+    <circle cx="296" cy="296" r="25"/>
+    <circle cx="728" cy="296" r="25"/>
+    <circle cx="296" cy="728" r="25"/>
+    <circle cx="728" cy="728" r="25"/>
+  </g>
+
+  <rect x="337" y="402" width="350" height="220" rx="76" fill="#f56a00"/>
+  <g fill="none" stroke="#fff8f2" stroke-linecap="round" stroke-linejoin="round" stroke-width="38">
+    <path d="m421 466 52 46-52 46"/>
+    <path d="M522 558h82"/>
+  </g>
+</svg>

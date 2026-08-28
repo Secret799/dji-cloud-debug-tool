@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC_CHANNELS } from '../shared/channels'
 import type {
+  AppUpdateState,
   ConnectionProfile,
   DeviceArchive,
   DjiDesktopApi,
@@ -15,6 +16,8 @@ import type {
   PublishRequest,
   RtmpRelayStartRequest,
   TelemetryLayoutConfig,
+  WebDavConfig,
+  WebDavSyncRequest,
   WhepOfferRequest,
 } from '../shared/contracts'
 
@@ -78,6 +81,32 @@ const api: DjiDesktopApi = {
       const handler = (_event: Electron.IpcRendererEvent, progress: FirmwareUploadProgress): void => listener(progress)
       ipcRenderer.on(IPC_CHANNELS.firmwareUploadProgress, handler)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.firmwareUploadProgress, handler)
+    },
+  },
+  updates: {
+    getState: () => ipcRenderer.invoke(IPC_CHANNELS.appUpdateState),
+    check: () => ipcRenderer.invoke(IPC_CHANNELS.appUpdateCheck),
+    download: () => ipcRenderer.invoke(IPC_CHANNELS.appUpdateDownload),
+    openInstaller: () => ipcRenderer.invoke(IPC_CHANNELS.appUpdateOpenInstaller),
+    onStateChange: (listener: (state: AppUpdateState) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, state: AppUpdateState): void => listener(state)
+      ipcRenderer.on(IPC_CHANNELS.appUpdateEvent, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.appUpdateEvent, handler)
+    },
+  },
+  webdav: {
+    getOverview: () => ipcRenderer.invoke(IPC_CHANNELS.webdavOverview),
+    saveConfig: (config: WebDavConfig) => ipcRenderer.invoke(IPC_CHANNELS.webdavSaveConfig, config),
+    removeConfig: () => ipcRenderer.invoke(IPC_CHANNELS.webdavRemoveConfig),
+    test: (config?: WebDavConfig) => ipcRenderer.invoke(IPC_CHANNELS.webdavTest, config),
+    sync: (request: WebDavSyncRequest) => ipcRenderer.invoke(IPC_CHANNELS.webdavSync, request),
+    changed: (request: WebDavSyncRequest) => ipcRenderer.invoke(IPC_CHANNELS.webdavChanged, request),
+    restore: (versionId: string) => ipcRenderer.invoke(IPC_CHANNELS.webdavRestore, versionId),
+    removeVersion: (versionId: string) => ipcRenderer.invoke(IPC_CHANNELS.webdavRemoveVersion, versionId),
+    onRemoteDataApplied: (listener: (rendererStorage: Record<string, string>) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, rendererStorage: Record<string, string>): void => listener(rendererStorage)
+      ipcRenderer.on(IPC_CHANNELS.webdavRemoteData, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.webdavRemoteData, handler)
     },
   },
   events: {
