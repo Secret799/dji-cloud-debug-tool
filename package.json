@@ -78,6 +78,8 @@
         "zip"
       ],
       "hardenedRuntime": true,
+      "forceCodeSigning": true,
+      "notarize": true,
       "extraResources": [
         {
           "from": "vendor/zlmediakit/${arch}",
