@@ -9,3 +9,5 @@ build/icon.iconset/
 .env
 .env.*
 !.env.example
+
+.idea
