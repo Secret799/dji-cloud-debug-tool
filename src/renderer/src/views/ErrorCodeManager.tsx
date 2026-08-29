@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { CircleAlert, CircleHelp, Search, Siren } from 'lucide-react'
+import type { DeviceProvider } from '../../../shared/contracts'
 import {
   cloudErrorCodes,
   commonIssues,
@@ -8,8 +9,15 @@ import {
   hmsDecimalCode,
   hmsErrorCodes,
 } from '../lib/dji-error-codes'
+import {
+  superDockErrorCodeData,
+  superDockErrorCodeStats,
+  superDockHmsErrors,
+  superDockTaskErrors,
+  superDockWaylineInterrupts,
+} from '../lib/superdock-error-codes'
 
-type ErrorCodeSection = 'cloud' | 'hms' | 'faq'
+type ErrorCodeSection = 'cloud' | 'hms' | 'faq' | 'task' | 'wayline'
 
 interface DetailField {
   label: string
@@ -25,16 +33,40 @@ interface ErrorCodeRecord {
   fields: DetailField[]
 }
 
-const sectionMeta: Record<ErrorCodeSection, { label: string; count: number; icon: typeof CircleAlert }> = {
-  cloud: { label: '上云错误码', count: errorCodeStats.cloud, icon: CircleAlert },
-  hms: { label: '机场 HMS', count: errorCodeStats.hms, icon: Siren },
-  faq: { label: '常见问题', count: errorCodeStats.faq, icon: CircleHelp },
+interface ErrorCodeSectionMeta {
+  label: string
+  count: number
+  icon: typeof CircleAlert
+  sourceLabel: string
+  sourceUrl?: string
+  attribution: string
+}
+
+const djiSectionMeta: Partial<Record<ErrorCodeSection, ErrorCodeSectionMeta>> = {
+  cloud: { label: '上云错误码', count: errorCodeStats.cloud, icon: CircleAlert, sourceLabel: errorCodeData.source.fileName, attribution: errorCodeData.source.attribution },
+  hms: { label: '机场 HMS', count: errorCodeStats.hms, icon: Siren, sourceLabel: errorCodeData.source.fileName, attribution: errorCodeData.source.attribution },
+  faq: { label: '常见问题', count: errorCodeStats.faq, icon: CircleHelp, sourceLabel: errorCodeData.source.fileName, attribution: errorCodeData.source.attribution },
+}
+
+const superDockSectionMeta: Partial<Record<ErrorCodeSection, ErrorCodeSectionMeta>> = {
+  task: {
+    label: '任务错误码', count: superDockErrorCodeStats.task, icon: CircleAlert,
+    sourceLabel: superDockErrorCodeData.source.name, sourceUrl: superDockErrorCodeData.source.taskErrorsUrl, attribution: superDockErrorCodeData.source.attribution,
+  },
+  hms: {
+    label: '机场 HMS', count: superDockErrorCodeStats.hms, icon: Siren,
+    sourceLabel: superDockErrorCodeData.source.name, sourceUrl: superDockErrorCodeData.source.hmsUrl, attribution: superDockErrorCodeData.source.attribution,
+  },
+  wayline: {
+    label: '航线中断', count: superDockErrorCodeStats.wayline, icon: CircleHelp,
+    sourceLabel: superDockErrorCodeData.source.name, sourceUrl: superDockErrorCodeData.source.waylineInterruptsUrl, attribution: superDockErrorCodeData.source.attribution,
+  },
 }
 
 const searchable = (values: Array<string | null | undefined>): string =>
   values.filter(Boolean).join(' ').toLocaleLowerCase()
 
-const recordsBySection: Record<ErrorCodeSection, ErrorCodeRecord[]> = {
+const djiRecordsBySection: Partial<Record<ErrorCodeSection, ErrorCodeRecord[]>> = {
   cloud: cloudErrorCodes.map((entry) => ({
     key: `cloud:${entry.code}`,
     code: entry.code,
@@ -96,20 +128,74 @@ const recordsBySection: Record<ErrorCodeSection, ErrorCodeRecord[]> = {
   })),
 }
 
+const superDockTaskGuidance = (code: string): string => {
+  if (/^60\d{4}$/.test(code)) return '检查飞行器状态、网络连接和任务参数设置。'
+  if (/^62\d{4}$/.test(code)) return '检查机场硬件状态、电源、网络、RTK 和天气条件；无法排除时联系草莓创新售后。'
+  if (/^64\d{4}$/.test(code)) return '检查遥控器 MSDK 航线加载、任务参数和起飞条件。'
+  return '该类错误兼容大疆上云 API 标准，可结合设备状态和大疆官方对应错误说明排查。'
+}
+
+const superDockRecordsBySection: Partial<Record<ErrorCodeSection, ErrorCodeRecord[]>> = {
+  task: superDockTaskErrors.map((entry, index) => ({
+    key: `task:${entry.code}:${entry.name}:${index}`,
+    code: entry.code,
+    title: entry.description,
+    subtitle: entry.name,
+    searchText: searchable([entry.code, entry.name, entry.description, superDockTaskGuidance(entry.code)]),
+    fields: [
+      { label: '错误名称', value: entry.name },
+      { label: '错误说明', value: entry.description },
+      { label: '处理建议', value: superDockTaskGuidance(entry.code) },
+    ],
+  })),
+  hms: superDockHmsErrors.map((entry) => ({
+    key: `hms:${entry.code}`,
+    code: entry.code,
+    title: entry.message,
+    subtitle: 'SuperDock 机场健康告警',
+    searchText: searchable([entry.code, entry.name, entry.message, entry.english]),
+    fields: [
+      { label: '告警文案', value: entry.message },
+      { label: '英文文案', value: entry.english },
+      { label: '原始标识', value: entry.name },
+    ],
+  })),
+  wayline: superDockWaylineInterrupts.map((entry, index) => ({
+    key: `wayline:${entry.code}:${entry.name}:${index}`,
+    code: entry.code,
+    title: entry.description,
+    subtitle: entry.name,
+    searchText: searchable([entry.code, entry.name, entry.description]),
+    fields: [
+      { label: '中断名称', value: entry.name },
+      { label: '中断说明', value: entry.description },
+    ],
+  })),
+}
+
 const linkify = (value: string): ReactNode[] => value.split(/(https?:\/\/[^\s]+)/g).map((part, index) =>
   /^https?:\/\//.test(part)
     ? <a href={part} target="_blank" rel="noreferrer" key={`${part}:${index}`}>{part}</a>
     : part,
 )
 
-export function ErrorCodeManager() {
-  const [section, setSection] = useState<ErrorCodeSection>('cloud')
+interface ErrorCodeManagerProps {
+  provider?: DeviceProvider
+}
+
+export function ErrorCodeManager({ provider = 'dji' }: ErrorCodeManagerProps) {
+  const sectionMeta = provider === 'superdock' ? superDockSectionMeta : djiSectionMeta
+  const recordsBySection = provider === 'superdock' ? superDockRecordsBySection : djiRecordsBySection
+  const sectionKeys = Object.keys(sectionMeta) as ErrorCodeSection[]
+  const defaultSection: ErrorCodeSection = provider === 'superdock' ? 'task' : 'cloud'
+  const [section, setSection] = useState<ErrorCodeSection>(defaultSection)
   const [query, setQuery] = useState('')
   const [selectedKey, setSelectedKey] = useState('')
   const normalizedQuery = query.trim().toLocaleLowerCase()
+  const activeMeta = (sectionMeta[section] ?? sectionMeta[defaultSection]) as ErrorCodeSectionMeta
   const records = useMemo(
-    () => recordsBySection[section].filter((entry) => !normalizedQuery || entry.searchText.includes(normalizedQuery)),
-    [normalizedQuery, section],
+    () => (recordsBySection[section] ?? []).filter((entry) => !normalizedQuery || entry.searchText.includes(normalizedQuery)),
+    [normalizedQuery, recordsBySection, section],
   )
   const selected = records.find((entry) => entry.key === selectedKey) ?? records[0]
 
@@ -122,8 +208,8 @@ export function ErrorCodeManager() {
     <div className="error-code-manager">
       <header className="error-code-toolbar">
         <div className="segmented error-code-segmented" aria-label="错误码分类">
-          {(Object.keys(sectionMeta) as ErrorCodeSection[]).map((key) => {
-            const meta = sectionMeta[key]
+          {sectionKeys.map((key) => {
+            const meta = sectionMeta[key] as ErrorCodeSectionMeta
             const Icon = meta.icon
             return (
               <button className={section === key ? 'active' : ''} onClick={() => selectSection(key)} key={key}>
@@ -145,7 +231,7 @@ export function ErrorCodeManager() {
       </header>
 
       <div className="error-code-layout">
-        <section className="error-code-list" aria-label={`${sectionMeta[section].label}列表`}>
+        <section className="error-code-list" aria-label={`${activeMeta.label}列表`}>
           {records.map((entry) => (
             <button
               className={`error-code-row ${selected?.key === entry.key ? 'selected' : ''}`}
@@ -177,8 +263,10 @@ export function ErrorCodeManager() {
                 ))}
               </div>
               <footer>
-                <span>数据来源：{errorCodeData.source.fileName}</span>
-                <span>{errorCodeData.source.attribution}</span>
+                <span>数据来源：{activeMeta.sourceLabel}</span>
+                {activeMeta.sourceUrl
+                  ? <a href={activeMeta.sourceUrl} target="_blank" rel="noreferrer">{activeMeta.attribution}</a>
+                  : <span>{activeMeta.attribution}</span>}
               </footer>
             </>
           ) : (

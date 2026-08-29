@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Cloud, Database, KeyRound, Plus, Save, ShieldCheck, Trash2 } from 'lucide-react'
+import { Cloud, Database, KeyRound, Plus, Save, Settings2, ShieldCheck, Trash2, X } from 'lucide-react'
 import type { ObjectStorageProfile, ObjectStorageProvider, OperationResult } from '../../../shared/contracts'
 import { createObjectStorageProfile, objectStorageProfileIssues } from '../lib/object-storage'
 import { SecretInput } from '../components/SecretInput'
@@ -30,6 +30,7 @@ const cloneProfile = (profile: ObjectStorageProfile): ObjectStorageProfile => ({
 
 export function OssManager({ profiles, selectedId, onSelect, onSave, onRemove, onNotify }: OssManagerProps) {
   const selected = profiles.find((profile) => profile.id === selectedId)
+  const [editorOpen, setEditorOpen] = useState(false)
   const [draft, setDraft] = useState<ObjectStorageProfile>(() => selected ? cloneProfile(selected) : createObjectStorageProfile())
   const [expire, setExpire] = useState(selected?.expire ? String(selected.expire) : String(draft.expire))
   const [isNew, setIsNew] = useState(!selected)
@@ -80,7 +81,8 @@ export function OssManager({ profiles, selectedId, onSelect, onSave, onRemove, o
     setDraft(cloneProfile(profile))
     setExpire(String(profile.expire))
     setIsNew(false)
-    if (profile.id === selectedId) void resolveProfile(profile, generation)
+    setEditorOpen(true)
+    void resolveProfile(profile, generation)
   }
 
   const createProfile = (): void => {
@@ -89,6 +91,13 @@ export function OssManager({ profiles, selectedId, onSelect, onSave, onRemove, o
     setDraft(next)
     setExpire(String(next.expire))
     setIsNew(true)
+    setEditorOpen(true)
+  }
+
+  const closeEditor = (): void => {
+    if (saving) return
+    resolveGeneration.current += 1
+    setEditorOpen(false)
   }
 
   const handleSave = async (): Promise<void> => {
@@ -105,6 +114,8 @@ export function OssManager({ profiles, selectedId, onSelect, onSave, onRemove, o
       setDraft(cloneProfile(saved))
       setExpire(String(saved.expire))
       setIsNew(false)
+      onSelect(saved.id)
+      setEditorOpen(false)
       onNotify('对象存储配置已保存', 'success')
     } catch (error) {
       onNotify(error instanceof Error ? error.message : String(error), 'error')
@@ -121,8 +132,7 @@ export function OssManager({ profiles, selectedId, onSelect, onSave, onRemove, o
       const result = await onRemove(draft.id)
       if (!result.ok) throw new Error(result.error ?? '删除失败')
       onNotify('对象存储配置已删除', 'success')
-      const remaining = profiles.filter((profile) => profile.id !== draft.id)
-      if (!remaining.length) createProfile()
+      setEditorOpen(false)
     } catch (error) {
       onNotify(error instanceof Error ? error.message : String(error), 'error')
     } finally {
@@ -133,88 +143,124 @@ export function OssManager({ profiles, selectedId, onSelect, onSave, onRemove, o
   const issues = objectStorageProfileIssues(draft)
 
   return (
-    <div className="oss-manager">
-      <aside className="oss-profile-panel">
-        <header>
-          <div><span>存储配置</span><strong>{profiles.length}</strong></div>
-          <Tooltip label="新增对象存储"><button className="icon-button small" onClick={createProfile}><Plus size={15} /></button></Tooltip>
-        </header>
-        <div className="oss-profile-list">
+    <div className="oss-center">
+      <aside className="oss-server-panel">
+        <div className="oss-server-actions">
+          <button className="button primary compact" type="button" onClick={createProfile}><Plus size={14} />添加 OSS 配置</button>
+        </div>
+        <div className="oss-server-list">
           {profiles.map((profile) => (
-            <button key={profile.id} className={`oss-profile-row ${!isNew && draft.id === profile.id ? 'selected' : ''}`} onClick={() => editProfile(profile)}>
+            <button key={profile.id} className={`oss-server-row ${selected?.id === profile.id ? 'selected' : ''}`} onClick={() => onSelect(profile.id)}>
               <span className={`oss-provider-icon ${profile.provider}`}><Database size={15} /></span>
-              <span><strong>{profile.name}</strong><small>{providerLabels[profile.provider]} · {profile.bucket}</small></span>
-              <i className={objectStorageProfileIssues(profile).length ? 'incomplete' : 'ready'} />
+              <span className="oss-server-copy"><strong>{profile.name}</strong><small>{profile.bucket || '未设置 Bucket'}</small></span>
+              <i className={`oss-config-state-dot ${objectStorageProfileIssues(profile).length ? 'incomplete' : 'ready'}`} title={objectStorageProfileIssues(profile).length ? '配置未完成' : '可以使用'} />
             </button>
           ))}
-          {!profiles.length && <div className="oss-profile-empty"><Database size={20} /><span>暂无对象存储配置</span></div>}
         </div>
       </aside>
-
-      <section className="oss-config-section">
-        <header className="oss-section-header">
-          <div className="oss-section-icon"><Database size={18} /></div>
-          <div><h2>{isNew ? '新增对象存储' : draft.name}</h2><span>{providerLabels[draft.provider]} · {draft.bucket || '未设置 Bucket'}</span></div>
-          <span className={`oss-config-status ${issues.length ? 'incomplete' : 'ready'}`}>{issues.length ? '配置未完成' : '可以使用'}</span>
-        </header>
-
-        <form className="oss-config-form" autoComplete="off" onSubmit={(event) => {
-          event.preventDefault()
-          void handleSave()
-        }}>
-          <div className="oss-form-group">
-            <div className="oss-form-group-title"><Cloud size={15} /><span>存储服务</span></div>
-            <div className="field-grid two-columns">
-              <label className="field"><span>配置名称</span><input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label>
-              <label className="field"><span>云存储厂商</span><select value={draft.provider} onChange={(event) => {
-                const provider = event.target.value as ObjectStorageProvider
-                setDraft((current) => ({ ...current, provider, ...providerDefaults[provider] }))
-              }}>{Object.entries(providerLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-              <label className="field"><span>Bucket</span><input value={draft.bucket} onChange={(event) => setDraft((current) => ({ ...current, bucket: event.target.value }))} /></label>
-              <label className="field"><span>Region</span><input value={draft.region} onChange={(event) => setDraft((current) => ({ ...current, region: event.target.value }))} placeholder={draft.provider === 'minio' ? '可留空' : 'cn-hangzhou'} /></label>
-              <label className="field oss-endpoint-field"><span>Endpoint</span><input value={draft.endpoint} onChange={(event) => setDraft((current) => ({ ...current, endpoint: event.target.value }))} placeholder="https://..." /></label>
+      {selected ? (
+        <div className="oss-service-workspace">
+          <section className="oss-service-config">
+            <div className="oss-service-config-inner">
+              <header className="oss-service-header">
+                <div>
+                  <span className={`oss-config-state-dot large ${objectStorageProfileIssues(selected).length ? 'incomplete' : 'ready'}`} />
+                  <div><h2>{selected.name}</h2><span>{providerLabels[selected.provider]} · {objectStorageProfileIssues(selected).length ? '配置未完成' : '可以使用'}</span></div>
+                </div>
+                <button className="icon-button" type="button" title="编辑 OSS 配置" aria-label="编辑 OSS 配置" onClick={() => editProfile(selected)}><Settings2 size={16} /></button>
+              </header>
+              <dl className="oss-detail-list">
+                <div><dt>Bucket</dt><dd>{selected.bucket || '未设置'}</dd></div>
+                <div><dt>Region</dt><dd>{selected.region || '未设置'}</dd></div>
+                <div className="wide"><dt>Endpoint</dt><dd>{selected.endpoint || '未设置'}</dd></div>
+                <div><dt>Access Key ID</dt><dd>{selected.accessKeyId || '未设置'}</dd></div>
+                <div><dt>Security Token</dt><dd>{selected.hasStoredSecurityToken ? '已加密保存' : '未设置'}</dd></div>
+                <div><dt>凭证过期时间</dt><dd>{selected.expire > 0 ? selected.expire : '不限制'}</dd></div>
+              </dl>
             </div>
-          </div>
-
-          <div className="oss-form-group">
-            <div className="oss-form-group-title"><KeyRound size={15} /><span>访问凭证</span></div>
-            <div className="field-grid two-columns">
-              <label className="field"><span>Access Key ID</span><input value={draft.accessKeyId} onChange={(event) => setDraft((current) => ({ ...current, accessKeyId: event.target.value }))} /></label>
-              <SecretInput
-                key={`${draft.id}:access-key-secret`}
-                label="Access Key Secret"
-                value={draft.accessKeySecret}
-                onChange={(accessKeySecret) => setDraft((current) => ({
-                  ...current,
-                  accessKeySecret,
-                  clearStoredAccessKeySecret: accessKeySecret ? false : Boolean(current.hasStoredAccessKeySecret),
-                }))}
-                placeholder={draft.clearStoredAccessKeySecret ? '请输入新密钥' : draft.hasStoredAccessKeySecret ? '已加密保存' : '必填'}
-              />
-              <SecretInput
-                key={`${draft.id}:security-token`}
-                label="Security Token"
-                value={draft.securityToken}
-                onChange={(securityToken) => setDraft((current) => ({
-                  ...current,
-                  securityToken,
-                  clearStoredSecurityToken: securityToken ? false : Boolean(current.hasStoredSecurityToken),
-                }))}
-                placeholder={draft.clearStoredSecurityToken ? '保存后清除' : draft.hasStoredSecurityToken ? '已加密保存' : '可选'}
-              />
-              <label className="field"><span>凭证过期时间戳</span><input inputMode="numeric" value={expire} onChange={(event) => setExpire(event.target.value)} placeholder="毫秒或秒时间戳" /></label>
+          </section>
+        </div>
+      ) : (
+        <div className="media-loading"><Database size={22} /><span>暂无 OSS 配置</span></div>
+      )}
+      {editorOpen && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && closeEditor()}>
+          <form
+            className="modal oss-config-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="oss-config-modal-title"
+            autoComplete="off"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void handleSave()
+            }}
+          >
+            <header className="modal-header">
+              <div><span className="eyebrow">OBJECT STORAGE</span><h2 id="oss-config-modal-title">{isNew ? '添加 OSS 配置' : '编辑 OSS 配置'}</h2></div>
+              <Tooltip label="关闭"><button className="icon-button" type="button" disabled={saving} onClick={closeEditor}><X size={17} /></button></Tooltip>
+            </header>
+            <div className="modal-body settings-form oss-config-modal-body">
+              <div className="oss-modal-summary">
+                <span className="oss-section-icon"><Database size={18} /></span>
+                <div><strong>{draft.name || '未命名配置'}</strong><span>{providerLabels[draft.provider]} · {draft.bucket || '未设置 Bucket'}</span></div>
+                <span className={`oss-config-status ${issues.length ? 'incomplete' : 'ready'}`}>{issues.length ? '配置未完成' : '可以使用'}</span>
+              </div>
+              <section className="oss-form-group">
+                <div className="oss-form-group-title"><Cloud size={15} /><span>存储服务</span></div>
+                <div className="field-grid two-columns">
+                  <label className="field"><span>配置名称</span><input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label>
+                  <label className="field"><span>云存储厂商</span><select value={draft.provider} onChange={(event) => {
+                    const provider = event.target.value as ObjectStorageProvider
+                    setDraft((current) => ({ ...current, provider, ...providerDefaults[provider] }))
+                  }}>{Object.entries(providerLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+                  <label className="field"><span>Bucket</span><input value={draft.bucket} onChange={(event) => setDraft((current) => ({ ...current, bucket: event.target.value }))} /></label>
+                  <label className="field"><span>Region</span><input value={draft.region} onChange={(event) => setDraft((current) => ({ ...current, region: event.target.value }))} placeholder={draft.provider === 'minio' ? '可留空' : 'cn-hangzhou'} /></label>
+                  <label className="field oss-endpoint-field"><span>Endpoint</span><input value={draft.endpoint} onChange={(event) => setDraft((current) => ({ ...current, endpoint: event.target.value }))} placeholder="https://..." /></label>
+                </div>
+              </section>
+              <section className="oss-form-group">
+                <div className="oss-form-group-title"><KeyRound size={15} /><span>访问凭证</span></div>
+                <div className="field-grid two-columns">
+                  <label className="field"><span>Access Key ID</span><input value={draft.accessKeyId} onChange={(event) => setDraft((current) => ({ ...current, accessKeyId: event.target.value }))} /></label>
+                  <SecretInput
+                    key={`${draft.id}:access-key-secret`}
+                    label="Access Key Secret"
+                    value={draft.accessKeySecret}
+                    onChange={(accessKeySecret) => setDraft((current) => ({
+                      ...current,
+                      accessKeySecret,
+                      clearStoredAccessKeySecret: accessKeySecret ? false : Boolean(current.hasStoredAccessKeySecret),
+                    }))}
+                    placeholder={draft.clearStoredAccessKeySecret ? '请输入新密钥' : draft.hasStoredAccessKeySecret ? '已加密保存' : '必填'}
+                  />
+                  <SecretInput
+                    key={`${draft.id}:security-token`}
+                    label="Security Token"
+                    value={draft.securityToken}
+                    onChange={(securityToken) => setDraft((current) => ({
+                      ...current,
+                      securityToken,
+                      clearStoredSecurityToken: securityToken ? false : Boolean(current.hasStoredSecurityToken),
+                    }))}
+                    placeholder={draft.clearStoredSecurityToken ? '保存后清除' : draft.hasStoredSecurityToken ? '已加密保存' : '可选'}
+                  />
+                  <label className="field"><span>凭证过期时间戳</span><input inputMode="numeric" value={expire} onChange={(event) => setExpire(event.target.value)} placeholder="毫秒或秒时间戳" /></label>
+                </div>
+              </section>
+              <div className="oss-modal-security"><ShieldCheck size={14} /><span>密钥由应用内 AES-256-GCM 加密保存</span></div>
             </div>
-          </div>
-
-          <footer className="oss-config-footer">
-            <span><ShieldCheck size={14} />密钥由应用内 AES-256-GCM 加密保存</span>
-            <div className="oss-config-actions">
+            <footer className="modal-footer">
               {!isNew && <button className="button danger-ghost" type="button" disabled={saving} onClick={() => void handleRemove()}><Trash2 size={14} />删除</button>}
-              <button className="button primary" type="submit" disabled={saving}><Save size={14} />{saving ? '保存中' : '保存配置'}</button>
-            </div>
-          </footer>
-        </form>
-      </section>
+              {isNew && <span />}
+              <div className="footer-actions">
+                <button className="button secondary" type="button" disabled={saving} onClick={closeEditor}>取消</button>
+                <button className="button primary" type="submit" disabled={saving}><Save size={14} />{saving ? '保存中' : '保存配置'}</button>
+              </div>
+            </footer>
+          </form>
+        </div>
+      )}
     </div>
   )
 }

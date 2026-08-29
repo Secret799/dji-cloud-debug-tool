@@ -814,9 +814,12 @@ export const createProfile = (): ConnectionProfile => {
   }
 }
 
+export const defaultDeviceName = (type: DeviceType): string =>
+  type === 'dock' ? '新机场' : type === 'aircraft' ? '新飞机' : '新遥控器'
+
 export const createDevice = (type: DeviceType = 'dock', provider: DeviceProvider = 'dji'): DjiDevice => ({
   id: crypto.randomUUID(),
-  name: type === 'dock' ? '新机场' : type === 'aircraft' ? '新飞机' : '新 Pilot',
+  name: defaultDeviceName(type),
   sn: '',
   type,
   provider: type === 'dock' ? provider : 'dji',

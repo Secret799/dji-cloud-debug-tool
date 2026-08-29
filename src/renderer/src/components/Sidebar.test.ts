@@ -5,6 +5,7 @@ import {
   aircraftPowerState,
   deviceContextMenuPosition,
   devicesForTree,
+  filterVisibleDevices,
   subscriptionsByParentDevice,
 } from './Sidebar'
 
@@ -78,6 +79,29 @@ describe('devicesForTree', () => {
 
     expect(result.map(({ sn }) => sn)).toEqual(['DOCK-A', 'AIR-1'])
     expect(result[1].parentSn).toBeUndefined()
+  })
+})
+
+describe('filterVisibleDevices', () => {
+  it('keeps all devices when the enabled-only filter is off', () => {
+    const devices = [
+      device('DOCK-A', '机场 A', 'dock'),
+      { ...device('DOCK-B', '机场 B', 'dock'), enabled: false },
+    ]
+
+    expect(filterVisibleDevices(devices, false)).toEqual(devices)
+  })
+
+  it('hides explicitly and inherited disabled devices', () => {
+    const devices = [
+      { ...device('DOCK-A', '机场 A', 'dock'), enabled: false },
+      device('AIR-A', '飞机 A', 'aircraft', 'DOCK-A'),
+      device('DOCK-B', '机场 B', 'dock'),
+      { ...device('AIR-B', '飞机 B', 'aircraft', 'DOCK-B'), enabled: false },
+      device('AIR-C', '飞机 C', 'aircraft', 'DOCK-B'),
+    ]
+
+    expect(filterVisibleDevices(devices, true).map((item) => item.sn)).toEqual(['DOCK-B', 'AIR-C'])
   })
 })
 

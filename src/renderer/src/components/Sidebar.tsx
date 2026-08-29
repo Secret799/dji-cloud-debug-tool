@@ -5,6 +5,8 @@ import {
   CheckCheck,
   ChevronDown,
   ChevronRight,
+  Eye,
+  EyeOff,
   Lock,
   MoreHorizontal,
   Plane,
@@ -143,6 +145,9 @@ export const devicesForTree = (
   ]
 }
 
+export const filterVisibleDevices = (devices: DjiDevice[], enabledOnly: boolean): DjiDevice[] =>
+  enabledOnly ? devices.filter((device) => isDeviceEffectivelyEnabled(devices, device.sn)) : devices
+
 interface SubscriptionGroup {
   id: string
   label: string
@@ -235,6 +240,7 @@ export function Sidebar({
   onRemoveSubscription,
 }: SidebarProps) {
   const [devicesOpen, setDevicesOpen] = useState(true)
+  const [enabledDevicesOnly, setEnabledDevicesOnly] = useState(false)
   const [subscriptionsOpen, setSubscriptionsOpen] = useState(true)
   const [collapsedSubscriptionGroups, setCollapsedSubscriptionGroups] = useState<Set<string>>(() => new Set())
   const [newTopic, setNewTopic] = useState('')
@@ -244,6 +250,10 @@ export function Sidebar({
   const profile = profiles.find((item) => item.id === activeProfileId)
   const connected = statuses[activeProfileId] === 'connected'
   const devices = useMemo(() => devicesForTree(profile, telemetry), [profile, telemetry])
+  const visibleDevices = useMemo(
+    () => filterVisibleDevices(devices, enabledDevicesOnly),
+    [devices, enabledDevicesOnly],
+  )
   const subscriptionGroups = useMemo(
     () => profile ? subscriptionsByParentDevice(profile, devices) : [],
     [profile, devices],
@@ -367,25 +377,41 @@ export function Sidebar({
             {devicesOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             设备
           </span>
-          <Tooltip label="添加设备">
-            <button
-              className="icon-button small"
-              onClick={(event) => {
-                event.stopPropagation()
-                onAddDevice()
-              }}
-              disabled={!profile || busy}
-            >
-              <Plus size={15} />
-            </button>
-          </Tooltip>
+          <span className="device-heading-actions">
+            <Tooltip label={enabledDevicesOnly ? '显示全部设备' : '仅显示已启用设备'}>
+              <button
+                type="button"
+                className={`icon-button small ${enabledDevicesOnly ? 'active' : ''}`}
+                aria-pressed={enabledDevicesOnly}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setDeviceContextMenu(null)
+                  setEnabledDevicesOnly((value) => !value)
+                }}
+              >
+                {enabledDevicesOnly ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </Tooltip>
+            <Tooltip label="添加网关">
+              <button
+                className="icon-button small"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onAddDevice()
+                }}
+                disabled={!profile || busy}
+              >
+                <Plus size={15} />
+              </button>
+            </Tooltip>
+          </span>
         </div>
         {devicesOpen && (
           <div className="device-tree">
-            {devices.length === 0 ? (
-              <div className="sidebar-empty">暂无设备</div>
+            {visibleDevices.length === 0 ? (
+              <div className="sidebar-empty">{enabledDevicesOnly ? '暂无已启用设备' : '暂无设备'}</div>
             ) : (
-              devices.map((device) => {
+              visibleDevices.map((device) => {
                 const runtime = telemetry.find((item) => item.sn === device.sn)
                 const recentlyReported = Boolean(runtime && Date.now() - runtime.lastSeenAt < 20_000)
                 const online = connected && recentlyReported

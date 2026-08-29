@@ -68,6 +68,7 @@ import { OssManager } from './views/OssManager'
 import { DataVersions } from './views/DataVersions'
 import { SettingsCenter } from './views/SettingsCenter'
 import { errorCodeStats, formatServiceError } from './lib/dji-error-codes'
+import { superDockErrorCodeStats } from './lib/superdock-error-codes'
 import { buildFirmwareEventReply } from './lib/dji-firmware'
 import {
   loadTelemetryLayout,
@@ -94,7 +95,7 @@ type WorkspaceView = 'overview' | 'media' | 'dji-config' | 'oss' | 'versions' | 
 const viewMeta: Record<WorkspaceView, { label: string; description: string }> = {
   overview: { label: '设备工作台', description: '设备状态与调试功能' },
   media: { label: '媒体中心', description: '外部视频源与本地流媒体' },
-  'dji-config': { label: '大疆配置', description: '遥测布局、物模型字段与错误码资料' },
+  'dji-config': { label: '监测项配置', description: '大疆与草莓设备的监测布局、物模型字段与错误码资料' },
   oss: { label: 'OSS 管理', description: '多个远程日志存储目标与临时凭证' },
   versions: { label: '云同步', description: 'WebDAV 加密同步与历史恢复' },
   settings: { label: '设置', description: '应用偏好与版本管理' },
@@ -801,7 +802,7 @@ export default function App() {
       saveTelemetryLayout(effectiveTelemetryLayout)
       setTelemetryLayout(effectiveTelemetryLayout)
     } catch (error) {
-      showToast(`保存遥测项配置失败：${errorMessage(error)}`, 'error')
+      showToast(`保存监测项配置失败：${errorMessage(error)}`, 'error')
     }
   }, [effectiveTelemetryLayout, telemetryLayout, showToast])
 
@@ -810,7 +811,7 @@ export default function App() {
       saveTelemetryLayout(next)
       setTelemetryLayout(next)
     } catch (error) {
-      showToast(`保存遥测项配置失败：${errorMessage(error)}`, 'error')
+      showToast(`保存监测项配置失败：${errorMessage(error)}`, 'error')
     }
   }
 
@@ -1403,7 +1404,7 @@ export default function App() {
             <Tooltip label="OSS 管理">
               <button className={activeView === 'oss' ? 'active' : ''} onClick={() => setActiveView('oss')}><Database size={20} /></button>
             </Tooltip>
-            <Tooltip label="大疆配置">
+            <Tooltip label="监测项配置">
               <button className={activeView === 'dji-config' ? 'active' : ''} onClick={() => setActiveView('dji-config')}><SlidersHorizontal size={20} /></button>
             </Tooltip>
           </div>
@@ -1503,7 +1504,7 @@ export default function App() {
               ) : activeView === 'dji-config' ? (
                 <div className="workspace-status">
                   <span>{Object.values(effectiveTelemetryLayout.devices).reduce((count, layout) => count + layout.fields.length, 0)} 个配置字段</span>
-                  <span>{errorCodeStats.cloud + errorCodeStats.hms + errorCodeStats.faq} 条错误码资料</span>
+                  <span>大疆 {errorCodeStats.total} 条 · 草莓 {superDockErrorCodeStats.total} 条错误项</span>
                 </div>
               ) : activeView === 'versions' ? (
                 <div className="workspace-status">

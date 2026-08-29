@@ -6,6 +6,7 @@ import {
   normalizeTelemetryFieldKey,
   reconcileTelemetryLayout,
   resolveTelemetryFieldMetadata,
+  telemetryFieldSupportsProvider,
 } from './telemetry-layout'
 
 describe('telemetry layout configuration', () => {
@@ -84,6 +85,20 @@ describe('telemetry layout configuration', () => {
         constraint: '{"min":0,"max":10}',
       },
     })).toMatchObject({ source: 'custom', metadata: { path: 'custom_control.level', accessMode: 'rw' } })
+  })
+
+  it('resolves dock metadata for the selected brand', () => {
+    expect(resolveTelemetryFieldMetadata('dock', 'air_transfer_enable', undefined, 'dji')).toMatchObject({
+      source: 'dji-dock2-dock3',
+      metadata: { label: '空中回传' },
+    })
+    expect(resolveTelemetryFieldMetadata('dock', 'air_transfer_enable', undefined, 'superdock')).toMatchObject({
+      source: 'superdock',
+      metadata: { label: '空中回传（无人机到机场）' },
+    })
+    expect(telemetryFieldSupportsProvider('dock', 'cloud_transfer_enable', 'dji')).toBe(false)
+    expect(telemetryFieldSupportsProvider('dock', 'cloud_transfer_enable', 'superdock')).toBe(true)
+    expect(telemetryFieldSupportsProvider('aircraft', 'rth_altitude', 'superdock')).toBe(false)
   })
 
   it('upgrades a legacy layout without replacing user configuration', () => {

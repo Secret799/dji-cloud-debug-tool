@@ -134,10 +134,10 @@ const parseDeviceLayout = (value: unknown, label: string): TelemetryDeviceLayout
 }
 
 export const parseTelemetryLayoutConfig = (value: unknown): TelemetryLayoutConfig => {
-  const config = record(value, '遥测项配置')
-  if (config.version !== 1) throw new Error('遥测项配置版本不受支持')
+  const config = record(value, '监测项配置')
+  if (config.version !== 1) throw new Error('监测项配置版本不受支持')
   if (typeof config.updatedAt !== 'number' || !Number.isFinite(config.updatedAt) || config.updatedAt < 0) {
-    throw new Error('遥测项配置更新时间无效')
+    throw new Error('监测项配置更新时间无效')
   }
   const devices = record(config.devices, '设备遥测配置')
   return {

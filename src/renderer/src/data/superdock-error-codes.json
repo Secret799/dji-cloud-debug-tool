@@ -1,0 +1,7445 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "name": "SuperDock开发者文档",
+    "extractedOn": "2026-08-29",
+    "taskErrorsUrl": "https://docs.sb.im/api-integration/cloud-api/error-codes",
+    "hmsUrl": "https://docs.sb.im/api-integration/cloud-api/hms",
+    "waylineInterruptsUrl": "https://docs.sb.im/api-integration/cloud-api/wayline-interrupt-reasons",
+    "attribution": "草莓创新 SuperDock 官方开发者文档"
+  },
+  "taskErrors": [
+    {
+      "code": "321528",
+      "name": "CUSTOM_FLIGHT_AREA_BOUNDARY_PAUSED",
+      "description": "触碰自定义飞行区边界，航线任务已暂停"
+    },
+    {
+      "code": "337546",
+      "name": "CUSTOM_FLIGHT_AREA_BOUNDARY_REACHED",
+      "description": "已触碰自定义飞行区边界"
+    },
+    {
+      "code": "338006",
+      "name": "CUSTOM_FLIGHT_AREA_CONSTRAINT_VIOLATION",
+      "description": "无法执行飞行任务，请检查降落机场是否已申请解禁证书、是否位于自定义禁飞区或是否位于自定义飞行区外"
+    },
+    {
+      "code": "319028",
+      "name": "CUSTOM_FLIGHT_AREA_UPDATE_IN_PROGRESS",
+      "description": "正在更新自定义飞行区"
+    },
+    {
+      "code": "325010",
+      "name": "DOCK_CUSTOM_FLIGHT_AREA_UPDATE_IN_PROGRESS",
+      "description": "当前机场正在更新自定义飞行区，请稍后重试"
+    },
+    {
+      "code": "314018",
+      "name": "RTK_POSITIONING_ERROR",
+      "description": "RTK 定位异常"
+    },
+    {
+      "code": "316009",
+      "name": "LOW_BATTERY_BELOW_30_PERCENT",
+      "description": "飞行器电量低于30%"
+    },
+    {
+      "code": "316026",
+      "name": "EMERGENCY_STOP_BUTTON_PRESSED",
+      "description": "机场急停按钮被按下"
+    },
+    {
+      "code": "321770",
+      "name": "WRONG_GEAR_POSITION",
+      "description": "飞行器挡位错误"
+    },
+    {
+      "code": "321530",
+      "name": "FLIGHT_ROUTE_PLANNING_FAILED",
+      "description": "飞行航线过程中轨迹规划失败"
+    },
+    {
+      "code": "321773",
+      "name": "LOW_BATTERY_RETURN_DURING_MISSION",
+      "description": "飞行器执行飞行任务过程中低电量返航"
+    },
+    {
+      "code": "321775",
+      "name": "LOST_COMMUNICATION_DURING_FLIGHT",
+      "description": "飞行器航线飞行过程中失联"
+    },
+    {
+      "code": "322539",
+      "name": "ROUTE_BREAKPOINT_INFO_ERROR",
+      "description": "航线的断点信息错误"
+    },
+    {
+      "code": "322283",
+      "name": "USER_TRIGGERED_RETURN_DURING_MISSION",
+      "description": "机场执行飞行任务过程中被用户触发返航"
+    },
+    {
+      "code": "321784",
+      "name": "EMERGENCY_RETURN_DUE_TO_STRONG_WIND",
+      "description": "任务过程中遇到大风紧急返航"
+    },
+    {
+      "code": "322282",
+      "name": "INTERRUPTED_BY_USER_TAKEOVER",
+      "description": "机场执行飞行任务过程中被中断，飞行器被云端用户或遥控器接管"
+    },
+    {
+      "code": "336017",
+      "name": "INSUFFICIENT_BATTERY_FOR_MISSION",
+      "description": "飞行器电量不足以完成当前任务"
+    },
+    {
+      "code": "514134",
+      "name": "HEAVY_RAIN",
+      "description": "雨量过大"
+    },
+    {
+      "code": "514135",
+      "name": "WIND_SPEED_OVER_12_MPS",
+      "description": "风速大于12m/s"
+    },
+    {
+      "code": "514124",
+      "name": "FAILED_TO_GET_BATTERY_INFO",
+      "description": "获取飞行器电池信息失败"
+    },
+    {
+      "code": "514145",
+      "name": "ON_SITE_DEBUGGING_CANNOT_EXECUTE",
+      "description": "机场处于现场调试中，无法执行当前操作或执行飞行任务"
+    },
+    {
+      "code": "514146",
+      "name": "REMOTE_DEBUGGING_CANNOT_EXECUTE",
+      "description": "机场处于远程调试中，无法执行飞行任务"
+    },
+    {
+      "code": "514153",
+      "name": "DOCK_NOT_IDLE_REJECT_OPERATION",
+      "description": "机场不在空闲中，拒绝操作"
+    },
+    {
+      "code": "514173",
+      "name": "WEATHER_CONDITIONS_PREVENT_FLIGHT",
+      "description": "由于天气原因（环境温度低于5度并且降雨大于等于中雨）"
+    },
+    {
+      "code": "514101",
+      "name": "PUSH_ROD_CLOSE_FAILURE",
+      "description": "推杆闭合失败"
+    },
+    {
+      "code": "514102",
+      "name": "PUSH_ROD_OPEN_FAILURE",
+      "description": "推杆展开失败"
+    },
+    {
+      "code": "514107",
+      "name": "HATCH_OPEN_FAILURE",
+      "description": "舱盖开启失败"
+    },
+    {
+      "code": "514108",
+      "name": "HATCH_CLOSE_FAILURE",
+      "description": "舱盖关闭失败"
+    },
+    {
+      "code": "314015",
+      "name": "FAILED_TO_TRANSMIT_PRECISION_PHOTO_ROUTE",
+      "description": "机场传输精准复拍航线至飞行器失败"
+    },
+    {
+      "code": "314013",
+      "name": "FLIGHT_MISSION_DOWNLOAD_FAILED",
+      "description": "飞行任务下发失败，机场无法获取到本次飞行任务的航线"
+    },
+    {
+      "code": "314010",
+      "name": "UNKNOWN_ROUTE_EXECUTION_FAILURE",
+      "description": "航线执行失败，请重启机场后重试航线未知原因"
+    },
+    {
+      "code": "316020",
+      "name": "RTK_SIGNAL_SOURCE_ERROR",
+      "description": "飞行器使用的 RTK 信号源错误，请稍后重试"
+    },
+    {
+      "code": "316026",
+      "name": "EMERGENCY_STOP_BUTTON_PRESSED_CANNOT_EXECUTE",
+      "description": "机场急停按钮被按下，无法执行飞行任务，请释放急停按钮后重试"
+    },
+    {
+      "code": "514105",
+      "name": "BATTERY_STOP_CHARGING_FAILURE",
+      "description": "飞行器电池停止充电失败，请重启机场后重试"
+    },
+    {
+      "code": "514104",
+      "name": "BATTERY_START_CHARGING_FAILURE",
+      "description": "飞行器电池停止充电失败，请重启机场后重试"
+    },
+    {
+      "code": "514103",
+      "name": "BATTERY_BELOW_30_PERCENT_CANNOT_EXECUTE",
+      "description": "飞行器电量低于30%，无法执行飞行任务，请充电后重试（建议电量≥50%）"
+    },
+    {
+      "code": "514136",
+      "name": "AIRPORT_POWER_DISCONNECTED",
+      "description": "机场供电断开，机场无法执行飞行任务，请恢复机场供电后重试"
+    },
+    {
+      "code": "514142",
+      "name": "CANNOT_ESTABLISH_WIRED_CONNECTION",
+      "description": "飞行器起飞前，机场与飞行器无法建立有线连接，请检查飞行器是否在舱内，推杆闭合时是否被卡住，充电连接器是否脏污或损坏"
+    },
+    {
+      "code": "314019",
+      "name": "RTK_CANNOT_CONVERGE",
+      "description": "RTK无法收敛"
+    },
+    {
+      "code": "326005",
+      "name": "ENHANCED_IMAGE_TRANSMISSION_FAILURE",
+      "description": "操作失败，增强图传无法建立连接，请检查 4G 信号强度，或咨询运营商查询套餐流量和 APN 设置"
+    },
+    {
+      "code": "325003",
+      "name": "DEVICE_COMMAND_RESPONSE_ERROR",
+      "description": "设备端命令响应错误，请重试"
+    },
+    {
+      "code": "325004",
+      "name": "DEVICE_COMMAND_REQUEST_TIMEOUT",
+      "description": "设备端命令请求已超时，请重试"
+    },
+    {
+      "code": "327013",
+      "name": "PARAMETER_SETTING_FAILURE",
+      "description": "参数设置失败，请稍后重试"
+    },
+    {
+      "code": "321257",
+      "name": "DRONE_MISSION_ALREADY_STARTING",
+      "description": "任务正在执行"
+    },
+    {
+      "code": "319003",
+      "name": "DRONE_TASK_PARAM_ERROR_OR_NOT_READY",
+      "description": "该任务参数错误或者该任务还未进入ready队列"
+    },
+    {
+      "code": "319016",
+      "name": "DRONE_AUTO_LAND_IN_PROGRESS",
+      "description": "飞机在降落"
+    },
+    {
+      "code": "316010",
+      "name": "DRONE_AIRCRAFT_CONNECT_TIMEOUT",
+      "description": "等待飞机连接超时"
+    },
+    {
+      "code": "326005",
+      "name": "DRONE_LTE_CONFIGURATION_FAILED",
+      "description": "LTE链路设置失败"
+    },
+    {
+      "code": "326006",
+      "name": "DRONE_NOT_SUPPORTED_FOR_LTE",
+      "description": "当前机型不支持LTE链路设置"
+    },
+    {
+      "code": "514158",
+      "name": "DRONE_RTK_CONFIG_FAILED",
+      "description": "RTK设置失败"
+    },
+    {
+      "code": "314007",
+      "name": "DRONE_WAYPOINT_UPLOAD_FAILED",
+      "description": "上传航点文件失败"
+    },
+    {
+      "code": "316009",
+      "name": "DRONE_BATTERY_LOW_FOR_MISSION",
+      "description": "飞机电量低"
+    },
+    {
+      "code": "316012",
+      "name": "DRONE_TAKEOFF_BLOCKED_BY_HMS",
+      "description": "HMS未满足起飞条件"
+    },
+    {
+      "code": "314008",
+      "name": "DRONE_TAKEOFF_TIMEOUT_FOR_MISSION",
+      "description": "起飞执行超时"
+    },
+    {
+      "code": "321523",
+      "name": "DRONE_TAKEOFF_FAILED",
+      "description": "起飞失败"
+    },
+    {
+      "code": "321000",
+      "name": "DRONE_START_WAYPOINT_MISSION_FAILED",
+      "description": "启动航线失败"
+    },
+    {
+      "code": "386535",
+      "name": "DRONE_START_WAYPOINT_MISSION_TIMEOUT",
+      "description": "启动航线超时"
+    },
+    {
+      "code": "316015",
+      "name": "DRONE_GPS_LOCATION_TOO_FAR_FROM_DOCK",
+      "description": "GPS位置距离机场过远"
+    },
+    {
+      "code": "319999",
+      "name": "DRONE_MISSION_START_EXCEPTION",
+      "description": "起飞任务异常"
+    },
+    {
+      "code": "600001",
+      "name": "UNKNOWN_ROUTE_EXECUTION_FAILURE",
+      "description": "无人机起飞前自检失败，请查看HMS信息"
+    },
+    {
+      "code": "600002",
+      "name": "RTK_HAS_CONNECTED",
+      "description": "RTK 已连接"
+    },
+    {
+      "code": "600003",
+      "name": "RTK_POSITION_ILLEGAL",
+      "description": "RTK 位置非法"
+    },
+    {
+      "code": "600004",
+      "name": "COORDINATE_SYSTEM_NOT_SUPPORT",
+      "description": "坐标系统不支持"
+    },
+    {
+      "code": "600005",
+      "name": "RTK_NO_NETWORK",
+      "description": "RTK 无网络"
+    },
+    {
+      "code": "600006",
+      "name": "RTK_CUSTOM_NETWORK_SETTING_INVALID",
+      "description": "RTK 自定义网络设置无效"
+    },
+    {
+      "code": "600007",
+      "name": "RTK_INCORRECT_REFERENCE_STATION_SOURCE",
+      "description": "RTK 参考站源不正确"
+    },
+    {
+      "code": "600008",
+      "name": "FILE_TRANSFER_FAIL",
+      "description": "文件传输失败"
+    },
+    {
+      "code": "600009",
+      "name": "SDR_CHANGE_FAIL",
+      "description": "SDR 切换失败"
+    },
+    {
+      "code": "600010",
+      "name": "UPLOAD_PRECICSE_MISSION_FAIL",
+      "description": "上传精确任务失败"
+    },
+    {
+      "code": "600011",
+      "name": "LOCK_MOTOR_RECOVERY_FAIL",
+      "description": "锁定电机恢复失败"
+    },
+    {
+      "code": "600012",
+      "name": "LOCK_MOTOR_FAIL",
+      "description": "锁定电机失败"
+    },
+    {
+      "code": "600013",
+      "name": "UPLOAD_CANCEL_BY_USER",
+      "description": "用户取消上传"
+    },
+    {
+      "code": "600014",
+      "name": "MOTOR_STATE_ERROR",
+      "description": "电机状态错误"
+    },
+    {
+      "code": "600015",
+      "name": "PRECISE_FILE_MD5_CHECK_FAIL",
+      "description": "精确文件 MD5 校验失败"
+    },
+    {
+      "code": "600016",
+      "name": "FILE_NOT_EXIST",
+      "description": "文件不存在"
+    },
+    {
+      "code": "600017",
+      "name": "CANT_EXCUTE_IN_CURRENT_STATUS",
+      "description": "当前状态无法执行"
+    },
+    {
+      "code": "600018",
+      "name": "PARSE_RETURN_PACK_FAILED",
+      "description": "解析返回包失败"
+    },
+    {
+      "code": "600019",
+      "name": "INVALID_PARAM",
+      "description": "参数无效"
+    },
+    {
+      "code": "600020",
+      "name": "SEND_PACK_TIMEOUT",
+      "description": "发送包超时"
+    },
+    {
+      "code": "600021",
+      "name": "SEND_PACK_FAILED",
+      "description": "发送包失败"
+    },
+    {
+      "code": "600022",
+      "name": "SYSTEM_ERROR",
+      "description": "系统错误"
+    },
+    {
+      "code": "600023",
+      "name": "WAYLINE_INFO_ERROR",
+      "description": "航线信息错误"
+    },
+    {
+      "code": "600024",
+      "name": "NO_BREAK_INFO",
+      "description": "无断点信息"
+    },
+    {
+      "code": "600025",
+      "name": "CMD_INVALID",
+      "description": "命令无效"
+    },
+    {
+      "code": "600026",
+      "name": "RADIUS_LIMIT",
+      "description": "半径限制"
+    },
+    {
+      "code": "600027",
+      "name": "CANNOT_START_AT_CURRENT_RC_MODE",
+      "description": "当前遥控模式下无法启动"
+    },
+    {
+      "code": "600028",
+      "name": "HOME_POINT_NOT_RECORDED",
+      "description": "未记录返航点"
+    },
+    {
+      "code": "600029",
+      "name": "RTK_NOT_READY",
+      "description": "RTK 未准备好"
+    },
+    {
+      "code": "600030",
+      "name": "DRONE_CRITICAL_ERROR",
+      "description": "无人机严重错误"
+    },
+    {
+      "code": "600031",
+      "name": "MISSION_INVALID_FILE_NAME",
+      "description": "任务文件名无效"
+    },
+    {
+      "code": "600032",
+      "name": "GENERATE_MISSION_FILE_FAILED",
+      "description": "生成任务文件失败"
+    },
+    {
+      "code": "600033",
+      "name": "UPLOAD_FILE_FAILED",
+      "description": "上传文件失败"
+    },
+    {
+      "code": "600034",
+      "name": "GPS_INVALID",
+      "description": "GPS 无效"
+    },
+    {
+      "code": "600035",
+      "name": "MISSION_ID_NOT_EXIST",
+      "description": "任务 ID 不存在"
+    },
+    {
+      "code": "600036",
+      "name": "OBSTACAL_STOP",
+      "description": "障碍停止"
+    },
+    {
+      "code": "600037",
+      "name": "HEIGHT_LIMIT",
+      "description": "高度限制"
+    },
+    {
+      "code": "600038",
+      "name": "LOW_LIMIT",
+      "description": "低限制"
+    },
+    {
+      "code": "600039",
+      "name": "LOWER_BATTERY",
+      "description": "电池电量低"
+    },
+    {
+      "code": "600040",
+      "name": "WPMZ_FILE_LOAD_ERROR",
+      "description": "WPMZ 文件加载错误"
+    },
+    {
+      "code": "600041",
+      "name": "CANNOT_STOP_WAYLINE_WHEN_WAYLINE_NOT_RUNNING",
+      "description": "航线未运行时无法停止"
+    },
+    {
+      "code": "600042",
+      "name": "CANNOT_BREAK_WAYLINE_IN_CUR_STATE",
+      "description": "当前状态下无法中断航线"
+    },
+    {
+      "code": "600043",
+      "name": "CANNOT_START_WAYLINE_WHEN_WAYLINE_RUNNING",
+      "description": "航线运行时无法启动航线"
+    },
+    {
+      "code": "600044",
+      "name": "WAYPOINT_METHOD_NOT_SUPPORT",
+      "description": "航点方法不支持"
+    },
+    {
+      "code": "600045",
+      "name": "TRAJ_INIT_FAIL",
+      "description": "轨迹初始化失败"
+    },
+    {
+      "code": "600046",
+      "name": "TRAJ_ON_GROUND_MOTOR_ON_CANNOT_GO",
+      "description": "轨迹在地面上，电机无法启动"
+    },
+    {
+      "code": "600047",
+      "name": "TRAJ_INVALID_START_INDEX_OR_PROG",
+      "description": "轨迹起始索引或进度无效"
+    },
+    {
+      "code": "600048",
+      "name": "TRAJ_INVALID_CSYS_MODE",
+      "description": "轨迹坐标系统模式无效"
+    },
+    {
+      "code": "600049",
+      "name": "TRAJ_INVALID_HEIGHT_MODE",
+      "description": "轨迹高度模式无效"
+    },
+    {
+      "code": "600050",
+      "name": "TRAJ_INVALID_FLY_WP_MODE",
+      "description": "轨迹飞行航点模式无效"
+    },
+    {
+      "code": "600051",
+      "name": "TRAJ_INVALID_YAW_MODE",
+      "description": "轨迹偏航模式无效"
+    },
+    {
+      "code": "600052",
+      "name": "TRAJ_INVALID_TURN_DIR_MODE",
+      "description": "轨迹转弯方向模式无效"
+    },
+    {
+      "code": "600053",
+      "name": "TRAJ_INVALID_WP_TYPE",
+      "description": "轨迹航点类型无效"
+    },
+    {
+      "code": "600054",
+      "name": "TRAJ_FIR_LAS_WP_TYPE_ERROR",
+      "description": "轨迹首尾航点类型错误"
+    },
+    {
+      "code": "600055",
+      "name": "TRAJ_GLOB_VEL_OUT_OF_RANGE",
+      "description": "轨迹全球速度超出范围"
+    },
+    {
+      "code": "600056",
+      "name": "TRAJ_WP_NUM_OUT_OF_RANGE",
+      "description": "轨迹航点数量超出范围"
+    },
+    {
+      "code": "600057",
+      "name": "TRAJ_LAT_LONG_OUT_OF_RANGE",
+      "description": "轨迹经纬度超出范围"
+    },
+    {
+      "code": "600058",
+      "name": "TRAJ_DAMP_DIS_OUT_OF_RANGE",
+      "description": "轨迹阻尼距离超出范围"
+    },
+    {
+      "code": "600059",
+      "name": "TRAJ_WP_YAW_OUT_OF_RANGE",
+      "description": "轨迹航点偏航超出范围"
+    },
+    {
+      "code": "600061",
+      "name": "DO_NOT_SUPPORT_LTE_IN_CURRENT_AREA",
+      "description": "当前区域不支持 LTE"
+    },
+    {
+      "code": "600062",
+      "name": "DO_NOT_SUPPORT_PUBLIC_LTE_IN_CURRENT_AREA",
+      "description": "当前区域不支持公共 LTE"
+    },
+    {
+      "code": "600063",
+      "name": "DO_NOT_SUPPORT_PRIVATE_LTE_IN_CURRENT_AREA",
+      "description": "当前区域不支持私人 LTE"
+    },
+    {
+      "code": "600064",
+      "name": "CAN_NOT_GET_SN",
+      "description": "无法获取 SN"
+    },
+    {
+      "code": "600065",
+      "name": "DO_NOT_NEED_AUTHENTICATION_IN_CURRENT_AREA",
+      "description": "当前区域不需要认证"
+    },
+    {
+      "code": "600066",
+      "name": "CAN_NOT_ENABLE_LTE",
+      "description": "无法启用 LTE"
+    },
+    {
+      "code": "600067",
+      "name": "AUTHENTICATE_LTE_FAILED",
+      "description": "LTE 认证失败"
+    },
+    {
+      "code": "600068",
+      "name": "DO_NOT_NEED_AUTHENTICATION_IN_PRIVATIZATION_SCENARIO",
+      "description": "私有化场景中不需要认证"
+    },
+    {
+      "code": "600071",
+      "name": "NETWORK_ERR",
+      "description": "网络错误"
+    },
+    {
+      "code": "600072",
+      "name": "LIVE_STREAM_NOT_STARTED",
+      "description": "直播未开始"
+    },
+    {
+      "code": "600073",
+      "name": "LIVE_STREAM_ALREADY_STARTED",
+      "description": "直播已开始"
+    },
+    {
+      "code": "600074",
+      "name": "LIVE_STREAM_CHANNEL_CREATE_ERR",
+      "description": "创建直播频道错误"
+    },
+    {
+      "code": "600075",
+      "name": "LIVE_STREAM_START_ERR",
+      "description": "启动直播错误"
+    },
+    {
+      "code": "600076",
+      "name": "LIVE_STREAM_IS_NOT_READY",
+      "description": "直播未准备好"
+    },
+    {
+      "code": "600077",
+      "name": "UNSUPPORT",
+      "description": "不支持"
+    },
+    {
+      "code": "600078",
+      "name": "ALREADY_POWERED_ON",
+      "description": "无人机已经开机，不支持重复开机"
+    },
+    {
+      "code": "600079",
+      "name": "NO_ERROR",
+      "description": "无错误"
+    },
+    {
+      "code": "600080",
+      "name": "REQUEST_HANDLER_NOT_FOUND",
+      "description": "未找到请求处理程序"
+    },
+    {
+      "code": "600081",
+      "name": "REQUEST_NOT_SUPPORTED_BY_HANDLER",
+      "description": "处理程序不支持请求"
+    },
+    {
+      "code": "600082",
+      "name": "REQUEST_TIMEOUT",
+      "description": "请求超时"
+    },
+    {
+      "code": "600083",
+      "name": "SEND_PACK_FAILURE",
+      "description": "发送包失败"
+    },
+    {
+      "code": "600084",
+      "name": "DISCONNECTED",
+      "description": "断开连接"
+    },
+    {
+      "code": "600087",
+      "name": "COMMAND_INTERRUPTED",
+      "description": "命令中断"
+    },
+    {
+      "code": "600088",
+      "name": "PARAMETERS_GET_ERROR",
+      "description": "获取参数错误"
+    },
+    {
+      "code": "600089",
+      "name": "PARAMETERS_SET_ERROR",
+      "description": "设置参数错误"
+    },
+    {
+      "code": "600090",
+      "name": "INVALID_RESPOND",
+      "description": "响应无效"
+    },
+    {
+      "code": "600091",
+      "name": "PARAM_OUT_OF_RANGE",
+      "description": "参数超出范围"
+    },
+    {
+      "code": "600092",
+      "name": "INVALID_REQUEST_IN_CURRENT_STATE",
+      "description": "当前状态下无效请求"
+    },
+    {
+      "code": "600093",
+      "name": "EXECUTION_FAILED",
+      "description": "执行失败"
+    },
+    {
+      "code": "600094",
+      "name": "NEED_REQUEST_AGAIN",
+      "description": "需要再次请求"
+    },
+    {
+      "code": "600095",
+      "name": "SYSTEM_BUSY",
+      "description": "系统繁忙"
+    },
+    {
+      "code": "600096",
+      "name": "OPERATION_CANCELLED",
+      "description": "操作取消"
+    },
+    {
+      "code": "600097",
+      "name": "WAIT_KEY_BIND_TIMEOUT",
+      "description": "等待密钥绑定超时"
+    },
+    {
+      "code": "600098",
+      "name": "KEY_MISS_EXECUTION_FUNCTION",
+      "description": "密钥执行功能缺失"
+    },
+    {
+      "code": "600099",
+      "name": "COMMAND_ACK",
+      "description": "命令确认"
+    },
+    {
+      "code": "600100",
+      "name": "EXEC_FAIL",
+      "description": "执行失败"
+    },
+    {
+      "code": "600101",
+      "name": "MODULE_BUSY",
+      "description": "模块繁忙"
+    },
+    {
+      "code": "600102",
+      "name": "NO_RESOURCE",
+      "description": "无资源"
+    },
+    {
+      "code": "600103",
+      "name": "FEATURE_NOT_SUPPORTED",
+      "description": "不支持的功能"
+    },
+    {
+      "code": "600104",
+      "name": "FILE_TRANSFER_BUSY",
+      "description": "文件传输繁忙"
+    },
+    {
+      "code": "600105",
+      "name": "NAVIGATION_IS_FORBIDDEN",
+      "description": "导航被禁止"
+    },
+    {
+      "code": "600106",
+      "name": "NAVIGATION_IS_OFF",
+      "description": "导航关闭"
+    },
+    {
+      "code": "600107",
+      "name": "INVALID_TASK_INFORMATION",
+      "description": "任务信息无效"
+    },
+    {
+      "code": "600108",
+      "name": "TASK_UPLOAD_ERROR",
+      "description": "任务上传错误"
+    },
+    {
+      "code": "600109",
+      "name": "INVALID_REQUEST_PARAMETER",
+      "description": "请求参数无效"
+    },
+    {
+      "code": "600110",
+      "name": "MAY_CROSS_RESTRICTED_AREA",
+      "description": "可能跨越限制区域"
+    },
+    {
+      "code": "600111",
+      "name": "EXCEEDED_INPUT_TIME_LIMIT",
+      "description": "超过输入时间限制"
+    },
+    {
+      "code": "600112",
+      "name": "EXECUTING_HIGHER_PRIORITY_TASK",
+      "description": "正在执行更高优先级任务"
+    },
+    {
+      "code": "600113",
+      "name": "CANNOT_START_TASK_ON_WEAK_GPS",
+      "description": "弱 GPS 信号无法启动任务"
+    },
+    {
+      "code": "600114",
+      "name": "CANNOT_START_TASK_VLOTAGE_ALARM",
+      "description": "电压报警无法启动任务"
+    },
+    {
+      "code": "600115",
+      "name": "OPERATION_NOT_MATCH",
+      "description": "操作不匹配"
+    },
+    {
+      "code": "600116",
+      "name": "RETURN_DATA",
+      "description": "返回数据"
+    },
+    {
+      "code": "600117",
+      "name": "RESOURCE_OCCUPIED",
+      "description": "资源被占用"
+    },
+    {
+      "code": "600118",
+      "name": "FUNC_NOT_IMPLEMENT",
+      "description": "功能未实现"
+    },
+    {
+      "code": "600119",
+      "name": "USER_CANCELED",
+      "description": "用户取消"
+    },
+    {
+      "code": "600120",
+      "name": "RESOURCE_NOT_FOUND",
+      "description": "资源未找到"
+    },
+    {
+      "code": "600121",
+      "name": "UNSUPPORTED_COMMAND",
+      "description": "不支持的命令"
+    },
+    {
+      "code": "600122",
+      "name": "TIMEOUT",
+      "description": "超时"
+    },
+    {
+      "code": "600123",
+      "name": "MEMORY_ALLOC",
+      "description": "内存分配错误"
+    },
+    {
+      "code": "600124",
+      "name": "INVALID_PARAMERTERS",
+      "description": "参数无效"
+    },
+    {
+      "code": "600125",
+      "name": "COMMAND_NOT_SUPPORT_NOW",
+      "description": "命令当前不支持"
+    },
+    {
+      "code": "600126",
+      "name": "TIME_NOT_SYNC",
+      "description": "时间不同步"
+    },
+    {
+      "code": "600127",
+      "name": "PARAMETER_SET_FAILED",
+      "description": "设置参数失败"
+    },
+    {
+      "code": "600128",
+      "name": "PARAMETER_GET_FAILED",
+      "description": "获取参数失败"
+    },
+    {
+      "code": "600129",
+      "name": "SD_CARD_NOT_INSERT",
+      "description": "未插入 SD 卡"
+    },
+    {
+      "code": "600130",
+      "name": "SD_CARD_FULL",
+      "description": "SD 卡已满"
+    },
+    {
+      "code": "600131",
+      "name": "SD_CARD_ERROR",
+      "description": "SD 卡错误"
+    },
+    {
+      "code": "600132",
+      "name": "SENSOR_ERROR",
+      "description": "传感器错误"
+    },
+    {
+      "code": "600133",
+      "name": "SYSTEM_HAS_ERROR",
+      "description": "系统有错误"
+    },
+    {
+      "code": "600134",
+      "name": "PARAMETER_TOTAL_TOO_LONG",
+      "description": "参数总长度过长"
+    },
+    {
+      "code": "600135",
+      "name": "MODULE_INACTIVATED",
+      "description": "模块未激活"
+    },
+    {
+      "code": "600136",
+      "name": "USER_NOT_BIND",
+      "description": "用户未绑定"
+    },
+    {
+      "code": "600137",
+      "name": "FIRMWARE_DATA_NUM_DISCONTINUOUS",
+      "description": "固件数据序号不连续"
+    },
+    {
+      "code": "600138",
+      "name": "FIRMWARE_DATA_OVERLOAD_FLASH",
+      "description": "固件数据超载闪存"
+    },
+    {
+      "code": "600139",
+      "name": "FIRMWARE_VERIFICATION_ERROR",
+      "description": "固件验证错误"
+    },
+    {
+      "code": "600140",
+      "name": "FLASH_ERASE_ERROR",
+      "description": "闪存擦除错误"
+    },
+    {
+      "code": "600141",
+      "name": "FLASH_WRITE_ERROR",
+      "description": "闪存写入错误"
+    },
+    {
+      "code": "600142",
+      "name": "UPGRADE_STATUS_ERROR",
+      "description": "升级状态错误"
+    },
+    {
+      "code": "600143",
+      "name": "FIRMWARE_TYPE_NOT_MATCH",
+      "description": "固件类型不匹配"
+    },
+    {
+      "code": "600144",
+      "name": "WAITING_CLIENT_UPGRADE_STATUS",
+      "description": "等待客户端升级状态"
+    },
+    {
+      "code": "600145",
+      "name": "REMOTE_CONTROLLER_DISCONNECTED",
+      "description": "遥控器断开连接"
+    },
+    {
+      "code": "600146",
+      "name": "MOTOR_ON",
+      "description": "电机启动"
+    },
+    {
+      "code": "600147",
+      "name": "HARDWARE_ERROR",
+      "description": "硬件错误"
+    },
+    {
+      "code": "600148",
+      "name": "INSUFFICIENT_ELECTRICITY",
+      "description": "电量不足"
+    },
+    {
+      "code": "600149",
+      "name": "AIRCRAFT_DISCONNECTED",
+      "description": "飞机断开连接"
+    },
+    {
+      "code": "600150",
+      "name": "FLASH_IS_ERASING",
+      "description": "闪存正在擦除"
+    },
+    {
+      "code": "600151",
+      "name": "CANNOT_UPGRADE_IN_CUR_STATE",
+      "description": "当前状态无法升级"
+    },
+    {
+      "code": "600152",
+      "name": "UNDEFINE_ERROR",
+      "description": "未定义错误"
+    },
+    {
+      "code": "600153",
+      "name": "SET_HOME_LOCATION_FAIL_UNKNOWN",
+      "description": "设置返航位置失败，未知原因"
+    },
+    {
+      "code": "600154",
+      "name": "SET_HOME_LOCATION_INVALID_GPS_COORDINATE",
+      "description": "设置返航位置失败，GPS 坐标无效"
+    },
+    {
+      "code": "600155",
+      "name": "SET_HOME_LOCATION_NOT_BE_RECORDED",
+      "description": "设置返航位置失败，未记录"
+    },
+    {
+      "code": "600156",
+      "name": "SET_HOME_LOCAITON_GPS_NOT_READY",
+      "description": "设置返航位置失败，GPS 未准备好"
+    },
+    {
+      "code": "600157",
+      "name": "SET_HOME_LOCATION_DIS_TOO_FAR",
+      "description": "设置返航位置失败，距离太远"
+    },
+    {
+      "code": "600158",
+      "name": "DOWNLOAD_ABORT_BY_FIRMWARE",
+      "description": "固件中止下载"
+    },
+    {
+      "code": "600159",
+      "name": "DOWNLOAD_DATA_PARSING_FAILURE",
+      "description": "下载数据解析失败"
+    },
+    {
+      "code": "600160",
+      "name": "PLAYBACK_START_STOP_FETCH_COMPLETED",
+      "description": "回放开始/停止获取完成"
+    },
+    {
+      "code": "600161",
+      "name": "PLAYBACK_FILE_LIST_RESET",
+      "description": "回放文件列表重置"
+    },
+    {
+      "code": "600162",
+      "name": "PLAYBACK_START_STOP_FETCH_BUSY",
+      "description": "回放开始/停止获取繁忙"
+    },
+    {
+      "code": "600163",
+      "name": "DOWNLOADED_EMPTY_DATA",
+      "description": "下载空数据"
+    },
+    {
+      "code": "600164",
+      "name": "MEDIA_TASK_CANCEL",
+      "description": "媒体任务取消"
+    },
+    {
+      "code": "600165",
+      "name": "MEDIA_CANCEL_TASK_NOT_EXIST",
+      "description": "媒体取消任务不存在"
+    },
+    {
+      "code": "600166",
+      "name": "MEDIA_TASK_SYNC_FAILURE",
+      "description": "媒体任务同步失败"
+    },
+    {
+      "code": "600167",
+      "name": "FILE_LIST_NOT_EXIST",
+      "description": "文件列表不存在"
+    },
+    {
+      "code": "600168",
+      "name": "FILE_LIST_UPDATE_ERROR",
+      "description": "文件列表更新错误"
+    },
+    {
+      "code": "600169",
+      "name": "FILE_LIST_INVOKE_RELOAD",
+      "description": "文件列表调用重新加载"
+    },
+    {
+      "code": "600170",
+      "name": "TRANSFER_NOT_EXIST",
+      "description": "传输不存在"
+    },
+    {
+      "code": "600171",
+      "name": "TRANSCODE_ERROR",
+      "description": "转码错误"
+    },
+    {
+      "code": "600172",
+      "name": "MEDIA_TASK_ABORT",
+      "description": "媒体任务中止"
+    },
+    {
+      "code": "600173",
+      "name": "DOWNLOAD_ABORT_BY_FIRMWARE_FORCE",
+      "description": "固件强制中止下载"
+    },
+    {
+      "code": "600174",
+      "name": "DOWNLOAD_ABORT_BY_FIRMWARE_FLASH_ERROR",
+      "description": "固件闪存错误中止下载"
+    },
+    {
+      "code": "600175",
+      "name": "DOWNLOAD_ABORT_BY_FIRMWARE_SESSION_REALLOC",
+      "description": "固件会话重新分配中止下载"
+    },
+    {
+      "code": "600176",
+      "name": "DOWNLOAD_ABORT_BY_FIRMWARE_SESSION_ALLOC_ERROR",
+      "description": "固件会话分配错误中止下载"
+    },
+    {
+      "code": "600177",
+      "name": "DOWNLOAD_ABORT_BY_FIRMWARE_UNKNOWN",
+      "description": "固件未知原因中止下载"
+    },
+    {
+      "code": "600178",
+      "name": "TRANSCODE_UNSUPPORTED",
+      "description": "不支持转码"
+    },
+    {
+      "code": "600179",
+      "name": "PLAYBACK_MP4_DOWNLOAD_HEADER_FAILED",
+      "description": "回放 MP4 下载头部失败"
+    },
+    {
+      "code": "600180",
+      "name": "PLAYBACK_MP4_HEADER_DATA_INVALID",
+      "description": "回放 MP4 头部数据无效"
+    },
+    {
+      "code": "600181",
+      "name": "PLAYBACK_MP4_DOWNLOAD_MOOV_FAILED",
+      "description": "回放 MP4 下载 MOOV 失败"
+    },
+    {
+      "code": "600182",
+      "name": "PLAYBACK_MP4_MOOV_DATA_INVALID",
+      "description": "回放 MP4 MOOV 数据无效"
+    },
+    {
+      "code": "600183",
+      "name": "CHANNEL_FRAME_PACK_OVER_SIZE",
+      "description": "频道帧包超出大小"
+    },
+    {
+      "code": "600184",
+      "name": "CHANNEL_FRAME_SEQ_NUM_SET_NOT_MATCH",
+      "description": "频道帧序号集合不匹配"
+    },
+    {
+      "code": "600185",
+      "name": "CHANNEL_FRAME_DUPLICATE_SEQ_NUM",
+      "description": "频道帧重复序号"
+    },
+    {
+      "code": "600186",
+      "name": "CHANNEL_CLEAR_CACHE",
+      "description": "频道清理缓存"
+    },
+    {
+      "code": "600187",
+      "name": "MCS_DATA_MODEL_ID_IS_EMPTY",
+      "description": "MCS 数据模型 ID 为空"
+    },
+    {
+      "code": "600188",
+      "name": "MCS_DATA_MODEL_DOES_NOT_MEET_MERGER_REQUIREMENTS",
+      "description": "MCS 数据模型不满足合并要求"
+    },
+    {
+      "code": "600189",
+      "name": "MCS_DATA_MODEL_MERGE_FAILURE",
+      "description": "MCS 数据模型合并失败"
+    },
+    {
+      "code": "600190",
+      "name": "MISSION_WAYPOINT_NULL_MISSION",
+      "description": "任务航点为空任务"
+    },
+    {
+      "code": "600191",
+      "name": "MISSION_WAYPOINT_MAX_FLIGHT_SPEED_INVALID",
+      "description": "任务航点最大飞行速度无效"
+    },
+    {
+      "code": "600192",
+      "name": "MISSION_WAYPOINT_REPEAT_TIMES_INVALID",
+      "description": "任务航点重复次数无效"
+    },
+    {
+      "code": "600193",
+      "name": "MISSION_WAYPOINT_COUNT_INVALID",
+      "description": "任务航点计数无效"
+    },
+    {
+      "code": "600194",
+      "name": "MISSION_WAYPOINT_DISCONNECTED",
+      "description": "任务航点断开连接"
+    },
+    {
+      "code": "600195",
+      "name": "MISSION_WAYPOINT_DOWNLOAD_UNNECESSARY",
+      "description": "任务航点下载不必要"
+    },
+    {
+      "code": "600196",
+      "name": "MISSION_WAYPOINT_ALREADY_STARTED",
+      "description": "任务航点已开始"
+    },
+    {
+      "code": "600197",
+      "name": "MISSION_WAYPOINT_CANCELLED",
+      "description": "任务航点已取消"
+    },
+    {
+      "code": "600198",
+      "name": "MISSION_WAYPOINT_FAILED",
+      "description": "任务航点失败"
+    },
+    {
+      "code": "600199",
+      "name": "MISSION_WAYPOINT_TIMEOUT",
+      "description": "任务航点超时"
+    },
+    {
+      "code": "600200",
+      "name": "MISSION_WAYPOINT_MODE_ERROR",
+      "description": "任务航点模式错误"
+    },
+    {
+      "code": "600201",
+      "name": "MISSION_WAYPOINT_GPS_NOT_READY",
+      "description": "任务航点 GPS 未准备好"
+    },
+    {
+      "code": "600202",
+      "name": "MISSION_WAYPOINT_MOTORS_DID_NOT_START",
+      "description": "任务航点电机未启动"
+    },
+    {
+      "code": "600203",
+      "name": "MISSION_WAYPOINT_TAKE_OFF",
+      "description": "任务航点起飞"
+    },
+    {
+      "code": "600204",
+      "name": "MISSION_WAYPOINT_IS_FLYING",
+      "description": "任务航点正在飞行"
+    },
+    {
+      "code": "600205",
+      "name": "MISSION_WAYPOINT_NOT_AUTO_MODE",
+      "description": "任务航点非自动模式"
+    },
+    {
+      "code": "600206",
+      "name": "MISSION_WAYPOINT_MAX_NUMBER_OF_WAYPOINTS_UPLOAD_LIMIT_REACHED",
+      "description": "任务航点上传数量限制已达到"
+    },
+    {
+      "code": "600207",
+      "name": "MISSION_WAYPOINT_UPLOADING_WAYPOINT",
+      "description": "任务航点上传航点中"
+    },
+    {
+      "code": "600208",
+      "name": "MISSION_WAYPOINT_KEY_LEVEL_LOW",
+      "description": "任务航点关键级别低"
+    },
+    {
+      "code": "600209",
+      "name": "MISSION_WAYPOINT_NAVIGATION_MODE_DISABLED",
+      "description": "任务航点导航模式禁用"
+    },
+    {
+      "code": "600210",
+      "name": "MISSION_IOC_TOO_CLOSE_TO_HOME_POINT",
+      "description": "任务 IOC 离返航点太近"
+    },
+    {
+      "code": "600211",
+      "name": "MISSION_IOC_TYPE_UNKNOWN",
+      "description": "任务 IOC 类型未知"
+    },
+    {
+      "code": "600212",
+      "name": "MISSION_HOTPOINT_VALUE_INVALID",
+      "description": "任务热点值无效"
+    },
+    {
+      "code": "600213",
+      "name": "MISSION_HOTPOINT_LOCATION_INVALID",
+      "description": "任务热点位置无效"
+    },
+    {
+      "code": "600214",
+      "name": "MISSION_HOTPOINT_DIRECTION_UNKNOWN",
+      "description": "任务热点方向未知"
+    },
+    {
+      "code": "600215",
+      "name": "MISSION_HOTPOINT_MISSION_PAUSED",
+      "description": "任务热点任务暂停"
+    },
+    {
+      "code": "600216",
+      "name": "MISSION_HOTPOINT_MISSION_NOT_PAUSED",
+      "description": "任务热点任务未暂停"
+    },
+    {
+      "code": "600217",
+      "name": "MISSION_FOLLOW_ME_DISTANCE_TOO_LARGE",
+      "description": "任务跟随距离过大"
+    },
+    {
+      "code": "600218",
+      "name": "MISSION_FOLLOW_ME_DISCONNECT_TIME_TOO_LONG",
+      "description": "任务跟随断开时间过长"
+    },
+    {
+      "code": "600219",
+      "name": "MISSION_FOLLOW_ME_GIMBAL_PITCH_ERROR",
+      "description": "任务跟随云台俯仰错误"
+    },
+    {
+      "code": "600220",
+      "name": "MISSION_WAYPOINT_ALTITUDE_TOO_HIGH",
+      "description": "任务航点高度过高"
+    },
+    {
+      "code": "600221",
+      "name": "MISSION_WAYPOINT_ALTITUDE_TOO_LOW",
+      "description": "任务航点高度过低"
+    },
+    {
+      "code": "600222",
+      "name": "MISSION_WAYPOINT_MISSION_RADIUS_INVALID",
+      "description": "任务航点任务半径无效"
+    },
+    {
+      "code": "600223",
+      "name": "MISSION_WAYPOINT_MISSION_SPEED_TOO_HIGH",
+      "description": "任务航点任务速度过高"
+    },
+    {
+      "code": "600224",
+      "name": "MISSION_WAYPOINT_MISSION_ENTRY_POINT_INVALID",
+      "description": "任务航点任务切入点无效"
+    },
+    {
+      "code": "600225",
+      "name": "MISSION_WAYPOINT_MISSION_HEADING_MODE_INVALID",
+      "description": "任务航点任务航向模式无效"
+    },
+    {
+      "code": "600226",
+      "name": "MISSION_WAYPOINT_MISSION_RESUME_FAILED",
+      "description": "任务航点任务恢复失败"
+    },
+    {
+      "code": "600227",
+      "name": "MISSION_WAYPOINT_MISSION_RADIUS_OVER_LIMIT",
+      "description": "任务航点任务半径超限"
+    },
+    {
+      "code": "600228",
+      "name": "MISSION_WAYPOINT_NAVIGATION_MODE_NOT_SUPPORTED",
+      "description": "任务航点导航模式不支持"
+    },
+    {
+      "code": "600229",
+      "name": "MISSION_WAYPOINT_DISTANCE_FROM_MISSION_TARGET_TOO_LONG",
+      "description": "任务航点距任务目标距离过长"
+    },
+    {
+      "code": "600230",
+      "name": "MISSION_WAYPOINT_IN_NOVICE_MODE",
+      "description": "任务航点在新手模式"
+    },
+    {
+      "code": "600231",
+      "name": "MISSION_WAYPOINT_MULTI_MODE_IS_OFF",
+      "description": "任务航点多模式关闭"
+    },
+    {
+      "code": "600232",
+      "name": "MISSION_WAYPOINT_RTK_IS_NOT_READY",
+      "description": "任务航点 RTK 未准备好"
+    },
+    {
+      "code": "600233",
+      "name": "MISSION_WAYPOINT_RC_MODE_ERROR",
+      "description": "任务航点遥控模式错误"
+    },
+    {
+      "code": "600234",
+      "name": "MISSION_WAYPOINT_AIRCRAFT_IN_NO_FLY_ZONE",
+      "description": "任务航点飞机在禁飞区"
+    },
+    {
+      "code": "600235",
+      "name": "MISSION_WAYPOINT_IOC_WORKING",
+      "description": "任务航点 IOC 工作中"
+    },
+    {
+      "code": "600236",
+      "name": "MISSION_WAYPOINT_MISSION_NOT_INITIALIZED",
+      "description": "任务航点任务未初始化"
+    },
+    {
+      "code": "600237",
+      "name": "MISSION_WAYPOINT_MISSION_NOT_EXIST",
+      "description": "任务航点任务不存在"
+    },
+    {
+      "code": "600238",
+      "name": "MISSION_WAYPOINT_MISSION_CONFLICT",
+      "description": "任务航点任务冲突"
+    },
+    {
+      "code": "600239",
+      "name": "MISSION_WAYPOINT_MISSION_ESTIMATE_TIME_TOO_LONG",
+      "description": "任务航点任务预计时间过长"
+    },
+    {
+      "code": "600240",
+      "name": "MISSION_WAYPOINT_HIGH_PRIORITY_MISSION_EXECUTING",
+      "description": "任务航点高优先级任务正在执行"
+    },
+    {
+      "code": "600241",
+      "name": "MISSION_WAYPOINT_GPS_SIGNAL_WEAK",
+      "description": "任务航点 GPS 信号弱"
+    },
+    {
+      "code": "600242",
+      "name": "MISSION_WAYPOINT_LOW_BATTERY",
+      "description": "任务航点电池电量低"
+    },
+    {
+      "code": "600243",
+      "name": "MISSION_WAYPOINT_AIRCRAFT_NOT_IN_THE_AIR",
+      "description": "任务航点飞机不在空中"
+    },
+    {
+      "code": "600244",
+      "name": "MISSION_WAYPOINT_MISSION_PARAMETERS_INVALID",
+      "description": "任务航点任务参数无效"
+    },
+    {
+      "code": "600245",
+      "name": "MISSION_WAYPOINT_MISSION_CONDITION_NOT_SATISFIED",
+      "description": "任务航点任务条件不满足"
+    },
+    {
+      "code": "600246",
+      "name": "MISSION_WAYPOINT_MISSION_ACROSS_NO_FLY_ZONE",
+      "description": "任务航点任务穿越禁飞区"
+    },
+    {
+      "code": "600247",
+      "name": "MISSION_WAYPOINT_HOME_POINT_NOT_RECORDED",
+      "description": "任务航点返航点未记录"
+    },
+    {
+      "code": "600248",
+      "name": "MISSION_WAYPOINT_WAYPOINT_NOT_RUNNING",
+      "description": "任务航点未运行"
+    },
+    {
+      "code": "600249",
+      "name": "MISSION_WAYPOINT_MISSION_INFO_INVALID",
+      "description": "任务航点任务信息无效"
+    },
+    {
+      "code": "600250",
+      "name": "MISSION_WAYPOINT_WAYPOINT_INFO_INVALID",
+      "description": "任务航点航点信息无效"
+    },
+    {
+      "code": "600251",
+      "name": "MISSION_WAYPOINT_WAYPOINT_TRACE_TOO_LONG",
+      "description": "任务航点航点轨迹过长"
+    },
+    {
+      "code": "600252",
+      "name": "MISSION_WAYPOINT_WAYPOINT_TOTAL_TRACE_TOO_LONG",
+      "description": "任务航点航点总轨迹过长"
+    },
+    {
+      "code": "600253",
+      "name": "MISSION_WAYPOINT_WAYPOINT_INDEX_OVER_RANGE",
+      "description": "任务航点航点索引超出范围"
+    },
+    {
+      "code": "600254",
+      "name": "MISSION_WAYPOINT_WAYPOINT_DISTANCE_TOO_CLOSE",
+      "description": "任务航点航点距离太近"
+    },
+    {
+      "code": "600255",
+      "name": "MISSION_WAYPOINT_WAYPOINT_DISTANCE_TOO_LONG",
+      "description": "任务航点航点距离太长"
+    },
+    {
+      "code": "600256",
+      "name": "MISSION_WAYPOINT_WAYPOINT_INVALID_CORNER_RADIUS",
+      "description": "任务航点航点无效转弯半径"
+    },
+    {
+      "code": "600257",
+      "name": "MISSION_WAYPOINT_WAYPOINT_ACTION_PARAMETER_INVALID",
+      "description": "任务航点航点动作参数无效"
+    },
+    {
+      "code": "600258",
+      "name": "MISSION_WAYPOINT_WAYPOINT_MISSION_INFO_NOT_UPLOADED",
+      "description": "任务航点航点任务信息未上传"
+    },
+    {
+      "code": "600259",
+      "name": "MISSION_WAYPOINT_WAYPOINT_UPLOAD_NOT_COMPLETE",
+      "description": "任务航点航点上传未完成"
+    },
+    {
+      "code": "600260",
+      "name": "MISSION_WAYPOINT_WAYPOINT_REQUEST_IS_RUNNING",
+      "description": "任务航点航点请求正在运行"
+    },
+    {
+      "code": "600261",
+      "name": "MISSION_WAYPOINT_WAYPOINT_IDLE_VELOCITY_INVALID",
+      "description": "任务航点航点空闲速度无效"
+    },
+    {
+      "code": "600262",
+      "name": "MISSION_WAYPOINT_AIRCRAFT_TAKING_OFF",
+      "description": "任务航点飞机起飞"
+    },
+    {
+      "code": "600263",
+      "name": "MISSION_WAYPOINT_AIRCRAFT_LANDING",
+      "description": "任务航点飞机降落"
+    },
+    {
+      "code": "600264",
+      "name": "MISSION_WAYPOINT_AIRCRAFT_GOING_HOME",
+      "description": "任务航点飞机返航"
+    },
+    {
+      "code": "600265",
+      "name": "MISSION_WAYPOINT_AIRCRAFT_STARTING_MOTOR",
+      "description": "任务航点飞机启动电机"
+    },
+    {
+      "code": "600266",
+      "name": "MISSION_WAYPOINT_WRONG_CMD",
+      "description": "任务航点错误命令"
+    },
+    {
+      "code": "600267",
+      "name": "MISSION_WAYPOINT_MISSION_ID_INVALID",
+      "description": "任务航点任务 ID 无效"
+    },
+    {
+      "code": "600268",
+      "name": "MISSION_WAYPOINT_MISSION_GET_NODE_INFO_BY_INDEX_FAIL",
+      "description": "任务航点任务按索引获取节点信息失败"
+    },
+    {
+      "code": "600269",
+      "name": "MISSION_WAYPOINT_MISSION_OTHER_SUB_OPENED",
+      "description": "任务航点任务其他子模式已打开"
+    },
+    {
+      "code": "600270",
+      "name": "MISSION_WAYPOINT_MISSION_NO_SUCH_SUB_MODE",
+      "description": "任务航点任务无此子模式"
+    },
+    {
+      "code": "600271",
+      "name": "MISSION_WAYPOINT_MISSION_GROUND_STATION_MODE_OPEN_FAIL",
+      "description": "任务航点任务地面站模式打开失败"
+    },
+    {
+      "code": "600272",
+      "name": "MISSION_WAYPOINT_MISSION_AIRCRAFT_INCLINATION_TOO_LARGE",
+      "description": "任务航点飞机倾斜角过大"
+    },
+    {
+      "code": "600273",
+      "name": "PIPELINE_UNKNOWN",
+      "description": "管道未知错误"
+    },
+    {
+      "code": "600274",
+      "name": "PIPELINE_CRC_CHECK_FAILED",
+      "description": "管道 CRC 校验失败"
+    },
+    {
+      "code": "600275",
+      "name": "PIPELINE_INVALID_PARAMETERS",
+      "description": "管道参数无效"
+    },
+    {
+      "code": "600276",
+      "name": "PIPELINE_NOT_ENOUGH_MEMORY",
+      "description": "管道内存不足"
+    },
+    {
+      "code": "600277",
+      "name": "PIPELINE_NOT_READY",
+      "description": "管道未准备好"
+    },
+    {
+      "code": "600278",
+      "name": "PIPELINE_SEND_FAILED",
+      "description": "管道发送失败"
+    },
+    {
+      "code": "600279",
+      "name": "PIPELINE_RECEIVE_FAILED",
+      "description": "管道接收失败"
+    },
+    {
+      "code": "600280",
+      "name": "PIPELINE_TIMEOUT",
+      "description": "管道超时"
+    },
+    {
+      "code": "600281",
+      "name": "PIPELINE_BUSY_OPERATION",
+      "description": "管道繁忙操作"
+    },
+    {
+      "code": "600282",
+      "name": "PIPELINE_UNACCEPTABLE_OPERATIONS",
+      "description": "管道不可接受的操作"
+    },
+    {
+      "code": "600283",
+      "name": "PIPELINE_CONNECTION_CLOSED",
+      "description": "管道连接关闭"
+    },
+    {
+      "code": "600284",
+      "name": "PIPELINE_CONNECTION_CONNECTING",
+      "description": "管道连接中"
+    },
+    {
+      "code": "600285",
+      "name": "PIPELINE_RESOURCES_NOT_AVAILABLE",
+      "description": "管道资源不可用"
+    },
+    {
+      "code": "600286",
+      "name": "PIPELINE_CONNECTION_CLOSING",
+      "description": "管道连接关闭中"
+    },
+    {
+      "code": "600287",
+      "name": "PIPELINE_NOT_CONNECTED",
+      "description": "管道未连接"
+    },
+    {
+      "code": "600288",
+      "name": "PIPELINE_LINK_BREAK",
+      "description": "管道链接中断"
+    },
+    {
+      "code": "600289",
+      "name": "PIPELINE_CONNECTION_REFUSED",
+      "description": "管道连接拒绝"
+    },
+    {
+      "code": "600290",
+      "name": "PIPELINE_ID_IS_OCCUPIED",
+      "description": "管道 ID 被占用"
+    },
+    {
+      "code": "600291",
+      "name": "PIPELINE_INTERNAL_STATUS_ERROR",
+      "description": "管道内部状态错误"
+    },
+    {
+      "code": "600292",
+      "name": "FLY_SAFE_LOCAL_USER_TOKEN_INVALID",
+      "description": "飞行安全本地用户令牌无效"
+    },
+    {
+      "code": "600293",
+      "name": "FLY_SAFE_NETWORK_INVALID",
+      "description": "飞行安全网络无效"
+    },
+    {
+      "code": "600294",
+      "name": "FLY_SAFE_SERVER_DATA_ERROR",
+      "description": "飞行安全服务器数据错误"
+    },
+    {
+      "code": "600295",
+      "name": "FLY_SAFE_SIGNATURE_ERROR",
+      "description": "飞行安全签名错误"
+    },
+    {
+      "code": "600296",
+      "name": "FLY_SAFE_CHECK_SIGNATURE_ERROR",
+      "description": "飞行安全检查签名错误"
+    },
+    {
+      "code": "600297",
+      "name": "FLY_SAFE_INVALID_REQUEST",
+      "description": "飞行安全无效请求"
+    },
+    {
+      "code": "600298",
+      "name": "FLY_SAFE_PAGE_NOT_FOUND",
+      "description": "飞行安全页面未找到"
+    },
+    {
+      "code": "600299",
+      "name": "FLY_SAFE_USER_IS_NOT_LOGIN",
+      "description": "飞行安全用户未登录"
+    },
+    {
+      "code": "600300",
+      "name": "FLY_SAFE_PACK_MANAGER_TIMEOUT",
+      "description": "飞行安全包管理器超时"
+    },
+    {
+      "code": "600301",
+      "name": "FLY_SAFE_PACK_MANAGER_WRONG_UNLOCK_VERSION",
+      "description": "飞行安全包管理器解锁版本错误"
+    },
+    {
+      "code": "600302",
+      "name": "FLY_SAFE_PACK_MANAGER_WRONG_DEVICE_ID",
+      "description": "飞行安全包管理器设备 ID 错误"
+    },
+    {
+      "code": "600303",
+      "name": "FLY_SAFE_WRONG_SERIAL_NUMBER",
+      "description": "飞行安全序列号错误"
+    },
+    {
+      "code": "600304",
+      "name": "FLY_SAFE_FILE_ERROR",
+      "description": "飞行安全文件错误"
+    },
+    {
+      "code": "600305",
+      "name": "FLY_SAFE_DB_INVALID_PARAMS",
+      "description": "飞行安全数据库参数无效"
+    },
+    {
+      "code": "600306",
+      "name": "FLY_SAFE_DB_NOT_VALID",
+      "description": "飞行安全数据库无效"
+    },
+    {
+      "code": "600307",
+      "name": "FLY_SAFE_INVALID_AREA_IDS",
+      "description": "飞行安全区域 ID 无效"
+    },
+    {
+      "code": "600308",
+      "name": "FLY_SAFE_FC_QUERY_FAILED",
+      "description": "飞行安全 FC 查询失败"
+    },
+    {
+      "code": "600309",
+      "name": "FLY_SAFE_FC_OP_SET_ENABLE_FAILED",
+      "description": "飞行安全 FC 操作设置启用失败"
+    },
+    {
+      "code": "600310",
+      "name": "FLY_SAFE_LICENSE_ENABLE_USER_ID_ERROR",
+      "description": "飞行安全许可证启用用户 ID 错误"
+    },
+    {
+      "code": "600311",
+      "name": "FLY_SAFE_LICENSE_NOT_EXIST",
+      "description": "飞行安全许可证不存在"
+    },
+    {
+      "code": "600312",
+      "name": "FLY_SAFE_NO_LICENSE_DATA",
+      "description": "飞行安全无许可证数据"
+    },
+    {
+      "code": "600313",
+      "name": "FLY_SAFE_LOW_FIRMWARE_VERSION_ERROR",
+      "description": "飞行安全固件版本过低错误"
+    },
+    {
+      "code": "600314",
+      "name": "FLY_SAFE_UNLOCK_VERSION_ERROR",
+      "description": "飞行安全解锁版本错误"
+    },
+    {
+      "code": "600315",
+      "name": "FLY_SAFE_OLD_LICENSE_DATA_ERROR",
+      "description": "飞行安全旧许可证数据错误"
+    },
+    {
+      "code": "600316",
+      "name": "FLY_SAFE_INVALID_KEY_VERSION",
+      "description": "飞行安全密钥版本无效"
+    },
+    {
+      "code": "600317",
+      "name": "FLY_SAFE_NO_LICENSE_ID",
+      "description": "飞行安全无许可证 ID"
+    },
+    {
+      "code": "600318",
+      "name": "FLY_SAFE_SERVER_INVALID_TOKEN",
+      "description": "飞行安全服务器无效令牌"
+    },
+    {
+      "code": "600319",
+      "name": "FLY_SAFE_SERVER_UNIDENTIFIED_PHONE",
+      "description": "飞行安全服务器未识别的手机"
+    },
+    {
+      "code": "600320",
+      "name": "FLY_SAFE_SERVER_NOT_UNLOCKABLE_AREA",
+      "description": "飞行安全服务器不可解锁区域"
+    },
+    {
+      "code": "600321",
+      "name": "FLY_SAFE_SERVER_UNLOCK_TO_MANY_AREAS",
+      "description": "飞行安全服务器解锁区域过多"
+    },
+    {
+      "code": "600322",
+      "name": "FLY_SAFE_SERVER_TOO_MANY_LICENSES",
+      "description": "飞行安全服务器许可证过多"
+    },
+    {
+      "code": "600323",
+      "name": "FLY_SAFE_SERVER_JSON_DATA_PARSE_ERROR",
+      "description": "飞行安全服务器 JSON 数据解析错误"
+    },
+    {
+      "code": "600324",
+      "name": "FLY_SAFE_UNLOCK_AREA_ID_INVALID",
+      "description": "飞行安全解锁区域 ID 无效"
+    },
+    {
+      "code": "600325",
+      "name": "FLY_SAFE_UNLOCK_NOT_AUTHORIZATION_AREA",
+      "description": "飞行安全解锁未授权区域"
+    },
+    {
+      "code": "600326",
+      "name": "SDK_REGISTRATION_COULD_NOT_CONNECT_TO_INTERNET",
+      "description": "SDK 注册无法连接到互联网"
+    },
+    {
+      "code": "600327",
+      "name": "SDK_REGISTRATION_INVALID_SDK_KEY",
+      "description": "SDK 注册无效的 SDK 密钥"
+    },
+    {
+      "code": "600328",
+      "name": "SDK_REGISTRATION_HTTP_TIMEOUT",
+      "description": "SDK 注册 HTTP 超时"
+    },
+    {
+      "code": "600329",
+      "name": "SDK_REGISTRATION_DEVICE_DOES_NOT_MATCH",
+      "description": "SDK 注册设备不匹配"
+    },
+    {
+      "code": "600330",
+      "name": "SDK_REGISTRATION_PACKAGE_ID_DOES_NOT_MATCH",
+      "description": "SDK 注册包 ID 不匹配"
+    },
+    {
+      "code": "600331",
+      "name": "SDK_REGISTRATION_SDK_KEY_PROHIBITED",
+      "description": "SDK 注册 SDK 密钥被禁止"
+    },
+    {
+      "code": "600332",
+      "name": "SDK_REGISTRATION_MAX_REGISTRATION_COUNT_REACHED",
+      "description": "SDK 注册达到最大注册次数"
+    },
+    {
+      "code": "600333",
+      "name": "SDK_REGISTRATION_SDK_KEY_INVALID_PLATFORM",
+      "description": "SDK 注册 SDK 密钥无效平台"
+    },
+    {
+      "code": "600334",
+      "name": "SDK_REGISTRATION_SDK_KEY_DOES_NOT_EXIST",
+      "description": "SDK 注册 SDK 密钥不存在"
+    },
+    {
+      "code": "600335",
+      "name": "SDK_REGISTRATION_SDK_KEY_LEVEL_NOT_PERMITTED",
+      "description": "SDK 注册 SDK 密钥级别不允许"
+    },
+    {
+      "code": "600336",
+      "name": "SDK_REGISTRATION_SERVER_PARSE_FAILURE",
+      "description": "SDK 注册服务器解析失败"
+    },
+    {
+      "code": "600337",
+      "name": "SDK_REGISTRATION_SERVER_WRITE_ERROR",
+      "description": "SDK 注册服务器写入错误"
+    },
+    {
+      "code": "600338",
+      "name": "SDK_REGISTRATION_SERVER_DATA_ABNORMAL",
+      "description": "SDK 注册服务器数据异常"
+    },
+    {
+      "code": "600339",
+      "name": "SDK_REGISTRATION_INVALID_META_DATA",
+      "description": "SDK 注册元数据无效"
+    },
+    {
+      "code": "600340",
+      "name": "SDK_REGISTRATION_EMPTY_SDK_KEY",
+      "description": "SDK 注册空的 SDK 密钥"
+    },
+    {
+      "code": "600341",
+      "name": "SDK_REGISTRATION_VERSION_NOT_ACCESSIBLE",
+      "description": "SDK 注册版本不可访问"
+    },
+    {
+      "code": "600342",
+      "name": "SDK_REGISTRATION_OVER_MAX_REGISTRATION_COUNT",
+      "description": "SDK 注册超过最大注册次数"
+    },
+    {
+      "code": "600343",
+      "name": "SDK_SERVICE_GIMBAL_ROTATE_PITCH_NOT_ALLOW",
+      "description": "SDK 服务云台旋转俯仰不允许"
+    },
+    {
+      "code": "600344",
+      "name": "SDK_SERVICE_GIMBAL_ROTATE_PITCH_OUT_OF_RANGE",
+      "description": "SDK 服务云台旋转俯仰超出范围"
+    },
+    {
+      "code": "600345",
+      "name": "SDK_SERVICE_GIMBAL_ROTATE_YAW_NOT_ALLOW",
+      "description": "SDK 服务云台旋转偏航不允许"
+    },
+    {
+      "code": "600346",
+      "name": "SDK_SERVICE_GIMBAL_ROTATE_YAW_OUT_OF_RANGE",
+      "description": "SDK 服务云台旋转偏航超出范围"
+    },
+    {
+      "code": "600347",
+      "name": "SDK_SERVICE_GIMBAL_ROTATE_ROLL_NOT_ALLOW",
+      "description": "SDK 服务云台旋转横滚不允许"
+    },
+    {
+      "code": "600348",
+      "name": "SDK_SERVICE_GIMBAL_ROTATE_ROLL_OUT_OF_RANGE",
+      "description": "SDK 服务云台旋转横滚超出范围"
+    },
+    {
+      "code": "600349",
+      "name": "SDK_SERVICE_GIMBAL_COMMAND_NOT_SUPPORTED_BY_CURRENT_ATTITUDE",
+      "description": "SDK 服务云台命令当前姿态不支持"
+    },
+    {
+      "code": "600350",
+      "name": "SDK_SERVICE_PAYLOAD_COMMAND_CAN_NOT_BE_EXECUTED_IN_CURRENT_MODE",
+      "description": "SDK 服务负载命令当前模式无法执行"
+    },
+    {
+      "code": "600351",
+      "name": "ACCOUNT_MANAGER_NETWORK_REQUEST_ERROR",
+      "description": "账户管理网络请求错误"
+    },
+    {
+      "code": "600352",
+      "name": "ACCOUNT_MANAGER_AUTHROIZED_FAILED",
+      "description": "账户管理授权失败"
+    },
+    {
+      "code": "600353",
+      "name": "ACCESS_LOCKER_FIRMWARE_WRITE",
+      "description": "访问锁固件写入错误"
+    },
+    {
+      "code": "600354",
+      "name": "ACCESS_LOCKER_FIRMWARE_READ",
+      "description": "访问锁固件读取错误"
+    },
+    {
+      "code": "600355",
+      "name": "ACCESS_LOCKER_SECURITYCODE_INCORRECT",
+      "description": "访问锁安全码不正确"
+    },
+    {
+      "code": "600356",
+      "name": "ACCESS_LOCKER_NOT_SETUP",
+      "description": "访问锁未设置"
+    },
+    {
+      "code": "600357",
+      "name": "ACCESS_LOCKER_ALREADY_UNLOCKED",
+      "description": "访问锁已解锁"
+    },
+    {
+      "code": "600358",
+      "name": "ACCESS_LOCKER_SECURITYCODE_INCORRECT_FIVETIMES",
+      "description": "访问锁安全码错误五次"
+    },
+    {
+      "code": "600359",
+      "name": "ACCESS_LOCKER_SECURITYCODE_INCORRECT_TWENTYTIMES",
+      "description": "访问锁安全码错误二十次"
+    },
+    {
+      "code": "600360",
+      "name": "ACCESS_LOCKER_USERNAME_NOT_EXIST",
+      "description": "访问锁用户名不存在"
+    },
+    {
+      "code": "600361",
+      "name": "ACCESS_LOCKER_SECURITYCODE_FORMAT_INVALID",
+      "description": "访问锁安全码格式无效"
+    },
+    {
+      "code": "600362",
+      "name": "ACCESS_LOCKER_INVALID_STATE",
+      "description": "访问锁无效状态"
+    },
+    {
+      "code": "600364",
+      "name": "RTK_CUSTOM_NETWORK_SERVER_START_FAIL",
+      "description": "RTK 自定义网络服务器启动失败"
+    },
+    {
+      "code": "600365",
+      "name": "RTK_CUSTOM_NETWORK_LOGIN_FAIL",
+      "description": "RTK 自定义网络登录失败"
+    },
+    {
+      "code": "600367",
+      "name": "RTK_NOT_SUPPORT_BY_CURRENT_CONTROLLER",
+      "description": "RTK 当前控制器不支持"
+    },
+    {
+      "code": "600368",
+      "name": "RTK_NOT_SUPPORT_BY_CONTROLLER_B",
+      "description": "RTK 控制器 B 不支持"
+    },
+    {
+      "code": "600370",
+      "name": "RTK_RC_ENCRPT_FAIL",
+      "description": "RTK 遥控器加密失败"
+    },
+    {
+      "code": "600371",
+      "name": "RTK_BASE_STATION_NEED_LOGIN",
+      "description": "RTK 基站需要登录"
+    },
+    {
+      "code": "600372",
+      "name": "RTK_SERVER_NOT_REACHABLE",
+      "description": "RTK 服务器不可达"
+    },
+    {
+      "code": "600373",
+      "name": "RTK_INVALID_REQUEST",
+      "description": "RTK 无效请求"
+    },
+    {
+      "code": "600374",
+      "name": "RTK_AUTENTICATION_FAILURE",
+      "description": "RTK 认证失败"
+    },
+    {
+      "code": "600375",
+      "name": "RTK_ACCOUNT_NOT_LOGGED_IN_OR_EXPIRED",
+      "description": "RTK 账户未登录或已过期"
+    },
+    {
+      "code": "600376",
+      "name": "RTK_ACCOUNT_UNACTIVATED",
+      "description": "RTK 账户未激活"
+    },
+    {
+      "code": "600377",
+      "name": "RTK_ACCOUNT_ERROR",
+      "description": "RTK 账户错误"
+    },
+    {
+      "code": "600378",
+      "name": "RTK_ALREADY_STARED",
+      "description": "RTK 已启动"
+    },
+    {
+      "code": "600379",
+      "name": "RTK_INVALID_GPS_DATA",
+      "description": "RTK 无效 GPS 数据"
+    },
+    {
+      "code": "600380",
+      "name": "RTK_AUTH_ENC_NOT_LOGIN",
+      "description": "RTK 授权加密未登录"
+    },
+    {
+      "code": "600381",
+      "name": "RTK_DPS_NETWORK_SETTING_INVALID",
+      "description": "RTK DPS 网络设置无效"
+    },
+    {
+      "code": "600382",
+      "name": "RTK_BASE_STATION_PARAMETER_NUMBER_NOT_MATCH",
+      "description": "RTK 基站参数数量不匹配"
+    },
+    {
+      "code": "600383",
+      "name": "RTK_BASE_STATION_PARAMETER_LENGTH_NOT_MATCH",
+      "description": "RTK 基站参数长度不匹配"
+    },
+    {
+      "code": "600384",
+      "name": "RTK_BASE_STATION_PARAMETER_READ_ONLY",
+      "description": "RTK 基站参数只读"
+    },
+    {
+      "code": "600385",
+      "name": "RTK_BASE_STATION_PASSWORD_INVALID",
+      "description": "RTK 基站密码无效"
+    },
+    {
+      "code": "600386",
+      "name": "RTK_NETWORK_SET_COORDINATE_SYS_FAIL",
+      "description": "RTK 网络设置坐标系统失败"
+    },
+    {
+      "code": "600387",
+      "name": "RTK_DPS_NETWORK_CONFIG_INVALID",
+      "description": "RTK DPS 网络配置无效"
+    },
+    {
+      "code": "600388",
+      "name": "RTK_DPS_NETWORK_GET_TOKEN_FAILED",
+      "description": "RTK DPS 网络获取令牌失败"
+    },
+    {
+      "code": "600389",
+      "name": "RTK_GET_ACCOUNT_INFO_FAILED",
+      "description": "RTK 获取账户信息失败"
+    },
+    {
+      "code": "600390",
+      "name": "RTK_GET_AUTH_ENC_FAILED",
+      "description": "RTK 获取授权加密失败"
+    },
+    {
+      "code": "600391",
+      "name": "RTK_GET_AUTH_ENC_IS_NULL",
+      "description": "RTK 获取授权加密为空"
+    },
+    {
+      "code": "600392",
+      "name": "RTK_SOURCE_AUTH_NOT_MATHED",
+      "description": "RTK 源授权不匹配"
+    },
+    {
+      "code": "600393",
+      "name": "RTK_REQUEST_ACCESS_ERROR",
+      "description": "RTK 请求访问错误"
+    },
+    {
+      "code": "600394",
+      "name": "RTK_RESPONSE_PARSE_ERROR",
+      "description": "RTK 响应解析错误"
+    },
+    {
+      "code": "600395",
+      "name": "ACCESS_LOCKER_USER_NAME_FORMAT_INVALID",
+      "description": "访问锁用户名格式无效"
+    },
+    {
+      "code": "600396",
+      "name": "ACCESS_LOCKER_V1_BUSY",
+      "description": "访问锁 V1 繁忙"
+    },
+    {
+      "code": "600397",
+      "name": "ACCESS_LOCKER_V1_VERSION_ERR",
+      "description": "访问锁 V1 版本错误"
+    },
+    {
+      "code": "600398",
+      "name": "ACCESS_LOCKER_V1_PW_SET_FAILED",
+      "description": "访问锁 V1 密码设置失败"
+    },
+    {
+      "code": "600399",
+      "name": "ACCESS_LOCKER_V1_PW_VERIFY_FAILED",
+      "description": "访问锁 V1 密码验证失败"
+    },
+    {
+      "code": "600400",
+      "name": "ACCESS_LOCKER_V1_NEW_PW_REPEAT",
+      "description": "访问锁 V1 新密码重复"
+    },
+    {
+      "code": "600401",
+      "name": "ACCESS_LOCKER_V1_CONTROL_NOT_SUPPORT",
+      "description": "访问锁 V1 控制不支持"
+    },
+    {
+      "code": "600402",
+      "name": "ACCESS_LOCKER_V1_CONTROL_FAILED",
+      "description": "访问锁 V1 控制失败"
+    },
+    {
+      "code": "600403",
+      "name": "ACCESS_LOCKER_V1_RESET_FAILED",
+      "description": "访问锁 V1 重置失败"
+    },
+    {
+      "code": "600404",
+      "name": "ACCESS_LOCKER_V1_RET_KEY_EXC_FAILED",
+      "description": "访问锁 V1 密钥交换失败"
+    },
+    {
+      "code": "600405",
+      "name": "ACCESS_LOCKER_V1_RET_KEY_EXC_NEEDED",
+      "description": "访问锁 V1 密钥交换需要"
+    },
+    {
+      "code": "600406",
+      "name": "FIRMWARE_LIVE_STREAMING_WIFI_CONNECT_PWD_ERROR",
+      "description": "固件直播 WiFi 连接密码错误"
+    },
+    {
+      "code": "600407",
+      "name": "FIRMWARE_LIVE_STREAMING_WIFI_CONNECT_FAILED",
+      "description": "固件直播 WiFi 连接失败"
+    },
+    {
+      "code": "600408",
+      "name": "FIRMWARE_LIVE_STREAMING_RTMP_IPC_FAILED",
+      "description": "固件直播 RTMP IPC 失败"
+    },
+    {
+      "code": "600409",
+      "name": "FIRMWARE_LIVE_STREAMING_RTMP_CONNECT_FAILED",
+      "description": "固件直播 RTMP 连接失败"
+    },
+    {
+      "code": "600410",
+      "name": "FIRMWARE_LIVE_STREAMING_RTMP_VERIFY_FAILED",
+      "description": "固件直播 RTMP 验证失败"
+    },
+    {
+      "code": "600411",
+      "name": "REMOTECONTROLLER_AUTHORITY_OWNER_OFFLINE",
+      "description": "遥控器权限所有者离线"
+    },
+    {
+      "code": "600412",
+      "name": "REMOTECONTROLLER_AUTHORITY_DEVICE_OFFLINE",
+      "description": "遥控器权限设备离线"
+    },
+    {
+      "code": "600413",
+      "name": "REMOTECONTROLLER_AUTHORITY_IS_OWNER",
+      "description": "遥控器权限为所有者"
+    },
+    {
+      "code": "600414",
+      "name": "REMOTECONTROLLER_AUTHORITY_DEVICE_LOCKED",
+      "description": "遥控器权限设备锁定"
+    },
+    {
+      "code": "600415",
+      "name": "REMOTECONTROLLER_AUTHORITY_AUTH_OTHER",
+      "description": "遥控器权限授权他人"
+    },
+    {
+      "code": "600416",
+      "name": "REMOTECONTROLLER_AUTHORITY_ALREADY_LOCK",
+      "description": "遥控器权限已锁定"
+    },
+    {
+      "code": "600417",
+      "name": "REMOTECONTROLLER_AUTHORITY_NO_AUTHORITY",
+      "description": "遥控器权限无权限"
+    },
+    {
+      "code": "600418",
+      "name": "REMOTECONTROLLER_NOT_NEED_CHANGE",
+      "description": "遥控器无需更改"
+    },
+    {
+      "code": "600419",
+      "name": "REMOTECONTROLLER_USER_OVER_LIMITS",
+      "description": "遥控器用户超限"
+    },
+    {
+      "code": "600420",
+      "name": "REMOTECONTROLLER_USER_NAME_EXIST",
+      "description": "遥控器用户名已存在"
+    },
+    {
+      "code": "600421",
+      "name": "REMOTECONTROLLER_USER_LESS_LIMITS",
+      "description": "遥控器用户低于限制"
+    },
+    {
+      "code": "600422",
+      "name": "REMOTECONTROLLER_USER_NAME_NOT_EXIST",
+      "description": "遥控器用户名不存在"
+    },
+    {
+      "code": "600423",
+      "name": "REMOTECONTROLLER_NOT_NEED_CHANGE_INDEX",
+      "description": "遥控器无需更改索引"
+    },
+    {
+      "code": "600424",
+      "name": "REMOTECONTROLLER_DATA_ERROR",
+      "description": "遥控器数据错误"
+    },
+    {
+      "code": "600425",
+      "name": "REMOTECONTROLLER_NOT_DATA",
+      "description": "遥控器无数据"
+    },
+    {
+      "code": "600426",
+      "name": "REMOTECONTROLLER_CONFIG_COUNT_OVERFLOW",
+      "description": "遥控器配置数量超限"
+    },
+    {
+      "code": "600427",
+      "name": "AIRLINK_MULTI_SOURCE_SOURCE_ID_INVALID",
+      "description": "Airlink 多源 ID 无效"
+    },
+    {
+      "code": "600428",
+      "name": "AIRLINK_MULTI_SOURCE_REACH_MA_MAX_LIMIT",
+      "description": "Airlink 多源达到 MA 最大限制"
+    },
+    {
+      "code": "600429",
+      "name": "AIRLINK_MULTI_SOURCE_V1_SOURCE_NOT_FOUND",
+      "description": "Airlink 多源 V1 源未找到"
+    },
+    {
+      "code": "600430",
+      "name": "AIRLINK_MULTI_SOURCE_CHANNEL_NOT_ALIVE",
+      "description": "Airlink 多源频道不活跃"
+    },
+    {
+      "code": "600431",
+      "name": "AIRLINK_LTE_LINK_SWITCH_TIME_OUT",
+      "description": "Airlink LTE 链接切换超时"
+    },
+    {
+      "code": "600432",
+      "name": "AIRLINK_LTE_LINK_SWITCH_HARDWARE_UNPREPARED",
+      "description": "Airlink LTE 链接切换硬件未准备好"
+    },
+    {
+      "code": "600433",
+      "name": "AIRLINK_LTE_LINK_SWITCH_LINK_AGENT_UNPREPARED",
+      "description": "Airlink LTE 链接切换链接代理未准备好"
+    },
+    {
+      "code": "600434",
+      "name": "AIRLINK_LTE_LINK_SWITCH_ROUTE_FAILED",
+      "description": "Airlink LTE 链接切换路由失败"
+    },
+    {
+      "code": "600435",
+      "name": "AIRLINK_LTE_LINK_SWITCH_AGAIN",
+      "description": "Airlink LTE 链接切换再次请求"
+    },
+    {
+      "code": "600436",
+      "name": "AIRLINK_LTE_LINK_SWITCH_REPEAT_REQUEST",
+      "description": "Airlink LTE 链接切换重复请求"
+    },
+    {
+      "code": "600437",
+      "name": "AIRLINK_LTE_LINK_SWITCH_NO_DEVICE",
+      "description": "Airlink LTE 链接切换无设备"
+    },
+    {
+      "code": "600438",
+      "name": "AIRLINK_LTE_LINK_SWITCH_INTERNAL_ERROR",
+      "description": "Airlink LTE 链接切换内部错误"
+    },
+    {
+      "code": "600439",
+      "name": "AIRLINK_LTE_LINK_SWITCH_PARAMETER",
+      "description": "Airlink LTE 链接切换参数错误"
+    },
+    {
+      "code": "600440",
+      "name": "AIRLINK_LTE_LINK_SWITCH_NEGOTIATION",
+      "description": "Airlink LTE 链接切换协商失败"
+    },
+    {
+      "code": "600441",
+      "name": "AIRLINK_LTE_LINK_SWITCH_NO_TARGET_DEVICE",
+      "description": "Airlink LTE 链接切换无目标设备"
+    },
+    {
+      "code": "600442",
+      "name": "GRAVITY_CENTER_CALIBRATION_NOT_FLYING",
+      "description": "重心校准不在飞行中"
+    },
+    {
+      "code": "600443",
+      "name": "GRAVITY_CENTER_CALIBRATION_NOT_FLYING_NOT_WORK_IN_SIMULATOR",
+      "description": "重心校准不在飞行中，模拟器不工作"
+    },
+    {
+      "code": "600444",
+      "name": "GRAVITY_CENTER_CALIBRATION_IS_RUNNING",
+      "description": "重心校准正在运行"
+    },
+    {
+      "code": "600445",
+      "name": "GRAVITY_CENTER_CALIBRATION_NOT_HOVERING",
+      "description": "重心校准未悬停"
+    },
+    {
+      "code": "600446",
+      "name": "CONTROL_AUTH_DEVICE_NOT_ALLOW",
+      "description": "控制授权设备不允许"
+    },
+    {
+      "code": "600447",
+      "name": "CONTROL_AUTH_ENGINE_STARTING",
+      "description": "控制授权发动机启动"
+    },
+    {
+      "code": "600448",
+      "name": "CONTROL_AUTH_TAKING_OFF",
+      "description": "控制授权起飞"
+    },
+    {
+      "code": "600449",
+      "name": "CONTROL_AUTH_LANDING",
+      "description": "控制授权降落"
+    },
+    {
+      "code": "600450",
+      "name": "CONTROL_AUTH_RC_NOT_P_MODE",
+      "description": "控制授权遥控器非 P 模式"
+    },
+    {
+      "code": "600451",
+      "name": "CONTROL_AUTH_HAS_NO_CONTROL_AUTH",
+      "description": "控制授权无控制权限"
+    },
+    {
+      "code": "600452",
+      "name": "CONTROL_AUTH_IN_RC_LOST_ACTION",
+      "description": "控制授权在遥控器失联动作中"
+    },
+    {
+      "code": "600453",
+      "name": "CARE_SIGNATURE_ERROR",
+      "description": "Care 签名错误"
+    },
+    {
+      "code": "600454",
+      "name": "CARE_INVALID_DATA",
+      "description": "Care 无效数据"
+    },
+    {
+      "code": "600455",
+      "name": "CARE_INVALID_TOKEN",
+      "description": "Care 无效令牌"
+    },
+    {
+      "code": "600456",
+      "name": "CARE_DEVICE_NOT_IN_SYSTEM",
+      "description": "Care 设备不在系统中"
+    },
+    {
+      "code": "600457",
+      "name": "CARE_DUPLICATE_BIND",
+      "description": "Care 重复绑定"
+    },
+    {
+      "code": "600458",
+      "name": "CARE_ALREADY_VERIFY_LOST",
+      "description": "Care 已验证丢失"
+    },
+    {
+      "code": "600459",
+      "name": "CARE_RC_WITH_UPPER_LIMIT_DRONE",
+      "description": "Care 遥控器带上限无人机"
+    },
+    {
+      "code": "600460",
+      "name": "CARE_ALREADY_BIND_OTHER_ACCOUNT",
+      "description": "Care 已绑定其他账户"
+    },
+    {
+      "code": "600461",
+      "name": "CARE_NO_CARE_SERVICE",
+      "description": "Care 无 Care 服务"
+    },
+    {
+      "code": "600462",
+      "name": "CARE_ALREADY_COMMIT_LOSS",
+      "description": "Care 已提交丢失"
+    },
+    {
+      "code": "600463",
+      "name": "CARE_NOT_BIND_RC",
+      "description": "Care 未绑定遥控器"
+    },
+    {
+      "code": "600464",
+      "name": "CARE_WRONG_STATE",
+      "description": "Care 状态错误"
+    },
+    {
+      "code": "600465",
+      "name": "CARE_NETWORK_ERROR",
+      "description": "Care 网络错误"
+    },
+    {
+      "code": "600466",
+      "name": "CARE_SERVICE_ERROR",
+      "description": "Care 服务错误"
+    },
+    {
+      "code": "600467",
+      "name": "CARE_NOT_COMMIT_LOSS",
+      "description": "Care 未提交丢失"
+    },
+    {
+      "code": "600468",
+      "name": "CARE_FIRMWARE_TIMEOUT",
+      "description": "Care 固件超时"
+    },
+    {
+      "code": "600469",
+      "name": "CARE_FIRMWARE_INVALID_PARAM",
+      "description": "Care 固件无效参数"
+    },
+    {
+      "code": "600470",
+      "name": "CARE_FIRMWARE_WRONG_STATE",
+      "description": "Care 固件状态错误"
+    },
+    {
+      "code": "600471",
+      "name": "CARE_FIRMWARE_IN_BLACKLIST",
+      "description": "Care 固件在黑名单中"
+    },
+    {
+      "code": "600472",
+      "name": "CARE_FIRMWARE_NO_CARE",
+      "description": "Care 固件无 Care"
+    },
+    {
+      "code": "600473",
+      "name": "CARE_FIRMWARE_ACCOUNT_VERIFY_FAIL",
+      "description": "Care 固件账户验证失败"
+    },
+    {
+      "code": "600474",
+      "name": "CARE_FIRMWARE_SERVCE_MAC_VERIFY_FAIL",
+      "description": "Care 固件服务 MAC 验证失败"
+    },
+    {
+      "code": "600475",
+      "name": "CARE_FIRMWARE_NONCE_VERIFY_FAIL",
+      "description": "Care 固件 nonce 验证失败"
+    },
+    {
+      "code": "600476",
+      "name": "CARE_FIRMWARE_DRONE_MAC_VERIFY_FAIL",
+      "description": "Care 固件无人机 MAC 验证失败"
+    },
+    {
+      "code": "600477",
+      "name": "CARE_FIRMWARE_DRONE_SN_VERIFY_FAIL",
+      "description": "Care 固件无人机 SN 验证失败"
+    },
+    {
+      "code": "600478",
+      "name": "CARE_FIRMWARE_RC_SN_VERIFY_FAIL",
+      "description": "Care 固件遥控器 SN 验证失败"
+    },
+    {
+      "code": "600479",
+      "name": "CARE_FIRMWARE_RC_CHIP_ID_VERIFY_FAIL",
+      "description": "Care 固件遥控器芯片 ID 验证失败"
+    },
+    {
+      "code": "600480",
+      "name": "CARE_FIRMWARE_DRONE_UPDATE_STATE_FAIL",
+      "description": "Care 固件无人机更新状态失败"
+    },
+    {
+      "code": "600481",
+      "name": "CARE_INVALID_DRONE_SN",
+      "description": "Care 无效的无人机 SN"
+    },
+    {
+      "code": "600482",
+      "name": "CARE_DUPLICATE_LOSS_VERIFY",
+      "description": "Care 重复丢失验证"
+    },
+    {
+      "code": "600483",
+      "name": "SERVICE_UNKNOWN_ERR",
+      "description": "服务未知错误"
+    },
+    {
+      "code": "600484",
+      "name": "SERVICE_INVALID_PARAM",
+      "description": "服务无效参数"
+    },
+    {
+      "code": "600485",
+      "name": "SERVICE_DB_ERR",
+      "description": "服务数据库错误"
+    },
+    {
+      "code": "600486",
+      "name": "SERVICE_DEVICE_USER_TOKEN_NOT_MATCH",
+      "description": "服务设备用户令牌不匹配"
+    },
+    {
+      "code": "600487",
+      "name": "SERVICE_DEVICE_NOT_BIND",
+      "description": "服务设备未绑定"
+    },
+    {
+      "code": "600488",
+      "name": "SERVICE_DEVICE_ALREADY_BIND",
+      "description": "服务设备已绑定"
+    },
+    {
+      "code": "600489",
+      "name": "SERVICE_DEVICE_INVALID_SN",
+      "description": "服务设备无效 SN"
+    },
+    {
+      "code": "600490",
+      "name": "SERVICE_DEVICE_INVALID_ACTIVATE_TIME",
+      "description": "服务设备无效激活时间"
+    },
+    {
+      "code": "600491",
+      "name": "SERVICE_NETWORK_ERROR",
+      "description": "服务网络错误"
+    },
+    {
+      "code": "600492",
+      "name": "SERVICE_CSDK_EMPTY_GIMBAL_SN",
+      "description": "服务 CSDK 空的云台 SN"
+    },
+    {
+      "code": "600493",
+      "name": "SERVICE_CSDK_EMPTY_USER_TOKEN",
+      "description": "服务 CSDK 空的用户令牌"
+    },
+    {
+      "code": "600494",
+      "name": "CARE_FIRMWARE_DEVICE_ALREADY_BIND",
+      "description": "Care 固件设备已绑定"
+    },
+    {
+      "code": "600495",
+      "name": "CLOUD_MEDIA_UPLOAD_CONFIG_INVALID",
+      "description": "云媒体上传配置无效"
+    },
+    {
+      "code": "600496",
+      "name": "CLOUD_UPLOAD_REQUEST_INVALID",
+      "description": "云上传请求无效"
+    },
+    {
+      "code": "600497",
+      "name": "CLOUD_GET_TOKEN_FAILED",
+      "description": "云获取令牌失败"
+    },
+    {
+      "code": "600498",
+      "name": "CLOUD_UPLOAD_FAILED",
+      "description": "云上传失败"
+    },
+    {
+      "code": "600499",
+      "name": "CLOUD_CALLBACK_FAILED",
+      "description": "云回调失败"
+    },
+    {
+      "code": "600500",
+      "name": "CLOUD_DOWNLOAD_FAILED",
+      "description": "云下载失败"
+    },
+    {
+      "code": "600501",
+      "name": "CLOUD_UPLOAD_STATE_SYNC_FAILED",
+      "description": "云上传状态同步失败"
+    },
+    {
+      "code": "600502",
+      "name": "CLOUD_SET_FOLDER_NAME_FAILED",
+      "description": "云设置文件夹名称失败"
+    },
+    {
+      "code": "600503",
+      "name": "CLOUD_UPLOAD_FAILED_ACCESS",
+      "description": "云上传访问失败"
+    },
+    {
+      "code": "600504",
+      "name": "WP3_NO_THIS_MISSION",
+      "description": "WP3 无此任务"
+    },
+    {
+      "code": "600505",
+      "name": "WP3_NO_THIS_BREAK_POINT",
+      "description": "WP3 无此断点"
+    },
+    {
+      "code": "600506",
+      "name": "WP3_QUERY_EXCUTION_STATUS_INVALID",
+      "description": "WP3 查询执行状态无效"
+    },
+    {
+      "code": "600507",
+      "name": "DEACTIVATE_Server_NETWORK_ERR",
+      "description": "停用服务器网络错误"
+    },
+    {
+      "code": "600508",
+      "name": "DEACTIVATE_Server_USERNAME_PASSWORD_ERR",
+      "description": "停用服务器用户名密码错误"
+    },
+    {
+      "code": "600509",
+      "name": "DEACTIVATE_Server_AUTH_DATA_FAILED",
+      "description": "停用服务器认证数据失败"
+    },
+    {
+      "code": "600510",
+      "name": "DEACTIVATE_Server_AUTHED_DATA_DOWNLOAD_ERR",
+      "description": "停用服务器认证数据下载错误"
+    },
+    {
+      "code": "600511",
+      "name": "DEACTIVATE_Server_AUTHED_DATA_MD5_ERR",
+      "description": "停用服务器认证数据 MD5 错误"
+    },
+    {
+      "code": "600512",
+      "name": "DEACTIVATE_DEVICE_GET_DATA_ERR",
+      "description": "停用设备获取数据错误"
+    },
+    {
+      "code": "600513",
+      "name": "DEACTIVATE_DEVICE_SET_DATA_ERR",
+      "description": "停用设备设置数据错误"
+    },
+    {
+      "code": "600514",
+      "name": "DEACTIVATE_Server_PERLOGIN_ERR",
+      "description": "停用服务器预登录错误"
+    },
+    {
+      "code": "600515",
+      "name": "UOM_REALNAME_NETWORK_ERROR",
+      "description": "UOM 实名制网络错误"
+    },
+    {
+      "code": "600516",
+      "name": "UOM_REALNAME_UOM_ERROR",
+      "description": "UOM 实名制 UOM 错误"
+    },
+    {
+      "code": "600517",
+      "name": "UOM_REALNAME_VALIDATION_FAILURE",
+      "description": "UOM 实名制验证失败"
+    },
+    {
+      "code": "600518",
+      "name": "UOM_REALNAME_NOT_ACTIVE_YET",
+      "description": "UOM 实名制未激活"
+    },
+    {
+      "code": "600519",
+      "name": "UOM_REALNAME_NO_REALNAME_CHECK_NEEDED",
+      "description": "UOM 实名制无需实名检查"
+    },
+    {
+      "code": "600520",
+      "name": "UOM_REALNAME_UNLOCKED",
+      "description": "UOM 实名制解锁"
+    },
+    {
+      "code": "600521",
+      "name": "UOM_REALNAME_DONT_IN_CHINA_MAINLAND",
+      "description": "UOM 实名制不在中国大陆"
+    },
+    {
+      "code": "600522",
+      "name": "UOM_REALNAME_UNKNOWN",
+      "description": "UOM 实名制未知"
+    },
+    {
+      "code": "600523",
+      "name": "UOM_REALNAME_SUBCMD_MISMATCH",
+      "description": "UOM 实名制子命令不匹配"
+    },
+    {
+      "code": "600524",
+      "name": "UOM_REALNAME_NEED_DRONE_PARAM",
+      "description": "UOM 实名制需要无人机参数"
+    },
+    {
+      "code": "600525",
+      "name": "UOM_REALNAME_UNSUPPORTED",
+      "description": "UOM 实名制不支持"
+    },
+    {
+      "code": "600526",
+      "name": "PLACEHOLDER",
+      "description": "占位符"
+    },
+    {
+      "code": "600527",
+      "name": "UNKNOWN",
+      "description": "未知错误"
+    },
+    {
+      "code": "600528",
+      "name": "USER_CANCELS_ROUTE_TASK",
+      "description": "用户取消航线任务"
+    },
+    {
+      "code": "610001",
+      "name": "REMOTE_CONTROLLER_BATTERY_BELOW_50_PERCENT",
+      "description": "遥控器电量低于50%"
+    },
+    {
+      "code": "610002",
+      "name": "PUSH_ROD_STATUS_NOT_OPEN",
+      "description": "推杆状态未开启"
+    },
+    {
+      "code": "610003",
+      "name": "HATCH_STATUS_NOT_OPEN",
+      "description": "舱门状态未开启"
+    },
+    {
+      "code": "610004",
+      "name": "REMOTE_CONTROLLER_START_FAILURE",
+      "description": "遥控器开启失败"
+    },
+    {
+      "code": "610005",
+      "name": "RTK_CONFIGURATION_ERROR",
+      "description": "RTK配置错误"
+    },
+    {
+      "code": "610006",
+      "name": "GIMBAL_SELF_ROTATION_ERROR",
+      "description": "云台自转错误"
+    },
+    {
+      "code": "610007",
+      "name": "PRE_FLIGHT_HMS_ERROR",
+      "description": "起飞前HMS出错"
+    },
+    {
+      "code": "610008",
+      "name": "SIMULATED_FLIGHT_SETTING_FAILURE",
+      "description": "模拟飞行设置失败"
+    },
+    {
+      "code": "610009",
+      "name": "GET_STORAGE_CONFIG_TIMES_FAILURE",
+      "description": "获取storage_config_times失败"
+    },
+    {
+      "code": "610010",
+      "name": "GET_PHOTO_DOWNLOAD_LIST_FAILURE",
+      "description": "获取照片下载列表失败"
+    },
+    {
+      "code": "610011",
+      "name": "DRONE_BATTERY_SELF_HEATING_FAILURE",
+      "description": "无人机电池自加热失败"
+    },
+    {
+      "code": "610012",
+      "name": "NO_FREQUENCY_PAIRING",
+      "description": "没有对频"
+    },
+    {
+      "code": "610013",
+      "name": "NOT_IN_HANGAR",
+      "description": "没有在机舱"
+    },
+    {
+      "code": "610014",
+      "name": "JUMP_AIRPORT_PREPARATION_FAILURE",
+      "description": "跳飞机场准备失败"
+    },
+    {
+      "code": "610015",
+      "name": "FLIGHTTASK_RESOURCE_GET_FAILURE",
+      "description": "任务资源获取失败"
+    },
+    {
+      "code": "615001",
+      "name": "DOCK_NOT_IDLE",
+      "description": "机场不在空闲状态"
+    },
+    {
+      "code": "615002",
+      "name": "DOCK_STATUS_CHECK_FAILED",
+      "description": "机场状态检查失败"
+    },
+    {
+      "code": "615003",
+      "name": "MISSION_START_FAILED",
+      "description": "任务启动失败"
+    },
+    {
+      "code": "615004",
+      "name": "MISSION_START_TIMEOUT",
+      "description": "任务启动超时"
+    },
+    {
+      "code": "615005",
+      "name": "MISSION_EXECUTION_FAILED",
+      "description": "任务执行失败"
+    },
+    {
+      "code": "615006",
+      "name": "MISSION_TIMEOUT",
+      "description": "任务执行超时"
+    },
+    {
+      "code": "615007",
+      "name": "DRONE_NOT_TAKEOFF",
+      "description": "无人机未起飞"
+    },
+    {
+      "code": "615008",
+      "name": "LANDING_TIMEOUT",
+      "description": "降落超时"
+    },
+    {
+      "code": "615009",
+      "name": "LANDING_FAILED",
+      "description": "降落失败"
+    },
+    {
+      "code": "615010",
+      "name": "DATA_RETRIEVAL_FAILED",
+      "description": "数据获取失败"
+    },
+    {
+      "code": "615011",
+      "name": "REDIS_CONNECTION_FAILED",
+      "description": "Redis连接失败"
+    },
+    {
+      "code": "615012",
+      "name": "HTTP_REQUEST_FAILED",
+      "description": "HTTP请求失败"
+    },
+    {
+      "code": "615013",
+      "name": "HTTP_TIMEOUT",
+      "description": "HTTP请求超时"
+    },
+    {
+      "code": "615014",
+      "name": "MISSION_CANCELED",
+      "description": "任务已取消"
+    },
+    {
+      "code": "620002",
+      "name": "COMMON_ERROR",
+      "description": "通用错误"
+    },
+    {
+      "code": "620003",
+      "name": "CMD_NOT_SEND",
+      "description": "固件未执行"
+    },
+    {
+      "code": "620004",
+      "name": "STOP_BUTTON_PRESSED",
+      "description": "急停按钮被按下"
+    },
+    {
+      "code": "620005",
+      "name": "NOT_SUPPORT",
+      "description": "不支持该功能"
+    },
+    {
+      "code": "620006",
+      "name": "DOCK_IS_BUSY",
+      "description": "机场正在执行任务"
+    },
+    {
+      "code": "621001",
+      "name": "CHECK_ERROR",
+      "description": "电机检查错误"
+    },
+    {
+      "code": "621002",
+      "name": "PARAM_ERROR",
+      "description": "参数错误"
+    },
+    {
+      "code": "621014",
+      "name": "MOTOR_CALIB_TIMEOUT",
+      "description": "电机回零超时"
+    },
+    {
+      "code": "621015",
+      "name": "MOTOR_CALIB_FAILED",
+      "description": "电机回零失败"
+    },
+    {
+      "code": "621017",
+      "name": "MOTOR_MOVE_TIMEOUT",
+      "description": "电机运行超时"
+    },
+    {
+      "code": "621018",
+      "name": "MOTOR_MOVE_STALL",
+      "description": "电机运行堵转"
+    },
+    {
+      "code": "621021",
+      "name": "MOTOR_IS_RUNNING",
+      "description": "电机正在运行"
+    },
+    {
+      "code": "621022",
+      "name": "MOTOR_NOT_CALIB",
+      "description": "电机未校准"
+    },
+    {
+      "code": "621023",
+      "name": "MOTOR_POS_NOT_ALLOWED",
+      "description": "当前电机位置不允许操作"
+    },
+    {
+      "code": "621019",
+      "name": "SERVO_MOVE_TIMEOUT",
+      "description": "舵机运行超时"
+    },
+    {
+      "code": "621020",
+      "name": "SERVO_MOVE_FAILED",
+      "description": "舵机运行失败"
+    },
+    {
+      "code": "621024",
+      "name": "MOTOR_XY_FREE_FAILED",
+      "description": "推杆松开失败"
+    },
+    {
+      "code": "621025",
+      "name": "MOTOR_XY_FIX_FAILED",
+      "description": "推杆夹紧失败"
+    },
+    {
+      "code": "621026",
+      "name": "MOTOR_DOOR_OPEN_FAILED",
+      "description": "舱门打开失败"
+    },
+    {
+      "code": "621027",
+      "name": "MOTOR_DOOR_CLOSE_FAILED",
+      "description": "舱门关闭失败"
+    },
+    {
+      "code": "621028",
+      "name": "MOTOR_RUNNING_CHECK_FAILED",
+      "description": "电机运行时，检测到传感器异常"
+    },
+    {
+      "code": "622024",
+      "name": "RC_ON_FAILED",
+      "description": "遥控器开启失败"
+    },
+    {
+      "code": "622025",
+      "name": "RC_ON_TIMEOUT",
+      "description": "遥控器开启超时"
+    },
+    {
+      "code": "622029",
+      "name": "RC_ON_FAILED_LED_NOT_ON",
+      "description": "遥控器开启失败，LED未亮"
+    },
+    {
+      "code": "622030",
+      "name": "RC_ON_FAILED_SWITCHING",
+      "description": "遥控器开启失败，正在切换"
+    },
+    {
+      "code": "622026",
+      "name": "RC_OFF_FAILED_DRONE_NOT_LAND",
+      "description": "遥控器关闭失败，飞行器未着陆"
+    },
+    {
+      "code": "622027",
+      "name": "RC_OFF_TIMEOUT",
+      "description": "遥控器关闭超时"
+    },
+    {
+      "code": "622028",
+      "name": "RC_OFF_FAILED",
+      "description": "遥控器关闭失败"
+    },
+    {
+      "code": "622031",
+      "name": "RC_OFF_FAILED_LED_NOT_OFF",
+      "description": "遥控器关闭失败，LED未灭"
+    },
+    {
+      "code": "622032",
+      "name": "RC_OFF_FAILED_SWITCHING",
+      "description": "遥控器关闭失败，正在切换"
+    },
+    {
+      "code": "622033",
+      "name": "RC_COLOR_SENSOR_COMM_ERROR",
+      "description": "遥控器颜色传感器通信错误"
+    },
+    {
+      "code": "622034",
+      "name": "RC_ON_FAILED_NOT_ADB",
+      "description": "遥控器开启失败，无法和遥控器建立USB连接"
+    },
+    {
+      "code": "622035",
+      "name": "RC_ON_FAILED_NOT_START_APP",
+      "description": "遥控器开启失败，无法启动APP"
+    },
+    {
+      "code": "622036",
+      "name": "RC_ON_FAILED_NOT_CONNECT_TO_DOCK_NETWORK",
+      "description": "遥控器开启失败，无法连接到机场网络"
+    },
+    {
+      "code": "626012",
+      "name": "RC_REBOOT_FAILED",
+      "description": "飞机和遥控器重启失败"
+    },
+    {
+      "code": "623033",
+      "name": "CHARGER_OUTPUT_TIMEOUT",
+      "description": "充电器输出超时"
+    },
+    {
+      "code": "623034",
+      "name": "CHARGER_STOP_TIMEOUT",
+      "description": "充电器停止输出超时"
+    },
+    {
+      "code": "623035",
+      "name": "CHARGER_XY_NOT_FIX",
+      "description": "充电器XY未固定"
+    },
+    {
+      "code": "623036",
+      "name": "CHARGER_ON_DRONE_NO_VOLTAGE",
+      "description": "开启飞行器无电压"
+    },
+    {
+      "code": "623037",
+      "name": "CHARGER_OFF_FAIL_STILL_VOLTAGE",
+      "description": "充电器关闭失败，仍有电压"
+    },
+    {
+      "code": "623038",
+      "name": "CHARGER_GET_DRONE_VOLTAGE_FAIL",
+      "description": "充电器获取飞行器电压失败"
+    },
+    {
+      "code": "623039",
+      "name": "CHARGER_PAIR_RC_START_FAIL",
+      "description": "对频失败，遥控器无法进入对频模式"
+    },
+    {
+      "code": "623040",
+      "name": "CHARGER_PAIR_RC_STOP_FAIL",
+      "description": "对频失败，遥控器无法停止对频模式"
+    },
+    {
+      "code": "623041",
+      "name": "CHARGER_PAIR_DRONE_ENTER_PAIR_FAIL",
+      "description": "对频失败，飞行器进入对频模式失败"
+    },
+    {
+      "code": "623042",
+      "name": "CHARGER_AUTO_WORKFLOW_FAIL",
+      "description": "充电器自动充电流程失败"
+    },
+    {
+      "code": "623043",
+      "name": "CHARGER_ON_DRONE_AND_REMOTE_FAIL",
+      "description": "开启飞行器和遥控器失败"
+    },
+    {
+      "code": "623044",
+      "name": "CHARGER_ON_COMMON_ERROR",
+      "description": "充电开始错误"
+    },
+    {
+      "code": "623045",
+      "name": "CHARGER_OFF_COMMON_ERROR",
+      "description": "充电关闭错误"
+    },
+    {
+      "code": "623046",
+      "name": "CHARGER_PAIR_RC_NOT_ON",
+      "description": "对频失败，遥控器未开启"
+    },
+    {
+      "code": "623047",
+      "name": "CHARGER_PAIR_DEPOT_NOT_FIX",
+      "description": "对频失败，飞机推杆未固定"
+    },
+    {
+      "code": "623048",
+      "name": "CHARGER_PAIR_DRONE_NOT_ON",
+      "description": "对频失败，飞行器未开启"
+    },
+    {
+      "code": "623049",
+      "name": "CHARGER_PAIR_DRONE_NOT_PAIR_MODE",
+      "description": "对频失败，飞行器无法进入对频模式"
+    },
+    {
+      "code": "623050",
+      "name": "CHARGER_ON_DRONE_NO_CURRENT",
+      "description": "开启飞行器无电流，可能未连接电池"
+    },
+    {
+      "code": "623051",
+      "name": "CHARGER_INPUT_VOLTAGE_NOT_MATCH",
+      "description": "充电器输入电压不匹配"
+    },
+    {
+      "code": "623052",
+      "name": "CHARGER_ON_PRESET_FAIL",
+      "description": "充电器预设参数失败"
+    },
+    {
+      "code": "623053",
+      "name": "CHARGER_OFF_FAIL_STILL_CURRENT",
+      "description": "充电器关闭失败，仍有电流"
+    },
+    {
+      "code": "623054",
+      "name": "CHARGER_TETHERED_BATTERY_COMM_ERROR",
+      "description": "系留电池通讯失败"
+    },
+    {
+      "code": "623055",
+      "name": "CHARGER_CONTROL_FAIL_NEED_CLOSE_DOOR",
+      "description": "控制充电失败，需关闭舱门"
+    },
+    {
+      "code": "624001",
+      "name": "SWAP_DOOR_NOT_CLOSE",
+      "description": "关闭舱门才可换电"
+    },
+    {
+      "code": "624002",
+      "name": "SWAP_CHARGER_NOT_READY",
+      "description": "充电仓未准备好"
+    },
+    {
+      "code": "624003",
+      "name": "SWAP_DRONE_ONLINE_TIMEOUT",
+      "description": "换电版飞行器上线超时"
+    },
+    {
+      "code": "624004",
+      "name": "SWAP_OFF_DRONE_NOT_ONLINE",
+      "description": "换电版飞行器未上线"
+    },
+    {
+      "code": "624005",
+      "name": "SWAP_NO_EMPTY_HOUSE",
+      "description": "换电版电池仓无空仓"
+    },
+    {
+      "code": "624006",
+      "name": "SWAP_PAIR_RC_NOT_ON",
+      "description": "换电版对频失败，遥控器未开启"
+    },
+    {
+      "code": "624007",
+      "name": "SWAP_PAIR_RC_START_FAIL",
+      "description": "换电版对频失败，遥控器无法进入对频模式"
+    },
+    {
+      "code": "624008",
+      "name": "SWAP_PAIR_RC_STOP_FAIL",
+      "description": "换电版对频失败，遥控器无法停止对频模式"
+    },
+    {
+      "code": "624009",
+      "name": "SWAP_PAIR_DRONE_ENTER_PAIR_FAIL",
+      "description": "换电版对频失败，飞行器进入对频模式失败"
+    },
+    {
+      "code": "624010",
+      "name": "SWAP_DEPOT_BUSY",
+      "description": "换电版电池仓忙"
+    },
+    {
+      "code": "624011",
+      "name": "SWAP_CHARGER_NOT_CONNECT",
+      "description": "充电仓未连接"
+    },
+    {
+      "code": "625001",
+      "name": "MISSION_GPS_UPDATE_TIMEOUT",
+      "description": "GPS数据更新超时"
+    },
+    {
+      "code": "625002",
+      "name": "MISSION_GPS_SOLUTION_STATUS_ERROR",
+      "description": "GPS解算状态异常"
+    },
+    {
+      "code": "625003",
+      "name": "MISSION_GPS_POSITION_TYPE_ERROR",
+      "description": "GPS定位类型异常"
+    },
+    {
+      "code": "625004",
+      "name": "MISSION_GPS_SVS_NOT_ENOUGH",
+      "description": "GPS卫星数量不足"
+    },
+    {
+      "code": "625005",
+      "name": "MISSION_GPS_DISTANCE_TOO_FAR",
+      "description": "GPS位置偏差过大"
+    },
+    {
+      "code": "625006",
+      "name": "MISSION_WEATHER_WIND_TOO_STRONG",
+      "description": "风速过大"
+    },
+    {
+      "code": "625007",
+      "name": "MISSION_WEATHER_RAIN_TOO_HEAVY",
+      "description": "降雨量过大"
+    },
+    {
+      "code": "625008",
+      "name": "MISSION_UPS_OUTPUT_STATUS_ERROR",
+      "description": "UPS输出状态异常"
+    },
+    {
+      "code": "625009",
+      "name": "MISSION_UPS_STATUS_ERROR",
+      "description": "UPS状态异常"
+    },
+    {
+      "code": "625010",
+      "name": "MISSION_BAKLAND_DISTANCE_TOO_FAR",
+      "description": "备降点距离过远"
+    },
+    {
+      "code": "625011",
+      "name": "MISSION_BAKLAND_HEIGHT_TOO_HIGH",
+      "description": "备降点高度过高"
+    },
+    {
+      "code": "625012",
+      "name": "MISSION_FILE_DOWNLOAD_FAILED",
+      "description": "航线文件下载失败"
+    },
+    {
+      "code": "625013",
+      "name": "MISSION_FILE_MD5_MISMATCH",
+      "description": "航线文件MD5校验失败"
+    },
+    {
+      "code": "625014",
+      "name": "MISSION_WAYPOINT_CHECK_FAILED",
+      "description": "航线检查失败"
+    },
+    {
+      "code": "625015",
+      "name": "MISSION_NTRIP_CONNECT_FAILED",
+      "description": "NTRIP连接失败"
+    },
+    {
+      "code": "625016",
+      "name": "MISSION_NTRIP_AUTH_FAILED",
+      "description": "NTRIP认证失败"
+    },
+    {
+      "code": "625017",
+      "name": "MISSION_NTRIP_NO_RTCM_DATA",
+      "description": "NTRIP未收到RTCM数据"
+    },
+    {
+      "code": "625018",
+      "name": "MISSION_DRONE_START_FAILED",
+      "description": "飞机任务启动失败"
+    },
+    {
+      "code": "626007",
+      "name": "CHARGER_VOLTAGE_ABNORMAL",
+      "description": "充电器电压异常"
+    },
+    {
+      "code": "626008",
+      "name": "CHARGER_CURRENT_ABNORMAL",
+      "description": "充电器电流异常"
+    },
+    {
+      "code": "627001",
+      "name": "DRONE_READY_TIMEOUT",
+      "description": "等待飞机就绪超时"
+    },
+    {
+      "code": "627002",
+      "name": "DRONE_TAKEOFF_TIMEOUT",
+      "description": "等待起飞超时"
+    },
+    {
+      "code": "627003",
+      "name": "DRONE_LANDING_TIMEOUT",
+      "description": "等待降落超时"
+    },
+    {
+      "code": "627004",
+      "name": "DRONE_LANDING_PRECISION_FAILED",
+      "description": "降落精度不合格"
+    },
+    {
+      "code": "627005",
+      "name": "DRONE_LOW_BATTERY",
+      "description": "飞机电量过低"
+    },
+    {
+      "code": "627006",
+      "name": "DRONE_HTTP_TIMEOUT",
+      "description": "飞机响应超时"
+    },
+    {
+      "code": "627007",
+      "name": "DRONE_HTTP_ERROR",
+      "description": "飞机响应错误"
+    },
+    {
+      "code": "627008",
+      "name": "DRONE_DOWNLOAD_TIMEOUT",
+      "description": "飞机数据下载超时"
+    },
+    {
+      "code": "627009",
+      "name": "DRONE_DOWNLOAD_STOPPED",
+      "description": "飞机数据下载已停止"
+    },
+    {
+      "code": "627010",
+      "name": "DRONE_DOWNLOAD_FAILED",
+      "description": "飞机数据下载失败"
+    },
+    {
+      "code": "627011",
+      "name": "DRONE_GO_HOME_HEIGHT_CONFIG_FAILED",
+      "description": "设置返航高度失败"
+    },
+    {
+      "code": "627012",
+      "name": "DRONE_BATTERY_RESERVE_HOME_CONFIG_FAILED",
+      "description": "设置返航电量失败"
+    },
+    {
+      "code": "627013",
+      "name": "DRONE_REMOTE_CONTROLLER_BATTERY_LOW",
+      "description": "遥控器电量低"
+    },
+    {
+      "code": "627014",
+      "name": "MISSION_TAKEOFF_READY_TIMEOUT",
+      "description": "等待起飞确认超时"
+    },
+    {
+      "code": "627015",
+      "name": "MISSION_CLOSE_READY_TIMEOUT",
+      "description": "等待回收确认超时"
+    },
+    {
+      "code": "627016",
+      "name": "MISSION_POWEROFF_READY_TIMEOUT",
+      "description": "等待断电确认超时"
+    },
+    {
+      "code": "627017",
+      "name": "PSDK_DOWNLOAD_FAILED",
+      "description": "PSDK下载失败"
+    },
+    {
+      "code": "627018",
+      "name": "PSDK_COMMUNICATION_TIMEOUT",
+      "description": "等待PSDK通信超时"
+    },
+    {
+      "code": "627099",
+      "name": "DRONE_INVALID_REQUEST_BODY",
+      "description": "请求参数JSON格式错误"
+    },
+    {
+      "code": "627099",
+      "name": "DRONE_PARAM_MISSING_FILE_OR_TARGET",
+      "description": "请求参数没有包含file或target字段"
+    },
+    {
+      "code": "627099",
+      "name": "DRONE_SIMULATOR_ENTER_FAILED",
+      "description": "模拟器进入失败"
+    },
+    {
+      "code": "627099",
+      "name": "DRONE_SIMULATOR_MODE_ACTIVE",
+      "description": "模拟器模式开启"
+    },
+    {
+      "code": "627099",
+      "name": "DRONE_PARAM_INVALID_LET_LINK_TYPE",
+      "description": "LTE链路类型参数错误"
+    },
+    {
+      "code": "627099",
+      "name": "DRONE_ALTERNATE_LAND_POINT_CONFIG_FAILED",
+      "description": "设置备降点失败"
+    },
+    {
+      "code": "627099",
+      "name": "DRONE_WAYPOINT_DOWNLOAD_FAILED",
+      "description": "下载航点文件失败"
+    },
+    {
+      "code": "627099",
+      "name": "DRONE_INNER_ERROR",
+      "description": "飞机内部错误，请联系售后"
+    },
+    {
+      "code": "627099",
+      "name": "DRONE_UNKNOWN_ERROR",
+      "description": "飞机内部错误，请联系售后"
+    },
+    {
+      "code": "628001",
+      "name": "RECOVERY_DOOR_WAIT_TIMEOUT",
+      "description": "等待开门任务完成超时"
+    },
+    {
+      "code": "629001",
+      "name": "AI_CAPTURE_FRAME_FAILED",
+      "description": "AI模块读取RTSP视频帧失败"
+    },
+    {
+      "code": "629002",
+      "name": "AI_SAFE_TO_TAKEOFF_CHECK_FAILED",
+      "description": "起飞前安全检查未通过"
+    },
+    {
+      "code": "629003",
+      "name": "AI_DRONE_PLACE_ERROR",
+      "description": "飞机摆放位置错误"
+    },
+    {
+      "code": "629004",
+      "name": "AI_DRONE_NOT_DETECTED",
+      "description": "未检测到飞机"
+    },
+    {
+      "code": "629005",
+      "name": "AI_CABIN_STATUS_CONFLICT",
+      "description": "舱内状态与AI检测结果不一致"
+    },
+    {
+      "code": "640009",
+      "name": "QUERY_EXCUTION_STATUS_INVALID",
+      "description": "查询执行状态无效"
+    },
+    {
+      "code": "640010",
+      "name": "QUERY_NO_THIS_BREAK_POINT",
+      "description": "查询不存在该断点"
+    },
+    {
+      "code": "640011",
+      "name": "QUERY_NO_THIS_MISSION",
+      "description": "查询不存在该任务"
+    },
+    {
+      "code": "640022",
+      "name": "WPMZ_FILE_VERSION_NOT_MATCH",
+      "description": "WPMZ文件版本不匹配"
+    },
+    {
+      "code": "640029",
+      "name": "CANNOT_BREAK_WAYLINE_WHEN_WAYLINE_NOT_RUNNING",
+      "description": "航线未运行时无法中断"
+    },
+    {
+      "code": "640030",
+      "name": "CANNOT_REQUEST_DRONE_CONTROL",
+      "description": "无法请求无人机控制"
+    },
+    {
+      "code": "640031",
+      "name": "CANNOT_RESUME_WAYLINE_IN_CUR_STATE",
+      "description": "当前状态无法恢复航线"
+    },
+    {
+      "code": "640034",
+      "name": "CROSS_FLYLIMIT_AERA",
+      "description": "穿越飞行限制区域"
+    },
+    {
+      "code": "640037",
+      "name": "RTK_DISCONNECT",
+      "description": "RTK断开"
+    },
+    {
+      "code": "640038",
+      "name": "BOUNDARY_LIMIT",
+      "description": "边界限制"
+    },
+    {
+      "code": "640039",
+      "name": "RC_PITCH_ROLL_BREAK",
+      "description": "遥控器俯仰/横滚中断"
+    },
+    {
+      "code": "640040",
+      "name": "AIRPORT_HEIGHT_LIMIT",
+      "description": "机场高度限制"
+    },
+    {
+      "code": "640041",
+      "name": "REQUEST_TAKEOFF_FAIL",
+      "description": "请求起飞失败"
+    },
+    {
+      "code": "640042",
+      "name": "AUTOTAKEOFF_RUN_FAIL",
+      "description": "自动起飞运行失败"
+    },
+    {
+      "code": "640043",
+      "name": "REQUEST_WAYLINE_FAIL",
+      "description": "请求航线失败"
+    },
+    {
+      "code": "640044",
+      "name": "AGRO_PLAN_FAIL",
+      "description": "农田规划失败"
+    },
+    {
+      "code": "640045",
+      "name": "REQUEST_QUICK_TAKEOFF_ASSIST_FAIL",
+      "description": "请求快速起飞辅助失败"
+    },
+    {
+      "code": "640046",
+      "name": "QUICK_TAKEOFF_ASSIST_RUN_FAIL",
+      "description": "快速起飞辅助运行失败"
+    },
+    {
+      "code": "640047",
+      "name": "VFENCE_LIMIT",
+      "description": "虚拟围栏限制"
+    },
+    {
+      "code": "640052",
+      "name": "RETURN_HOME",
+      "description": "返航"
+    },
+    {
+      "code": "640053",
+      "name": "ADSB_ERROR",
+      "description": "ADSB错误"
+    },
+    {
+      "code": "640054",
+      "name": "RC_LOST",
+      "description": "遥控器信号丢失"
+    },
+    {
+      "code": "640056",
+      "name": "DRONE_IS_MOVING",
+      "description": "无人机正在移动"
+    },
+    {
+      "code": "640057",
+      "name": "DRONE_ON_GROUND_MOTOR_ON",
+      "description": "无人机在地面且电机开启"
+    },
+    {
+      "code": "640058",
+      "name": "SURFACE_FOLLOW_CAMERA_INVALID",
+      "description": "表面跟随摄像头无效"
+    },
+    {
+      "code": "640059",
+      "name": "SURFACE_FOLLOW_HEIGHT_INVALID",
+      "description": "表面跟随高度无效"
+    },
+    {
+      "code": "640060",
+      "name": "SURFACE_FOLLOW_MAP_WRONG",
+      "description": "表面跟随地图错误"
+    },
+    {
+      "code": "640061",
+      "name": "HOMEPOINT_NOT_MATCH_RTK",
+      "description": "返航点与RTK不匹配"
+    },
+    {
+      "code": "640062",
+      "name": "STRONG_WIND_GOHOME",
+      "description": "强风返航"
+    },
+    {
+      "code": "640063",
+      "name": "CANNOT_FIND_PAYLOAD",
+      "description": "无法找到有效载荷"
+    },
+    {
+      "code": "640064",
+      "name": "ACTION_EXECUTION_FAILED",
+      "description": "动作执行失败"
+    },
+    {
+      "code": "640065",
+      "name": "USER_EXIT",
+      "description": "用户退出"
+    },
+    {
+      "code": "640066",
+      "name": "USER_BREAK",
+      "description": "用户中断"
+    },
+    {
+      "code": "640067",
+      "name": "USER_SET_GOHOME",
+      "description": "用户设置返航"
+    },
+    {
+      "code": "640069",
+      "name": "TRAJ_JOB_EXIT_BUT_MIS_RUNNING",
+      "description": "轨迹任务退出但任务仍在运行"
+    },
+    {
+      "code": "640083",
+      "name": "TRAJ_MAX_VEL_OUT_OF_RANGE",
+      "description": "最大速度超出范围"
+    },
+    {
+      "code": "640084",
+      "name": "TRAJ_VEL_OUT_OF_RANGE",
+      "description": "速度超出范围"
+    },
+    {
+      "code": "640086",
+      "name": "TRAJ_INVALID_YAW_MODE_IN_VERT_SEGM",
+      "description": "垂直段中的无效偏航模式"
+    },
+    {
+      "code": "640087",
+      "name": "TRAJ_WP_BREAK_INFO_MISSION_ID_CHANGED",
+      "description": "航点中断信息任务ID已更改"
+    },
+    {
+      "code": "640088",
+      "name": "TRAJ_WP_BREAK_INFO_PROGRESS_OUT_OF_RANGE",
+      "description": "航点中断信息进度超出范围"
+    },
+    {
+      "code": "640089",
+      "name": "TRAJ_WP_BREAK_INFO_INVALID_MISSION_STATE",
+      "description": "航点中断信息任务状态无效"
+    },
+    {
+      "code": "640090",
+      "name": "TRAJ_WP_BREAK_INFO_WP_INDEX_OUT_OF_RANGE",
+      "description": "航点中断信息航点索引超出范围"
+    },
+    {
+      "code": "640091",
+      "name": "TRAJ_BREAK_LAT_LONG_OUT_OF_RANGE",
+      "description": "中断经纬度超出范围"
+    },
+    {
+      "code": "640092",
+      "name": "TRAJ_BREAK_INFO_WP_YAW_OUT_OF_RANGE",
+      "description": "中断信息航点偏航超出范围"
+    },
+    {
+      "code": "640093",
+      "name": "TRAJ_INVALID_BREAK_INFO_FLAG",
+      "description": "无效的中断信息标志"
+    },
+    {
+      "code": "640094",
+      "name": "TRAJ_GET_TRAJ_INFO_FAILED",
+      "description": "获取轨迹信息失败"
+    },
+    {
+      "code": "640095",
+      "name": "TRAJ_GENERATE_FAIL",
+      "description": "轨迹生成失败"
+    },
+    {
+      "code": "640096",
+      "name": "TRAJ_LIB_RUN_FAIL",
+      "description": "轨迹库运行失败"
+    },
+    {
+      "code": "640097",
+      "name": "TRAJ_LIB_EMERGENCY_BRAKE",
+      "description": "轨迹库紧急刹车"
+    },
+    {
+      "code": "640098",
+      "name": "ACTION_COMMON_ACTION_NOT_FOUND",
+      "description": "未找到通用动作"
+    },
+    {
+      "code": "640099",
+      "name": "ACTION_COMMON_ACTION_INDEX_REPEATED",
+      "description": "通用动作索引重复"
+    },
+    {
+      "code": "640100",
+      "name": "ACTION_COMMON_ACTION_INFO_SIZE_TOO_LONG_OR_TOO_SHORT",
+      "description": "通用动作信息大小过长或过短"
+    },
+    {
+      "code": "640101",
+      "name": "ACTION_COMMON_ACTION_TREE_EMPTY",
+      "description": "通用动作树为空"
+    },
+    {
+      "code": "640102",
+      "name": "ACTION_COMMON_ACTION_TREE_LAYER_EMPTY",
+      "description": "通用动作树层为空"
+    },
+    {
+      "code": "640103",
+      "name": "ACTION_COMMON_ACTION_ID_REPEATED",
+      "description": "通用动作ID重复"
+    },
+    {
+      "code": "640104",
+      "name": "ACTION_COMMON_ACTION_NODE_CHILDREN_NUM_LT_2",
+      "description": "通用动作节点子节点数量少于2"
+    },
+    {
+      "code": "640105",
+      "name": "ACTION_COMMON_ACTION_INDEX_OUT_OF_RANGE",
+      "description": "通用动作索引超出范围"
+    },
+    {
+      "code": "640106",
+      "name": "ACTION_COMMON_ACTION_ID_IS_65535",
+      "description": "通用动作ID为65535"
+    },
+    {
+      "code": "640107",
+      "name": "ACTION_COMMON_ACTION_NODE_CHILDNUM_SUM_NOT_EQ_NEXT_LAYER_SIZE",
+      "description": "通用动作节点子节点总和不等于下一层大小"
+    },
+    {
+      "code": "640108",
+      "name": "ACTION_COMMON_ACTION_TREE_LAYER_NUM_TOO_MORE",
+      "description": "通用动作树层数过多"
+    },
+    {
+      "code": "640109",
+      "name": "ACTION_COMMON_ACTION_TREE_LAYER_NUM_TOO_LESS",
+      "description": "通用动作树层数过少"
+    },
+    {
+      "code": "640110",
+      "name": "ACTION_COMMON_ACTION_GROUP_NUM_OUT_OF_RANGE",
+      "description": "通用动作组数量超出范围"
+    },
+    {
+      "code": "640111",
+      "name": "ACTION_COMMON_ACTION_GROUP_VALID_RANGE_ERROR",
+      "description": "通用动作组有效范围错误"
+    },
+    {
+      "code": "640112",
+      "name": "ACTION_COMMON_ACTION_TREE_ROOT_STATUS_INVALID",
+      "description": "通用动作树根状态无效"
+    },
+    {
+      "code": "640113",
+      "name": "ACTION_COMMON_ACTION_TREE_NODE_STATUS_INVALID",
+      "description": "通用动作树节点状态无效"
+    },
+    {
+      "code": "640114",
+      "name": "ACTION_COMMON_BREAK_INFO_ACTION_GROUP_ID_OUT_OF_RANGE",
+      "description": "中断信息动作组ID超出范围"
+    },
+    {
+      "code": "640115",
+      "name": "ACTION_COMMON_ACTION_STATUS_TREE_SIZE_ERROR",
+      "description": "通用动作状态树大小错误"
+    },
+    {
+      "code": "640116",
+      "name": "ACTION_COMMON_BREAK_INFO_TRIGGER_RUN_RESULT_INVALID",
+      "description": "中断信息触发运行结果无效"
+    },
+    {
+      "code": "640117",
+      "name": "ACTION_COMMON_BREAK_INFO_ACTION_GROUP_ID_REPEATED",
+      "description": "中断信息动作组ID重复"
+    },
+    {
+      "code": "640118",
+      "name": "ACTION_COMMON_BREAK_INFO_ACTION_LOCATION_REPEATED",
+      "description": "中断信息动作位置重复"
+    },
+    {
+      "code": "640119",
+      "name": "ACTION_COMMON_BREAK_INFO_ACTION_LOCATION_OUT_OF_RANGE",
+      "description": "中断信息动作位置超出范围"
+    },
+    {
+      "code": "640120",
+      "name": "ACTION_COMMON_RESUME_ID_NOT_IN_BREAK_INFO",
+      "description": "恢复ID不在中断信息中"
+    },
+    {
+      "code": "640121",
+      "name": "ACTION_COMMON_RESUME_INFO_MODIFY_ACTION_STATUS_FROM_NO_INTERRUPT_TO_INTERRUPT",
+      "description": "恢复信息将动作状态从无中断修改为有中断"
+    },
+    {
+      "code": "640122",
+      "name": "ACTION_COMMON_ACTION_RESUME_FAIL_FOR_INVALID_RESUME_INFO",
+      "description": "由于恢复信息无效，动作恢复失败"
+    },
+    {
+      "code": "640123",
+      "name": "ACTUATOR_COMMON_ACTUATOR_NOT_FOUND",
+      "description": "未找到执行器"
+    },
+    {
+      "code": "640124",
+      "name": "TRIGGER_SINGLE_TIME_CHECK_FAIL",
+      "description": "单次触发检查失败"
+    },
+    {
+      "code": "640125",
+      "name": "TRIGGER_NOT_FOUND",
+      "description": "未找到触发器"
+    },
+    {
+      "code": "640127",
+      "name": "COMMAND_CAN_NOT_EXECUTE",
+      "description": "命令无法执行"
+    },
+    {
+      "code": "640128",
+      "name": "COMMAND_EXECUTION_FAILED",
+      "description": "命令执行失败"
+    },
+    {
+      "code": "640129",
+      "name": "INVALID_PARAMETERS",
+      "description": "无效参数"
+    },
+    {
+      "code": "640131",
+      "name": "PRODUCT_CONNECT_FAILED",
+      "description": "产品连接失败"
+    },
+    {
+      "code": "640133",
+      "name": "OPERATION_CANCEL_BY_USER",
+      "description": "用户取消操作"
+    },
+    {
+      "code": "640134",
+      "name": "UPLOAD_MEDIA_FILE_FAILED",
+      "description": "上传媒体文件失败"
+    },
+    {
+      "code": "640135",
+      "name": "SDR_LINK_RESERVE_FAILED",
+      "description": "SDR链路保留失败"
+    },
+    {
+      "code": "640136",
+      "name": "CHECK_PHOTOS_STORAGE_PACK_ERROR",
+      "description": "检查照片存储包错误"
+    },
+    {
+      "code": "640137",
+      "name": "SDR_LINK_RESERVE_FAILED_CAUSE_MOTOR_ON",
+      "description": "因电机启动SDR链路保留失败"
+    },
+    {
+      "code": "640138",
+      "name": "ACTION_TRIGGER_NOT_MATCH_ACTUATOR",
+      "description": "动作触发器与执行器不匹配"
+    },
+    {
+      "code": "640139",
+      "name": "INTERRUPT_REASON_AVOID",
+      "description": "中断原因：避障"
+    },
+    {
+      "code": "640140",
+      "name": "INTERRUPT_REASON_AVOID_RADIUS_LIMIT",
+      "description": "中断原因：避障半径限制"
+    },
+    {
+      "code": "640141",
+      "name": "INTERRUPT_REASON_AVOID_HEIGHT_LIMIT",
+      "description": "中断原因：避障高度限制"
+    },
+    {
+      "code": "640142",
+      "name": "INTERRUPT_REASON_AVOID_RTK_UNHEALTHY",
+      "description": "中断原因：RTK不健康"
+    },
+    {
+      "code": "640143",
+      "name": "INTERRUPT_REASON_AVOID_USER_REQ_BREAK",
+      "description": "中断原因：用户请求中断"
+    },
+    {
+      "code": "640144",
+      "name": "INTERRUPT_REASON_AVOID_AIRPORT_LIMIT",
+      "description": "中断原因：机场限制"
+    },
+    {
+      "code": "640145",
+      "name": "INTERRUPT_REASON_AVOID_EMERGENCY_BREAK",
+      "description": "中断原因：紧急制动"
+    },
+    {
+      "code": "640146",
+      "name": "INTERRUPT_REASON_GPS_BAD",
+      "description": "中断原因：GPS信号差"
+    },
+    {
+      "code": "640147",
+      "name": "INTERRUPT_REASON_HOME_STATUS_ERROR",
+      "description": "中断原因：返航点状态错误"
+    },
+    {
+      "code": "640148",
+      "name": "INTERRUPT_REASON_RC_STICK",
+      "description": "中断原因：遥控杆"
+    },
+    {
+      "code": "640149",
+      "name": "TRANJECTORY_REPLAY_INVALID_LOCATION",
+      "description": "轨迹回放位置无效"
+    },
+    {
+      "code": "640150",
+      "name": "TRANJECTORY_REPLAY_NO_WAYPOINT_TO_REMOVE",
+      "description": "轨迹回放无航点可移除"
+    },
+    {
+      "code": "640151",
+      "name": "TRANJECTORY_REPLAY_GIMBAL_ATTI_ERROR",
+      "description": "轨迹回放云台姿态错误"
+    },
+    {
+      "code": "640152",
+      "name": "INVALID_INPUT_DATA_FC_LENGTH",
+      "description": "输入数据FC长度无效"
+    },
+    {
+      "code": "640153",
+      "name": "INVALID_INPUT_DATA_FLOAT_NUMBER",
+      "description": "输入数据浮点数无效"
+    },
+    {
+      "code": "640154",
+      "name": "INIT_MISSION_COUNT_OVER_RANGE",
+      "description": "初始化任务次数超出范围"
+    },
+    {
+      "code": "640155",
+      "name": "INIT_MISSION_COUNT_TOO_LESS",
+      "description": "初始化任务次数太少"
+    },
+    {
+      "code": "640156",
+      "name": "INIT_MISSION_END_INDEX_INVALID",
+      "description": "初始化任务结束索引无效"
+    },
+    {
+      "code": "640157",
+      "name": "INIT_MISSION_GLOBAL_MAX_SPEED_INVALID",
+      "description": "初始化任务全局最大速度无效"
+    },
+    {
+      "code": "640158",
+      "name": "INIT_MISSION_CRUISE_SPEED_INVALID",
+      "description": "初始化任务巡航速度无效"
+    },
+    {
+      "code": "640159",
+      "name": "INIT_MISSION_GOTO_FIRST_WAYPOINT_INVALID",
+      "description": "初始化任务前往第一个航点无效"
+    },
+    {
+      "code": "640160",
+      "name": "INIT_MISSION_FINISHED_ACTION_INVALID",
+      "description": "初始化任务完成动作无效"
+    },
+    {
+      "code": "640161",
+      "name": "INIT_MISSION_RC_LOST_CONTROL_ACTION_INVALID",
+      "description": "初始化任务遥控失控动作无效"
+    },
+    {
+      "code": "640162",
+      "name": "INIT_MISSION_REFERENCE_LOCATION_INVALID",
+      "description": "初始化任务参考位置无效"
+    },
+    {
+      "code": "640163",
+      "name": "INIT_MISSION_EXIST_RUNNING",
+      "description": "存在正在运行的初始化任务"
+    },
+    {
+      "code": "640164",
+      "name": "UPLOAD_MISSION_INDEX_INVALID",
+      "description": "上传任务索引无效"
+    },
+    {
+      "code": "640165",
+      "name": "UPLOAD_MISSION_COUNT_OVER_INIT_TOTAL_COUNT",
+      "description": "上传任务次数超过初始化总次数"
+    },
+    {
+      "code": "640166",
+      "name": "UPLOAD_MISSION_START_INDEX_NOT_IN_END_OF_LAST_UPLOAD",
+      "description": "上传任务起始索引不在上次上传的末端"
+    },
+    {
+      "code": "640167",
+      "name": "UPLOAD_MISSION_DISTANCE_TOO_CLOSE",
+      "description": "上传任务距离太近"
+    },
+    {
+      "code": "640168",
+      "name": "UPLOAD_MISSION_DISTANCE_TO_FAR",
+      "description": "上传任务距离太远"
+    },
+    {
+      "code": "640169",
+      "name": "UPLOAD_MISSION_MAX_CRUISE_SPEED_OVER_GLOBAL_MAX_SPEED",
+      "description": "上传任务最大巡航速度超过全局最大速度"
+    },
+    {
+      "code": "640170",
+      "name": "UPLOAD_MISSION_CRUISE_SPEED_OVER_LOCAL_MAX_SPEED",
+      "description": "上传任务巡航速度超过局部最大速度"
+    },
+    {
+      "code": "640171",
+      "name": "UPLOAD_MISSION_CRUISE_SPEED_OVER_GLOBAL_MAX_SPEED",
+      "description": "上传任务巡航速度超过全局最大速度"
+    },
+    {
+      "code": "640172",
+      "name": "UPLOAD_MISSION_YAW_MODE_INVALID",
+      "description": "上传任务偏航模式无效"
+    },
+    {
+      "code": "640173",
+      "name": "UPLOAD_MISSION_YAW_CONTROL_DEGREE_INVALID",
+      "description": "上传任务偏航控制角度无效"
+    },
+    {
+      "code": "640174",
+      "name": "UPLOAD_MISSION_YAW_CONTROL_DIRECTION_INVALID",
+      "description": "上传任务偏航控制方向无效"
+    },
+    {
+      "code": "640175",
+      "name": "UPLOAD_MISSION_WAYPOINT_TYPE_INVALID",
+      "description": "上传任务航点类型无效"
+    },
+    {
+      "code": "640176",
+      "name": "UPLOAD_MISSION_DAMPING_DISTANCE_INVALID",
+      "description": "上传任务阻尼距离无效"
+    },
+    {
+      "code": "640177",
+      "name": "UPLOAD_MISSION_CANNOT_SET_EXIT_LINE_TYPE",
+      "description": "上传任务无法设置退出航线类型"
+    },
+    {
+      "code": "640178",
+      "name": "UPLOAD_MISSION_INDEX_NOT_CONTINUE",
+      "description": "上传任务索引不连续"
+    },
+    {
+      "code": "640179",
+      "name": "UPLOAD_MISSION_ENTER_LINE_TYPE_SET_TO_START_POINT_INVALID",
+      "description": "上传任务进入航线类型设置为起点无效"
+    },
+    {
+      "code": "640180",
+      "name": "UPLOAD_MISSION_DAMPING_INVALID",
+      "description": "上传任务阻尼无效"
+    },
+    {
+      "code": "640181",
+      "name": "UPLOAD_MISSION_COORDINATE_INVALID",
+      "description": "上传任务坐标无效"
+    },
+    {
+      "code": "640182",
+      "name": "FIRST_WAYPOINT_TYPE_INVALID",
+      "description": "第一个航点类型无效"
+    },
+    {
+      "code": "640183",
+      "name": "MISSION_FLYING_RADIUS_LIMIT",
+      "description": "任务飞行半径限制"
+    },
+    {
+      "code": "640184",
+      "name": "MISSION_FLYING_HEIGHT_LIMIT",
+      "description": "任务飞行高度限制"
+    },
+    {
+      "code": "640185",
+      "name": "MISSION_VERSION_NOT_MATCHED",
+      "description": "任务版本不匹配"
+    },
+    {
+      "code": "640186",
+      "name": "DOWNLOAD_MISSION_RANGE_OVER_STORAGE_COUNT",
+      "description": "下载任务范围超出存储计数"
+    },
+    {
+      "code": "640187",
+      "name": "DOWNLOAD_MISSION_NOT_INITIALIZED",
+      "description": "下载任务未初始化"
+    },
+    {
+      "code": "640188",
+      "name": "DOWNLOAD_MISSION_NOT_UPLOADED",
+      "description": "下载任务未上传"
+    },
+    {
+      "code": "640189",
+      "name": "MISSION_CONTROL_START_CURRENT_POINT_TO_FIRST_POINT_TOO_FAR",
+      "description": "任务控制起始点到第一个点太远"
+    },
+    {
+      "code": "640190",
+      "name": "MISSION_CONTROL_START_STOP_INVALID",
+      "description": "任务控制启动停止无效"
+    },
+    {
+      "code": "640191",
+      "name": "MISSION_CONTROL_PAUSE_RESUME_INVALID",
+      "description": "任务控制暂停恢复无效"
+    },
+    {
+      "code": "640192",
+      "name": "MISSION_CONTROL_INTERRUPT_RECOVER_INVALID",
+      "description": "任务控制中断恢复无效"
+    },
+    {
+      "code": "640193",
+      "name": "MISSION_CONTROL_UPLOADED_POINT_TOO_LESS",
+      "description": "任务控制上传点太少"
+    },
+    {
+      "code": "640194",
+      "name": "MISSION_CONTROL_STARTED_NO_IN_RUNNING",
+      "description": "任务控制启动但未运行"
+    },
+    {
+      "code": "640195",
+      "name": "MISSION_CONTROL_ALREADY_STARTED",
+      "description": "任务控制已启动"
+    },
+    {
+      "code": "640196",
+      "name": "MISSION_CONTROL_ALREADY_STOPPED",
+      "description": "任务控制已停止"
+    },
+    {
+      "code": "640197",
+      "name": "MISSION_CONTROL_MISSION_ALREADY_PAUSED",
+      "description": "任务控制任务已暂停"
+    },
+    {
+      "code": "640198",
+      "name": "MISSION_CONTROL_NO_RUNNING_MISSION_FOR_RESUME",
+      "description": "任务控制无正在运行的任务可恢复"
+    },
+    {
+      "code": "640199",
+      "name": "MISSION_CONTROL_NO_RUNNING_MISSION_FOR_RECOVER",
+      "description": "任务控制无正在运行的任务可恢复"
+    },
+    {
+      "code": "640200",
+      "name": "MISSION_CONTROL_ALREADY_INTERRUPT",
+      "description": "任务控制已中断"
+    },
+    {
+      "code": "640201",
+      "name": "MISSION_CONTROL_NOT_SUPPORT_PAUSE_RESUME",
+      "description": "任务控制不支持暂停恢复"
+    },
+    {
+      "code": "640202",
+      "name": "MISSION_CONTROL_NOT_SUPPORT_INTERRUPT_RESUME",
+      "description": "任务控制不支持中断恢复"
+    },
+    {
+      "code": "640203",
+      "name": "MISSION_CONTROL_BREAK_POINT_NOT_RECORD",
+      "description": "任务控制断点未记录"
+    },
+    {
+      "code": "640204",
+      "name": "MISSION_CONTROL_PROJECTION_POINT_NOT_IN_CURRENT_WAYPOINT_LINE",
+      "description": "任务控制投影点不在当前航线"
+    },
+    {
+      "code": "640205",
+      "name": "MISSION_CONTROL_PROJECTION_POINT_NOT_NEXT_WAYPOINT_LINE",
+      "description": "任务控制投影点不在下一个航线"
+    },
+    {
+      "code": "640206",
+      "name": "MISSION_CONTROL_PROJECTION_POINT_NOT_NEXT_NEXT_WAYPOINT_LINE",
+      "description": "任务控制投影点不在下下个航线"
+    },
+    {
+      "code": "640207",
+      "name": "MISSION_STATE_AIRCRAFT_FLYING_STATUS_BAD",
+      "description": "任务状态飞行器飞行状态不佳"
+    },
+    {
+      "code": "640208",
+      "name": "MISSION_STATE_HOME_POINT_NOT_RECORD",
+      "description": "任务状态返航点未记录"
+    },
+    {
+      "code": "640209",
+      "name": "MISSION_STATE_GPS_SIGNAL_WEAK",
+      "description": "任务状态GPS信号弱"
+    },
+    {
+      "code": "640210",
+      "name": "MISSION_STATE_RTK_NOT_READY",
+      "description": "任务状态RTK未就绪"
+    },
+    {
+      "code": "640211",
+      "name": "MISSION_SECURE_STATE_NFZ_ZONE_CROSS",
+      "description": "任务安全状态NFZ区域穿越"
+    },
+    {
+      "code": "640212",
+      "name": "MISSION_SECURE_STATE_AIRCRAFT_LOW_BATTERY",
+      "description": "任务安全状态飞行器电量低"
+    },
+    {
+      "code": "640213",
+      "name": "UPLOAD_ACTION_ID_DUPLICATED",
+      "description": "上传动作ID重复"
+    },
+    {
+      "code": "640214",
+      "name": "UPLOAD_ACTION_ITEMS_SPACE_NOT_ENOUGH",
+      "description": "上传动作项空间不足"
+    },
+    {
+      "code": "640215",
+      "name": "UPLOAD_ACTION_BUFFER_NOT_ENOUGH",
+      "description": "上传动作缓冲区不足"
+    },
+    {
+      "code": "640216",
+      "name": "DOWNLOAD_ACTION_ID_NOT_FOUND",
+      "description": "下载动作ID未找到"
+    },
+    {
+      "code": "640217",
+      "name": "DOWNLOAD_ACTION_ID_OVER_RANGE",
+      "description": "下载动作ID超出范围"
+    },
+    {
+      "code": "640218",
+      "name": "DOWNLOAD_ACTION_NO_ACTION_STORED",
+      "description": "下载动作无动作存储"
+    },
+    {
+      "code": "640219",
+      "name": "UPLOAD_ACTION_TRIGGER_TYPE_INVALID",
+      "description": "上传动作触发类型无效"
+    },
+    {
+      "code": "640220",
+      "name": "UPLOAD_ACTION_TRIGGER_REACH_END_INDEX_LESS_START_INDEX",
+      "description": "上传动作触发结束索引小于起始索引"
+    },
+    {
+      "code": "640221",
+      "name": "UPLOAD_ACTION_TRIGGER_REACH_INTERVAL_COUNT_INVALID",
+      "description": "上传动作触发间隔计数无效"
+    },
+    {
+      "code": "640222",
+      "name": "UPLOAD_ACTION_TRIGGER_REACH_AUTO_TERMINATE_INVALID",
+      "description": "上传动作触发自动终止无效"
+    },
+    {
+      "code": "640223",
+      "name": "UPLOAD_ACTION_TRIGGER_ASSOCIATE_TYPE_INVALID",
+      "description": "上传动作触发关联类型无效"
+    },
+    {
+      "code": "640224",
+      "name": "UPLOAD_ACTION_TRIGGER_SIMPLE_INTERVAL_TYPE_INVALID",
+      "description": "上传动作简单间隔类型无效"
+    },
+    {
+      "code": "640225",
+      "name": "UPLOAD_ACTION_ACTUATOR_EXECUTE_NOT_SUPPORT",
+      "description": "上传动作执行器不支持执行"
+    },
+    {
+      "code": "640226",
+      "name": "UPLOAD_ACTION_ACTUATOR_TYPE_INVALID",
+      "description": "上传动作执行器类型无效"
+    },
+    {
+      "code": "640227",
+      "name": "UPLOAD_ACTION_ACTUATOR_FUNCTION_INVALID",
+      "description": "上传动作执行器功能无效"
+    },
+    {
+      "code": "640228",
+      "name": "UPLOAD_ACTION_ACTUATOR_SPRAY_EXTERNAL_SPRAY_MODE_INVALID",
+      "description": "上传动作执行器喷洒外部喷洒模式无效"
+    },
+    {
+      "code": "640229",
+      "name": "UPLOAD_ACTION_ACTUATOR_SPRAY_FLOW_SPEED_INVALID",
+      "description": "上传动作执行器喷洒流速无效"
+    },
+    {
+      "code": "640230",
+      "name": "UPLOAD_ACTION_ACTUATOR_SPRAY_FLOW_SPEED_PRE_MU_INVALID",
+      "description": "上传动作执行器喷洒流速单位无效"
+    },
+    {
+      "code": "640231",
+      "name": "ACTION_ACTUATOR_GIMBAL_ANGLE_INVALID",
+      "description": "动作执行器云台角度无效"
+    },
+    {
+      "code": "640232",
+      "name": "ACTION_ACTUATOR_GIMBAL_DURATION_INVALID",
+      "description": "动作执行器云台持续时间无效"
+    },
+    {
+      "code": "640233",
+      "name": "ACTION_ACTUATOR_GIMBAL_ARRIVE_TAG_ANGLE_FAILED",
+      "description": "动作执行器云台到达目标角度失败"
+    },
+    {
+      "code": "640234",
+      "name": "ACTION_ACTUATOR_GIMBAL_SEND_COMMAND_TO_GIMBAL_FAILED",
+      "description": "动作执行器向云台发送命令失败"
+    },
+    {
+      "code": "640235",
+      "name": "ACTION_ACTUATOR_FLIGHT_YAW_ANGLE_INVALID",
+      "description": "动作执行器飞行偏航角度无效"
+    },
+    {
+      "code": "640236",
+      "name": "ACTION_ACTUATOR_FLIGHT_YAW_TO_TARGET_TIMEOUT",
+      "description": "动作执行器飞行偏航到目标超时"
+    },
+    {
+      "code": "640237",
+      "name": "ACTION_ACTUATOR_FLIGHT_YAW_OCCUPIED",
+      "description": "动作执行器飞行偏航被占用"
+    },
+    {
+      "code": "640238",
+      "name": "ACTION_ACTUATOR_FLIGHT_CUR_AND_TARGET_STATE_EQUAL",
+      "description": "动作执行器当前和目标状态相等"
+    },
+    {
+      "code": "640239",
+      "name": "ACTION_ACTUATOR_PAYLOAD_FAIL_TO_SNED_CMD_TO_PAYLOAD",
+      "description": "动作执行器向有效载荷发送命令失败"
+    },
+    {
+      "code": "640240",
+      "name": "ACTION_ACTUATOR_PAYLOAD_EXEC_FAILED",
+      "description": "动作执行器有效载荷执行失败"
+    },
+    {
+      "code": "640241",
+      "name": "OVER_STOP_BY_USER",
+      "description": "任务因用户停止"
+    },
+    {
+      "code": "640242",
+      "name": "OVER_ON_GROUND_MOTOR_ON",
+      "description": "任务因地面电机开启停止"
+    },
+    {
+      "code": "640243",
+      "name": "OVER_AUTO_TAKEOFF_TIMEOUT",
+      "description": "任务因自动起飞超时停止"
+    },
+    {
+      "code": "640244",
+      "name": "OVER_AUTO_TAKEOFF_FAIL_TO_ARRIVE_TARGET_HEIGHT",
+      "description": "任务因自动起飞未到达目标高度停止"
+    },
+    {
+      "code": "640245",
+      "name": "OVER_AUTO_TAKEOFF_NOT_EXEC_OR_INTERRUPT",
+      "description": "任务因自动起飞未执行或中断停止"
+    },
+    {
+      "code": "640246",
+      "name": "OVER_BY_HIGH_PRIORITY_MISSION",
+      "description": "任务因高优先级任务停止"
+    },
+    {
+      "code": "640247",
+      "name": "OVER_UNKNOWN_REASON",
+      "description": "任务因未知原因停止"
+    },
+    {
+      "code": "640248",
+      "name": "OVER_GS_FAIL_TO_GENERATE_TRAJ",
+      "description": "任务因GS生成轨迹失败停止"
+    }
+  ],
+  "hmsErrors": [
+    {
+      "code": "0x12040000",
+      "name": "dock_tip_0x12040000",
+      "message": "机场RTK设备断连",
+      "english": "Dock RTK device disconnected"
+    },
+    {
+      "code": "0x12040001",
+      "name": "dock_tip_0x12040001",
+      "message": "机场位置被移动",
+      "english": "Dock moved"
+    },
+    {
+      "code": "0x12040002",
+      "name": "dock_tip_0x12040002",
+      "message": "机场RTK工作异常",
+      "english": "Dock RTK error"
+    },
+    {
+      "code": "0x12040003",
+      "name": "dock_tip_0x12040003",
+      "message": "机场RTK标定位置距离机场位置过远",
+      "english": "Location calibrated by RTK device far from current dock location"
+    },
+    {
+      "code": "0x12040004",
+      "name": "dock_tip_0x12040004",
+      "message": "机场RTK初始化收敛失败",
+      "english": "Dock RTK initialization error"
+    },
+    {
+      "code": "0x16070045",
+      "name": "dock_tip_0x16070045",
+      "message": "检测到机场发生移动，请谨慎操作",
+      "english": "Dock moved. Exercise caution"
+    },
+    {
+      "code": "0x160900BF",
+      "name": "dock_tip_0x160900BF",
+      "message": "风速过大（≥9 m/s），无法执行飞行任务",
+      "english": "Wind speed too high (≥9 m/s). Unable to perform task"
+    },
+    {
+      "code": "0x17000001",
+      "name": "dock_tip_0x17000001",
+      "message": "无图传信号",
+      "english": "No image transmission signal"
+    },
+    {
+      "code": "0x17000004",
+      "name": "dock_tip_0x17000004",
+      "message": "图传信号弱",
+      "english": "Image transmission signal weak"
+    },
+    {
+      "code": "0x17000005",
+      "name": "dock_tip_0x17000005",
+      "message": "机场所在位置信号干扰较强，请注意飞行安全",
+      "english": "Strong signal interference in dock location. Fly with caution"
+    },
+    {
+      "code": "0x17110041",
+      "name": "dock_tip_0x17110041",
+      "message": "机场工作状态异常，飞行器可能执行航线失联行为",
+      "english": "Dock working status error. Aircraft may perform signal lost action"
+    },
+    {
+      "code": "0x1910F003",
+      "name": "dock_tip_0x1910F003",
+      "message": "机场舱外监控摄像头未安装或断连",
+      "english": "Dock external security camera not installed or disconnected"
+    },
+    {
+      "code": "0x19110000",
+      "name": "dock_tip_0x19110000",
+      "message": "%1$s舱盖电机堵转",
+      "english": "Dock %1$s cover motor stalled"
+    },
+    {
+      "code": "0x19110002",
+      "name": "dock_tip_0x19110002",
+      "message": "%1$s舱盖位置误差过大",
+      "english": "Dock %1$s cover excessive position error"
+    },
+    {
+      "code": "0x19110003",
+      "name": "dock_tip_0x19110003",
+      "message": "%1$s舱盖电机运动超速",
+      "english": "Dock %1$s cover motor overspeed"
+    },
+    {
+      "code": "0x19110004",
+      "name": "dock_tip_0x19110004",
+      "message": "%1$s舱盖电机无法控制",
+      "english": "Dock %1$s cover motor out of control"
+    },
+    {
+      "code": "0x19110005",
+      "name": "dock_tip_0x19110005",
+      "message": "%1$s舱盖电机电压过低",
+      "english": "Dock %1$s cover motor voltage too low"
+    },
+    {
+      "code": "0x19110006",
+      "name": "dock_tip_0x19110006",
+      "message": "%1$s舱盖电机电压过高",
+      "english": "Dock %1$s cover motor voltage too high"
+    },
+    {
+      "code": "0x1911000F",
+      "name": "dock_tip_0x1911000F",
+      "message": "%1$s舱盖驱动器通讯异常",
+      "english": "Dock %1$s cover motor driver communication error"
+    },
+    {
+      "code": "0x19110011",
+      "name": "dock_tip_0x19110011",
+      "message": "%1$s舱盖运行未知错误",
+      "english": "Dock %1$s cover unknown error"
+    },
+    {
+      "code": "0x19110012",
+      "name": "dock_tip_0x19110012",
+      "message": "%1$s舱盖位置校准数据错误",
+      "english": "Calibrating dock %dock_cover_index cover or position calibration data error"
+    },
+    {
+      "code": "0x19110013",
+      "name": "dock_tip_0x19110013",
+      "message": "%1$s舱盖开启或关闭时位置不到位",
+      "english": "Dock %1$s cover not properly open or closed"
+    },
+    {
+      "code": "0x19110014",
+      "name": "dock_tip_0x19110014",
+      "message": "%1$s舱盖开启超时",
+      "english": "Opening dock %1$s cover timed out"
+    },
+    {
+      "code": "0x19110015",
+      "name": "dock_tip_0x19110015",
+      "message": "%1$s舱盖关闭超时",
+      "english": "Closing dock %1$s cover timed out"
+    },
+    {
+      "code": "0x19110016",
+      "name": "dock_tip_0x19110016",
+      "message": "%1$s舱盖关闭时触发防夹，未成功关闭",
+      "english": "Dock %1$s cover stalled. Failed to close"
+    },
+    {
+      "code": "0x19110017",
+      "name": "dock_tip_0x19110017",
+      "message": "%1$s舱盖开启时触发防夹，未成功开启",
+      "english": "Dock %1$s cover stalled. Failed to open"
+    },
+    {
+      "code": "0x19110020",
+      "name": "dock_tip_0x19110020",
+      "message": "%s舱盖霍尔传感器故障",
+      "english": "%s dock cover Hall sensor error"
+    },
+    {
+      "code": "0x19110021",
+      "name": "dock_tip_0x19110021",
+      "message": "%s舱盖开启或关闭超时",
+      "english": "Opening or closing %s dock cover timed out"
+    },
+    {
+      "code": "0x19110022",
+      "name": "dock_tip_0x19110022",
+      "message": "%s舱盖打开或关闭时触发防夹",
+      "english": "Pinch protection triggered when opening or closing dock %dock_cover_index cover"
+    },
+    {
+      "code": "0x19110023",
+      "name": "dock_tip_0x19110023",
+      "message": "%s舱盖推杆电压过低",
+      "english": "Driving rod of %s dock cover voltage too low"
+    },
+    {
+      "code": "0x19110024",
+      "name": "dock_tip_0x19110024",
+      "message": "%s舱盖推杆断线",
+      "english": "Driving rod of %s dock cover disconnected"
+    },
+    {
+      "code": "0x19110025",
+      "name": "dock_tip_0x19110025",
+      "message": "%s推杆短路",
+      "english": "%s driving rod short-circuited"
+    },
+    {
+      "code": "0x19110026",
+      "name": "dock_tip_0x19110026",
+      "message": "%s推杆温度过高",
+      "english": "%s driving rod temperature too high"
+    },
+    {
+      "code": "0x19110027",
+      "name": "dock_tip_0x19110027",
+      "message": "%s舱盖异常",
+      "english": "%s dock cover error"
+    },
+    {
+      "code": "0x19110028",
+      "name": "dock_tip_0x19110028",
+      "message": "%s急停按钮故障",
+      "english": "%s flight pause button error"
+    },
+    {
+      "code": "0x19110029",
+      "name": "dock_tip_0x19110029",
+      "message": "%s舱盖命令执行失败",
+      "english": "%s dock cover command execution failed"
+    },
+    {
+      "code": "0x1911002A",
+      "name": "dock_tip_0x1911002A",
+      "message": "%s舱盖未处于密封状态",
+      "english": "%s dock cover not sealed"
+    },
+    {
+      "code": "0x1911002D",
+      "name": "dock_tip_0x1911002D",
+      "message": "%dock_cover_index位置功能异常",
+      "english": "Dock %dock_cover_index cover positioning error"
+    },
+    {
+      "code": "0x19110400",
+      "name": "dock_tip_0x19110400",
+      "message": "%1$s推杆位置标定数据错误",
+      "english": "Dock %1$s driving rod position calibration data error"
+    },
+    {
+      "code": "0x19110401",
+      "name": "dock_tip_0x19110401",
+      "message": "%1$s推杆舵机堵转",
+      "english": "Dock %1$s driving rod steering gear stalled"
+    },
+    {
+      "code": "0x19110402",
+      "name": "dock_tip_0x19110402",
+      "message": "%1$s推杆舵机阻力过大",
+      "english": "Excessive resistance in steering %1$s driving rod"
+    },
+    {
+      "code": "0x19110403",
+      "name": "dock_tip_0x19110403",
+      "message": "%1$s推杆舵机温度过高",
+      "english": "Dock %1$s driving rod steering gear overheated"
+    },
+    {
+      "code": "0x19110404",
+      "name": "dock_tip_0x19110404",
+      "message": "%1$s推杆舵机通讯异常",
+      "english": "Dock %1$s driving rod steering gear communication error"
+    },
+    {
+      "code": "0x19110405",
+      "name": "dock_tip_0x19110405",
+      "message": "%1$s推杆舵机内部错误",
+      "english": "Dock %1$s driving rod steering gear internal error"
+    },
+    {
+      "code": "0x19110406",
+      "name": "dock_tip_0x19110406",
+      "message": "%1$s推杆内侧限位开关工作异常",
+      "english": "Dock %1$s driving rod internal limit switch error"
+    },
+    {
+      "code": "0x19110407",
+      "name": "dock_tip_0x19110407",
+      "message": "%1$s推杆内侧限位开关工作异常",
+      "english": "Dock %1$s driving rod internal limit switch error"
+    },
+    {
+      "code": "0x19110408",
+      "name": "dock_tip_0x19110408",
+      "message": "%1$s推杆外侧限位开关工作异常",
+      "english": "Dock %1$s driving rod external limit switch error"
+    },
+    {
+      "code": "0x19110409",
+      "name": "dock_tip_0x19110409",
+      "message": "%1$s推杆外侧限位开关工作异常",
+      "english": "Dock %1$s driving rod external limit switch error"
+    },
+    {
+      "code": "0x1911040B",
+      "name": "dock_tip_0x1911040B",
+      "message": "%1$s推杆闭合超时",
+      "english": "Pushing %1$s driving rod timed out"
+    },
+    {
+      "code": "0x1911040C",
+      "name": "dock_tip_0x1911040C",
+      "message": "%1$s推杆展开超时",
+      "english": "Pulling %1$s driving rod timed out"
+    },
+    {
+      "code": "0x19110800",
+      "name": "dock_tip_0x19110800",
+      "message": "机场蓄电池无法充电",
+      "english": "Failed to charge dock backup battery"
+    },
+    {
+      "code": "0x19110801",
+      "name": "dock_tip_0x19110801",
+      "message": "机场蓄电池电量低",
+      "english": "Dock backup battery level low"
+    },
+    {
+      "code": "0x19110802",
+      "name": "dock_tip_0x19110802",
+      "message": "机场蓄电池温度过高",
+      "english": "Dock backup battery overheated"
+    },
+    {
+      "code": "0x19110803",
+      "name": "dock_tip_0x19110803",
+      "message": "机场蓄电池温度过低",
+      "english": "Dock backup battery temperature too low"
+    },
+    {
+      "code": "0x19110804",
+      "name": "dock_tip_0x19110804",
+      "message": "机场蓄电池开关未开启",
+      "english": "Dock backup battery switch not turned on"
+    },
+    {
+      "code": "0x19110805",
+      "name": "dock_tip_0x19110805",
+      "message": "机场蓄电池过度放电，已无法正常工作",
+      "english": "Dock backup battery completely depleted. Unable to work properly"
+    },
+    {
+      "code": "0x19110806",
+      "name": "dock_tip_0x19110806",
+      "message": "机场蓄电池充电功能异常",
+      "english": "Dock backup battery charging function error"
+    },
+    {
+      "code": "0x19110807",
+      "name": "dock_tip_0x19110807",
+      "message": "机场蓄电池充电功能异常",
+      "english": "Dock backup battery charging function error"
+    },
+    {
+      "code": "0x19110808",
+      "name": "dock_tip_0x19110808",
+      "message": "机场蓄电池功能异常",
+      "english": "Dock backup battery function error"
+    },
+    {
+      "code": "0x19110809",
+      "name": "dock_tip_0x19110809",
+      "message": "机场蓄电池功能异常",
+      "english": "Dock backup battery function error"
+    },
+    {
+      "code": "0x19110C00",
+      "name": "dock_tip_0x19110C00",
+      "message": "机场监控摄像头未安装或断连",
+      "english": "Dock security camera not installed or disconnected"
+    },
+    {
+      "code": "0x19111400",
+      "name": "dock_tip_0x19111400",
+      "message": "机场配电柜柜门被打开",
+      "english": "Dock electrical cabinet cover open"
+    },
+    {
+      "code": "0x19111401",
+      "name": "dock_tip_0x19111401",
+      "message": "机场配电柜柜门传感器异常",
+      "english": "Door sensor of dock electrical cabinet error"
+    },
+    {
+      "code": "0x19111402",
+      "name": "dock_tip_0x19111402",
+      "message": "机场配电柜柜门传感器异常",
+      "english": "Door sensor of dock electrical cabinet error"
+    },
+    {
+      "code": "0x19111800",
+      "name": "dock_tip_0x19111800",
+      "message": "急停按钮被按下",
+      "english": "Emergency stop button pressed down"
+    },
+    {
+      "code": "0x19111D01",
+      "name": "dock_tip_0x19111D01",
+      "message": "舱内飞行器未对频，已对频飞行器在舱外",
+      "english": "Aircraft inside dock is not linked. Linked aircraft is outside of dock"
+    },
+    {
+      "code": "0x19112C01",
+      "name": "dock_tip_0x19112C01",
+      "message": "机场主控模块温度传感器损坏",
+      "english": "Temperature sensor of dock control module damaged"
+    },
+    {
+      "code": "0x19112C02",
+      "name": "dock_tip_0x19112C02",
+      "message": "机场主控模块温度传感器损坏",
+      "english": "Temperature sensor of dock control module damaged"
+    },
+    {
+      "code": "0x19112C03",
+      "name": "dock_tip_0x19112C03",
+      "message": "机场环境温度传感器损坏",
+      "english": "Dock environment temperature sensor damaged"
+    },
+    {
+      "code": "0x19112C04",
+      "name": "dock_tip_0x19112C04",
+      "message": "机场主控模块温度传感器损坏",
+      "english": "Temperature sensor of dock control module damaged"
+    },
+    {
+      "code": "0x19112C05",
+      "name": "dock_tip_0x19112C05",
+      "message": "机场主控模块温度传感器损坏",
+      "english": "Temperature sensor of dock control module damaged"
+    },
+    {
+      "code": "0x19112C06",
+      "name": "dock_tip_0x19112C06",
+      "message": "机场左侧充电连接器温度传感器损坏",
+      "english": "Temperature sensor of dock left charging connector damaged"
+    },
+    {
+      "code": "0x19112C07",
+      "name": "dock_tip_0x19112C07",
+      "message": "机场右侧充电连接器温度传感器损坏",
+      "english": "Temperature sensor of dock right charging connector damaged"
+    },
+    {
+      "code": "0x19112C08",
+      "name": "dock_tip_0x19112C08",
+      "message": "停机坪接口板温度传感器损坏",
+      "english": "Temperature sensor of landing pad interface board damaged"
+    },
+    {
+      "code": "0x19112C09",
+      "name": "dock_tip_0x19112C09",
+      "message": "停机坪接口板温度传感器损坏",
+      "english": "Temperature sensor of landing pad interface board damaged"
+    },
+    {
+      "code": "0x19112C0A",
+      "name": "dock_tip_0x19112C0A",
+      "message": "停机坪接口板温度传感器损坏",
+      "english": "Temperature sensor of landing pad interface board damaged"
+    },
+    {
+      "code": "0x19112C0B",
+      "name": "dock_tip_0x19112C0B",
+      "message": "机场主控模块温度传感器损坏",
+      "english": "Temperature sensor of dock control module damaged"
+    },
+    {
+      "code": "0x19112C0C",
+      "name": "dock_tip_0x19112C0C",
+      "message": "机场主控模块温度传感器未连接",
+      "english": "Temperature sensor of dock control module not connected"
+    },
+    {
+      "code": "0x19112C0D",
+      "name": "dock_tip_0x19112C0D",
+      "message": "机场充电电源模块温度传感器损坏",
+      "english": "Temperature sensor of dock charging module damaged"
+    },
+    {
+      "code": "0x19112C0E",
+      "name": "dock_tip_0x19112C0E",
+      "message": "机场充电电源模块温度传感器未连接",
+      "english": "Temperature sensor of dock charging module not connected"
+    },
+    {
+      "code": "0x19112C0F",
+      "name": "dock_tip_0x19112C0F",
+      "message": "机场电源模块温度传感器损坏",
+      "english": "Temperature sensor of dock battery module damaged"
+    },
+    {
+      "code": "0x19112C10",
+      "name": "dock_tip_0x19112C10",
+      "message": "机场电源模块温度传感器未连接",
+      "english": "Temperature sensor of dock power module not connected"
+    },
+    {
+      "code": "0x19112C11",
+      "name": "dock_tip_0x19112C11",
+      "message": "机场电源模块连接器温度传感器损坏",
+      "english": "Temperature sensor of dock battery module connector damaged"
+    },
+    {
+      "code": "0x19112C12",
+      "name": "dock_tip_0x19112C12",
+      "message": "机场电源模块连接器温度传感器未连接",
+      "english": "Temperature sensor of dock battery module connector not connected"
+    },
+    {
+      "code": "0x19112C13",
+      "name": "dock_tip_0x19112C13",
+      "message": "机场充电模块连接器温度传感器损坏",
+      "english": "Temperature sensor of dock charging module connector damaged"
+    },
+    {
+      "code": "0x19112C14",
+      "name": "dock_tip_0x19112C14",
+      "message": "机场充电模块连接器温度传感器未连接",
+      "english": "Temperature sensor of dock charging module connector not connected"
+    },
+    {
+      "code": "0x19112C15",
+      "name": "dock_tip_0x19112C15",
+      "message": "机场空调电源模块温度传感器损坏",
+      "english": "Temperature sensor of dock AC battery module damaged"
+    },
+    {
+      "code": "0x19112C16",
+      "name": "dock_tip_0x19112C16",
+      "message": "机场空调电源模块温度传感器未连接",
+      "english": "Temperature sensor of dock AC battery module not connected"
+    },
+    {
+      "code": "0x19112C17",
+      "name": "dock_tip_0x19112C17",
+      "message": "机场空调电源模块连接器温度传感器损坏",
+      "english": "Temperature sensor of dock AC battery module connector damaged"
+    },
+    {
+      "code": "0x19112C18",
+      "name": "dock_tip_0x19112C18",
+      "message": "机场空调电源模块连接器温度传感器未连接",
+      "english": "Temperature sensor of dock AC battery module connector not connected"
+    },
+    {
+      "code": "0x19112C19",
+      "name": "dock_tip_0x19112C19",
+      "message": "机场蓄电池温度传感器损坏",
+      "english": "Temperature sensor of dock backup battery damaged"
+    },
+    {
+      "code": "0x19112C1A",
+      "name": "dock_tip_0x19112C1A",
+      "message": "机场蓄电池温度传感器未连接",
+      "english": "Temperature sensor of dock backup battery not connected"
+    },
+    {
+      "code": "0x19113000",
+      "name": "dock_tip_0x19113000",
+      "message": "机场振动传感器工作异常",
+      "english": "Dock vibration sensor error"
+    },
+    {
+      "code": "0x19113001",
+      "name": "dock_tip_0x19113001",
+      "message": "机场产生振动，可能被移动或遭到破坏",
+      "english": "Dock vibration detected. Dock may be moved or damaged"
+    },
+    {
+      "code": "0x19113401",
+      "name": "dock_tip_0x19113401",
+      "message": "飞行器电池充电电压异常",
+      "english": "Aircraft battery charge voltage error"
+    },
+    {
+      "code": "0x19113403",
+      "name": "dock_tip_0x19113403",
+      "message": "飞行器电池不在位，或电量极低已进入休眠模式",
+      "english": "Aircraft battery not properly installed, or battery level too low and battery enters hibernation mode"
+    },
+    {
+      "code": "0x19113404",
+      "name": "dock_tip_0x19113404",
+      "message": "飞行器电池充电失败",
+      "english": "Failed to charge aircraft battery"
+    },
+    {
+      "code": "0x19113406",
+      "name": "dock_tip_0x19113406",
+      "message": "飞行器电池异常",
+      "english": "Aircraft battery error"
+    },
+    {
+      "code": "0x19113407",
+      "name": "dock_tip_0x19113407",
+      "message": "机场供电电源模块异常，无法给飞行器电池充电",
+      "english": "Dock power supply module error. Unable to charge aircraft"
+    },
+    {
+      "code": "0x19113414",
+      "name": "dock_tip_0x19113414",
+      "message": "电池温度过高（≥44℃）无法开始充电",
+      "english": "Battery overheated (≥44° C). Unable to start charging"
+    },
+    {
+      "code": "0x19113800",
+      "name": "dock_tip_0x19113800",
+      "message": "机场内部电源模块工作异常",
+      "english": "Dock internal power module error"
+    },
+    {
+      "code": "0x19113802",
+      "name": "dock_tip_0x19113802",
+      "message": "机场弱电模块供电异常",
+      "english": "Dock electronic module power supply error"
+    },
+    {
+      "code": "0x19113803",
+      "name": "dock_tip_0x19113803",
+      "message": "机场供电电源断开",
+      "english": "Dock power supply disconnected"
+    },
+    {
+      "code": "0x19113806",
+      "name": "dock_tip_0x19113806",
+      "message": "机场电源模块故障",
+      "english": "Dock battery module error"
+    },
+    {
+      "code": "0x19113807",
+      "name": "dock_tip_0x19113807",
+      "message": "机场电源模块输出电压过高",
+      "english": "Output voltage of dock battery module too high"
+    },
+    {
+      "code": "0x19113808",
+      "name": "dock_tip_0x19113808",
+      "message": "机场电源模块输出电压过低",
+      "english": "Output voltage of dock battery module too low"
+    },
+    {
+      "code": "0x19113809",
+      "name": "dock_tip_0x19113809",
+      "message": "机场电源模块温度过高",
+      "english": "Dock battery module temperature too high"
+    },
+    {
+      "code": "0x1911380A",
+      "name": "dock_tip_0x1911380A",
+      "message": "机场电源模块温度过低",
+      "english": "Dock battery module temperature too low"
+    },
+    {
+      "code": "0x1911380B",
+      "name": "dock_tip_0x1911380B",
+      "message": "机场电源模块连接器温度过高",
+      "english": "Dock battery module connector temperature too high"
+    },
+    {
+      "code": "0x1911380C",
+      "name": "dock_tip_0x1911380C",
+      "message": "机场电源模块连接器温度过低",
+      "english": "Dock battery module connector temperature too low"
+    },
+    {
+      "code": "0x19113901",
+      "name": "dock_tip_0x19113901",
+      "message": "机场系统电源电压过高",
+      "english": "Battery voltage of dock system too high"
+    },
+    {
+      "code": "0x19113902",
+      "name": "dock_tip_0x19113902",
+      "message": "机场系统电源电压过低",
+      "english": "Battery voltage of dock system too low"
+    },
+    {
+      "code": "0x19113903",
+      "name": "dock_tip_0x19113903",
+      "message": "机场主控模块异常掉电",
+      "english": "Dock control module powered off abnormally"
+    },
+    {
+      "code": "0x19113C00",
+      "name": "dock_tip_0x19113C00",
+      "message": "防雷器后备保护器开关未开启，或防雷器损坏",
+      "english": "Surge protector circuit breaker not turned on, or surge protector device damaged"
+    },
+    {
+      "code": "0x19113C01",
+      "name": "dock_tip_0x19113C01",
+      "message": "停机坪连接异常",
+      "english": "Landing pad connection error"
+    },
+    {
+      "code": "0x19113C02",
+      "name": "dock_tip_0x19113C02",
+      "message": "雨量计连接异常",
+      "english": "Rainfall gauge connection error"
+    },
+    {
+      "code": "0x19113C03",
+      "name": "dock_tip_0x19113C03",
+      "message": "空调连接异常",
+      "english": "AC connection error"
+    },
+    {
+      "code": "0x19113C04",
+      "name": "dock_tip_0x19113C04",
+      "message": "机场充电模块连接异常",
+      "english": "Dock charging module connection error"
+    },
+    {
+      "code": "0x19113D00",
+      "name": "dock_tip_0x19113D00",
+      "message": "空调制冷片损坏",
+      "english": "AC cooler damaged"
+    },
+    {
+      "code": "0x19113D01",
+      "name": "dock_tip_0x19113D01",
+      "message": "空调制冷片损坏",
+      "english": "AC cooler damaged"
+    },
+    {
+      "code": "0x19113D02",
+      "name": "dock_tip_0x19113D02",
+      "message": "空调制冷片损坏",
+      "english": "AC cooling error"
+    },
+    {
+      "code": "0x19113D03",
+      "name": "dock_tip_0x19113D03",
+      "message": "空调加热器损坏",
+      "english": "AC heater damaged"
+    },
+    {
+      "code": "0x19113D04",
+      "name": "dock_tip_0x19113D04",
+      "message": "空调加热器损坏",
+      "english": "AC heater damaged"
+    },
+    {
+      "code": "0x19113D05",
+      "name": "dock_tip_0x19113D05",
+      "message": "空调内循环风扇损坏",
+      "english": "AC internal circulation fan damaged"
+    },
+    {
+      "code": "0x19113D06",
+      "name": "dock_tip_0x19113D06",
+      "message": "空调外循环风扇损坏",
+      "english": "AC external circulation fan damaged"
+    },
+    {
+      "code": "0x19113D07",
+      "name": "dock_tip_0x19113D07",
+      "message": "空调外循环出风口温度传感器损坏",
+      "english": "Temperature sensor of AC external circulation supply vent damaged"
+    },
+    {
+      "code": "0x19113D08",
+      "name": "dock_tip_0x19113D08",
+      "message": "空调内循环进风口温度传感器损坏",
+      "english": "Temperature sensor of AC internal circulation return vent damaged"
+    },
+    {
+      "code": "0x19113D09",
+      "name": "dock_tip_0x19113D09",
+      "message": "空调内循环出风口右侧温度传感器损坏",
+      "english": "Temperature sensor on the right of AC internal circulation supply vent damaged"
+    },
+    {
+      "code": "0x19113D0A",
+      "name": "dock_tip_0x19113D0A",
+      "message": "空调内循环出风口左侧温度传感器损坏",
+      "english": "Temperature sensor on the left of AC internal circulation supply vent damaged"
+    },
+    {
+      "code": "0x19113D0B",
+      "name": "dock_tip_0x19113D0B",
+      "message": "空调制冷片温度传感器损坏",
+      "english": "AC cooler temperature sensor damaged"
+    },
+    {
+      "code": "0x19113D0C",
+      "name": "dock_tip_0x19113D0C",
+      "message": "空调内循环风道温度传感器损坏",
+      "english": "Temperature sensor of AC internal circulation tube damaged"
+    },
+    {
+      "code": "0x19113D0D",
+      "name": "dock_tip_0x19113D0D",
+      "message": "舱盖破损或无法完全关闭",
+      "english": "Dock cover damaged, or unable to close cover properly"
+    },
+    {
+      "code": "0x19113D0E",
+      "name": "dock_tip_0x19113D0E",
+      "message": "空调内循环进风口堵塞",
+      "english": "AC internal circulation return vent blocked"
+    },
+    {
+      "code": "0x19113D0F",
+      "name": "dock_tip_0x19113D0F",
+      "message": "空调内循环出风口堵塞",
+      "english": "AC internal circulation supply vent blocked"
+    },
+    {
+      "code": "0x19113D10",
+      "name": "dock_tip_0x19113D10",
+      "message": "空调外循环出风口与进风口温差过大（≥20℃）",
+      "english": "Large temperature difference (≥20° C) between AC internal circulation supply and return vents"
+    },
+    {
+      "code": "0x19113D11",
+      "name": "dock_tip_0x19113D11",
+      "message": "空调制冷片供电异常",
+      "english": "AC cooler power supply error"
+    },
+    {
+      "code": "0x19113D12",
+      "name": "dock_tip_0x19113D12",
+      "message": "空调加热器供电异常",
+      "english": "AC heater power supply error"
+    },
+    {
+      "code": "0x19113D13",
+      "name": "dock_tip_0x19113D13",
+      "message": "空调外循环风扇供电异常",
+      "english": "AC external circulation fan power supply error"
+    },
+    {
+      "code": "0x19113D14",
+      "name": "dock_tip_0x19113D14",
+      "message": "空调内循环风扇供电异常",
+      "english": "AC internal circulation fan power supply error"
+    },
+    {
+      "code": "0x19113D15",
+      "name": "dock_tip_0x19113D15",
+      "message": "空调供电异常",
+      "english": "AC power supply error"
+    },
+    {
+      "code": "0x19113D16",
+      "name": "dock_tip_0x19113D16",
+      "message": "空调外循环进风口堵塞",
+      "english": ""
+    },
+    {
+      "code": "0x19113D20",
+      "name": "dock_tip_0x19113D20",
+      "message": "空调外循环进风口温度传感器损坏",
+      "english": "Temperature sensor of return vent of AC external circulation damaged"
+    },
+    {
+      "code": "0x19113D21",
+      "name": "dock_tip_0x19113D21",
+      "message": "空调内循环出风口温度传感器损坏",
+      "english": "Temperature sensor of supply vent of AC internal circulation damaged"
+    },
+    {
+      "code": "0x19113D22",
+      "name": "dock_tip_0x19113D22",
+      "message": "空调TEC冷端温度传感器损坏",
+      "english": "Temperature sensor of AC TEC cold side damaged"
+    },
+    {
+      "code": "0x19113D23",
+      "name": "dock_tip_0x19113D23",
+      "message": "空调外循环出风口与进风口温差过大（≥10℃）",
+      "english": "Large temperature difference between AC external circulation supply vent and return vent (≥10° C)"
+    },
+    {
+      "code": "0x19113D24",
+      "name": "dock_tip_0x19113D24",
+      "message": "左推杆温感NTC温度传感器损坏",
+      "english": "NTC temperature sensor of left driving rod damaged"
+    },
+    {
+      "code": "0x19113D25",
+      "name": "dock_tip_0x19113D25",
+      "message": "右推杆温感NTC温度传感器损坏",
+      "english": "NTC temperature sensor of right driving rod damaged"
+    },
+    {
+      "code": "0x19113D26",
+      "name": "dock_tip_0x19113D26",
+      "message": "高温预警（≥45℃）",
+      "english": "High temperature warning (≥45℃)"
+    },
+    {
+      "code": "0x19113D27",
+      "name": "dock_tip_0x19113D27",
+      "message": "低温预警（≤-20℃）",
+      "english": "Low temperature warning (≤-20℃)"
+    },
+    {
+      "code": "0x19113D28",
+      "name": "dock_tip_0x19113D28",
+      "message": "空调外循环出风口温度传感器短路",
+      "english": "Temperature sensor of AC external circulation supply vent short-circuited"
+    },
+    {
+      "code": "0x19113D29",
+      "name": "dock_tip_0x19113D29",
+      "message": "空调内循环进风口温度传感器短路",
+      "english": "Temperature sensor of AC internal circulation return vent short-circuited"
+    },
+    {
+      "code": "0x19113D2A",
+      "name": "dock_tip_0x19113D2A",
+      "message": "空调制冷片温度传感器短路",
+      "english": "AC cooler temperature sensor short-circuited"
+    },
+    {
+      "code": "0x19113D2B",
+      "name": "dock_tip_0x19113D2B",
+      "message": "空调TEC冷端温度传感器短路",
+      "english": "Temperature sensor of AC TEC cold side short-circuited"
+    },
+    {
+      "code": "0x19113D2C",
+      "name": "dock_tip_0x19113D2C",
+      "message": "空调外循环进风口温度传感器短路",
+      "english": "Temperature sensor of AC external circulation return vent short-circuited"
+    },
+    {
+      "code": "0x19113D2D",
+      "name": "dock_tip_0x19113D2D",
+      "message": "空调内循环出风口温度传感器短路",
+      "english": "Temperature sensor of AC internal circulation supply vent short-circuited"
+    },
+    {
+      "code": "0x19113D2E",
+      "name": "dock_tip_0x19113D2E",
+      "message": "左推杆温感NTC温度传感器短路",
+      "english": "NTC temperature sensor of left driving rod short-circuited"
+    },
+    {
+      "code": "0x19113D2F",
+      "name": "dock_tip_0x19113D2F",
+      "message": "右推杆温感NTC温度传感器短路",
+      "english": "NTC temperature sensor of right driving rod short-circuited"
+    },
+    {
+      "code": "0x19113D60",
+      "name": "dock_tip_0x19113D60",
+      "message": "空调制冷功能异常",
+      "english": "AC cooling error"
+    },
+    {
+      "code": "0x19113D61",
+      "name": "dock_tip_0x19113D61",
+      "message": "空调制冷功能异常",
+      "english": "AC cooling error"
+    },
+    {
+      "code": "0x19113D62",
+      "name": "dock_tip_0x19113D62",
+      "message": "空调外循环风扇损坏",
+      "english": "AC external circulation fan damaged"
+    },
+    {
+      "code": "0x19113D63",
+      "name": "dock_tip_0x19113D63",
+      "message": "空调外循环风扇风速异常",
+      "english": "AC external circulation fan speed error"
+    },
+    {
+      "code": "0x19113D64",
+      "name": "dock_tip_0x19113D64",
+      "message": "空调内循环风扇损坏",
+      "english": "AC internal circulation fan damaged"
+    },
+    {
+      "code": "0x19113D65",
+      "name": "dock_tip_0x19113D65",
+      "message": "空调内循环风扇风速异常",
+      "english": "AC internal circulation fan speed error"
+    },
+    {
+      "code": "0x19114000",
+      "name": "dock_tip_0x19114000",
+      "message": "风速过大（≥9 m/s），无法执行飞行任务",
+      "english": "Wind speed too high (≥ 9 m/s). Unable to perform task"
+    },
+    {
+      "code": "0x19114800",
+      "name": "dock_tip_0x19114800",
+      "message": "雨量过大，无法执行飞行任务",
+      "english": "Heavy rainfall. Unable to perform task"
+    },
+    {
+      "code": "0x19114801",
+      "name": "dock_tip_0x19114801",
+      "message": "机场监控摄像头供电异常",
+      "english": "Dock security camera power supply error"
+    },
+    {
+      "code": "0x19114802",
+      "name": "dock_tip_0x19114802",
+      "message": "DJI Cellular 模块供电异常",
+      "english": "DJI Cellular Dongle power supply error"
+    },
+    {
+      "code": "0x19114803",
+      "name": "dock_tip_0x19114803",
+      "message": "舱盖告警灯供电异常",
+      "english": "Power supply error in status indicator on dock cover"
+    },
+    {
+      "code": "0x19114804",
+      "name": "dock_tip_0x19114804",
+      "message": "风速计加热供电异常",
+      "english": "Wind speed gauge heating module power supply error"
+    },
+    {
+      "code": "0x19114805",
+      "name": "dock_tip_0x19114805",
+      "message": "舱内温湿度传感器连接异常",
+      "english": "Temperature and humidity sensor connection error"
+    },
+    {
+      "code": "0x19114806",
+      "name": "dock_tip_0x19114806",
+      "message": "雨量计连接异常",
+      "english": "Rainfall gauge connection error"
+    },
+    {
+      "code": "0x19114807",
+      "name": "dock_tip_0x19114807",
+      "message": "雨量计加热模块供电异常",
+      "english": "Rainfall gauge heating module power supply error"
+    },
+    {
+      "code": "0x19114808",
+      "name": "dock_tip_0x19114808",
+      "message": "雨量计加热模块温度传感器连接异常",
+      "english": "Temperature sensor of rainfall gauge heating module connection error"
+    },
+    {
+      "code": "0x19114809",
+      "name": "dock_tip_0x19114809",
+      "message": "雨量计加热模块温度传感器温度过高",
+      "english": "Temperature sensor of rainfall gauge heating module overheated"
+    },
+    {
+      "code": "0x1911480A",
+      "name": "dock_tip_0x1911480A",
+      "message": "风速计加热模块温度传感器损坏",
+      "english": "Temperature sensor of wind speed gauge heating module damaged"
+    },
+    {
+      "code": "0x1911480B",
+      "name": "dock_tip_0x1911480B",
+      "message": "风速计加热模块温度传感器温度过高",
+      "english": "Temperature sensor of wind speed gauge heating module overheated"
+    },
+    {
+      "code": "0x1911480C",
+      "name": "dock_tip_0x1911480C",
+      "message": "舱盖除冰加热温度传感器损坏",
+      "english": "Dock cover temperature sensor damaged. Heating module unable to work properly in low-temperature environments"
+    },
+    {
+      "code": "0x1911480D",
+      "name": "dock_tip_0x1911480D",
+      "message": "舱盖除冰加热温度传感器温度过高",
+      "english": "Dock cover temperature sensor overheated. Heating module failed to work properly"
+    },
+    {
+      "code": "0x1911480E",
+      "name": "dock_tip_0x1911480E",
+      "message": "雨量计连接异常",
+      "english": "Rainfall gauge connection error"
+    },
+    {
+      "code": "0x1911480F",
+      "name": "dock_tip_0x1911480F",
+      "message": "雨量计短路",
+      "english": "Rainfall gauge short-circuited"
+    },
+    {
+      "code": "0x19114810",
+      "name": "dock_tip_0x19114810",
+      "message": "风速计模块连接异常",
+      "english": ""
+    },
+    {
+      "code": "0x19114811",
+      "name": "dock_tip_0x19114811",
+      "message": "风速计霍尔温度传感器损坏",
+      "english": "Hall temperature sensor of wind speed gauge damaged"
+    },
+    {
+      "code": "0x19114812",
+      "name": "dock_tip_0x19114812",
+      "message": "风速计霍尔温度传感器损坏",
+      "english": "Hall temperature sensor of wind speed gauge damaged"
+    },
+    {
+      "code": "0x19114813",
+      "name": "dock_tip_0x19114813",
+      "message": "温湿度传感器自加热时间过久",
+      "english": "Temperature and humidity sensor self-heating time too long"
+    },
+    {
+      "code": "0x19114814",
+      "name": "dock_tip_0x19114814",
+      "message": "雨量计检测部件损坏",
+      "english": "Rainfall gauge damaged"
+    },
+    {
+      "code": "0x19114815",
+      "name": "dock_tip_0x19114815",
+      "message": "雨量计检测部件损坏",
+      "english": "Rainfall gauge damaged"
+    },
+    {
+      "code": "0x1911481A",
+      "name": "dock_tip_0x1911481A",
+      "message": "机场舱盖除冰功能异常",
+      "english": "Dock cover failed to deice"
+    },
+    {
+      "code": "0x1911481B",
+      "name": "dock_tip_0x1911481B",
+      "message": "风速计供电异常",
+      "english": "Wind speed gauge power supply error"
+    },
+    {
+      "code": "0x19114C00",
+      "name": "dock_tip_0x19114C00",
+      "message": "机场浸水",
+      "english": "Water immersion detected"
+    },
+    {
+      "code": "0x19115000",
+      "name": "dock_tip_0x19115000",
+      "message": "机场异常重启",
+      "english": "Error occurred and dock restarted"
+    },
+    {
+      "code": "0x19116000",
+      "name": "dock_tip_0x19116000",
+      "message": "机场充电模块电源故障",
+      "english": "Battery of dock charging module error"
+    },
+    {
+      "code": "0x19116001",
+      "name": "dock_tip_0x19116001",
+      "message": "机场充电模块电源电压过高",
+      "english": "Battery voltage of dock charging module too high"
+    },
+    {
+      "code": "0x19116002",
+      "name": "dock_tip_0x19116002",
+      "message": "机场充电模块电源电压过低",
+      "english": "Battery voltage of dock charging module too low"
+    },
+    {
+      "code": "0x19116003",
+      "name": "dock_tip_0x19116003",
+      "message": "机场充电模块电源电流过大",
+      "english": "Electric current of dock charging module too large"
+    },
+    {
+      "code": "0x19116004",
+      "name": "dock_tip_0x19116004",
+      "message": "机场充电模块电源电流过小",
+      "english": "Electric current of dock charging module too small"
+    },
+    {
+      "code": "0x19116005",
+      "name": "dock_tip_0x19116005",
+      "message": "机场充电模块电源MOS温度过高",
+      "english": "Battery MOS of dock charging module temperature too high"
+    },
+    {
+      "code": "0x19116006",
+      "name": "dock_tip_0x19116006",
+      "message": "机场充电模块电源MOS温度过低",
+      "english": "Battery MOS of dock charging module temperature too low"
+    },
+    {
+      "code": "0x19116007",
+      "name": "dock_tip_0x19116007",
+      "message": "机场充电模块控制器电源异常",
+      "english": "Controller battery of dock charging module error"
+    },
+    {
+      "code": "0x19116008",
+      "name": "dock_tip_0x19116008",
+      "message": "机场充电模块连接器温度过高",
+      "english": "Dock charging module connector temperature too high"
+    },
+    {
+      "code": "0x19116009",
+      "name": "dock_tip_0x19116009",
+      "message": "机场充电模块连接器温度过低",
+      "english": "Dock charging module connector temperature too low"
+    },
+    {
+      "code": "0x1911600A",
+      "name": "dock_tip_0x1911600A",
+      "message": "机场空调电源模块供电异常",
+      "english": "Dock AC battery power supply error"
+    },
+    {
+      "code": "0x1911600B",
+      "name": "dock_tip_0x1911600B",
+      "message": "机场空调电源模块电压过高",
+      "english": "Dock AC battery voltage too high"
+    },
+    {
+      "code": "0x1911600C",
+      "name": "dock_tip_0x1911600C",
+      "message": "机场空调电源模块电压过低",
+      "english": "Dock AC battery voltage too low"
+    },
+    {
+      "code": "0x1911600D",
+      "name": "dock_tip_0x1911600D",
+      "message": "机场空调电源模块电流过大",
+      "english": "Electric current of dock AC power module too large"
+    },
+    {
+      "code": "0x1911600E",
+      "name": "dock_tip_0x1911600E",
+      "message": "机场空调电源模块电流过小",
+      "english": "Electric current of dock AC power module too small"
+    },
+    {
+      "code": "0x1911600F",
+      "name": "dock_tip_0x1911600F",
+      "message": "机场空调控制器模块电源故障",
+      "english": "Dock AC controller module battery error"
+    },
+    {
+      "code": "0x19116010",
+      "name": "dock_tip_0x19116010",
+      "message": "机场空调控制器模块电流过大",
+      "english": "Electric current of dock AC controller module too large"
+    },
+    {
+      "code": "0x19116011",
+      "name": "dock_tip_0x19116011",
+      "message": "机场空调控制器模块电流过小",
+      "english": "Electric current of dock AC controller module too small"
+    },
+    {
+      "code": "0x19116012",
+      "name": "dock_tip_0x19116012",
+      "message": "机场空调模块电源MOS温度过高",
+      "english": "Battery MOS of dock AC module temperature too high"
+    },
+    {
+      "code": "0x19116013",
+      "name": "dock_tip_0x19116013",
+      "message": "机场空调模块电源MOS温度过低",
+      "english": "Battery MOS of dock AC module temperature too low"
+    },
+    {
+      "code": "0x19116014",
+      "name": "dock_tip_0x19116014",
+      "message": "空调模块连接器温度过高",
+      "english": "AC module connector temperature too high"
+    },
+    {
+      "code": "0x19116015",
+      "name": "dock_tip_0x19116015",
+      "message": "空调模块连接器温度过低",
+      "english": "AC module connector temperature too low"
+    },
+    {
+      "code": "0x19116016",
+      "name": "dock_tip_0x19116016",
+      "message": "气象站模块电源故障",
+      "english": "Battery of weather station module error"
+    },
+    {
+      "code": "0x19116017",
+      "name": "dock_tip_0x19116017",
+      "message": "气象站模块电源电流过大",
+      "english": "Electric current of weather station module too large"
+    },
+    {
+      "code": "0x19116018",
+      "name": "dock_tip_0x19116018",
+      "message": "气象站模块电源电流过小",
+      "english": "Electric current of weather station module too small"
+    },
+    {
+      "code": "0x1911601B",
+      "name": "dock_tip_0x1911601B",
+      "message": "机场图传模块电源异常",
+      "english": "Battery of dock image transmission module error"
+    },
+    {
+      "code": "0x1911601F",
+      "name": "dock_tip_0x1911601F",
+      "message": "机场舱内监控摄像头电压过高",
+      "english": "Battery voltage of dock internal security camera too high"
+    },
+    {
+      "code": "0x19116020",
+      "name": "dock_tip_0x19116020",
+      "message": "机场舱内监控摄像头电压过低",
+      "english": "Battery voltage of dock internal security camera too low"
+    },
+    {
+      "code": "0x19116021",
+      "name": "dock_tip_0x19116021",
+      "message": "右舱盖电源电压过高",
+      "english": "Battery voltage of right dock cover too high"
+    },
+    {
+      "code": "0x19116022",
+      "name": "dock_tip_0x19116022",
+      "message": "右舱盖电源电压过低",
+      "english": "Battery voltage of right dock cover too low"
+    },
+    {
+      "code": "0x19116023",
+      "name": "dock_tip_0x19116023",
+      "message": "机场主控模块温度过高",
+      "english": "Dock control module temperature too high"
+    },
+    {
+      "code": "0x19116024",
+      "name": "dock_tip_0x19116024",
+      "message": "机场主控模块温度过低",
+      "english": "Dock control module temperature too low"
+    },
+    {
+      "code": "0x19117000",
+      "name": "dock_tip_0x19117000",
+      "message": "飞行器电池充电失败",
+      "english": "Failed to recharge aircraft battery"
+    },
+    {
+      "code": "0x19117021",
+      "name": "dock_tip_0x19117021",
+      "message": "舱盖运动中，飞行器电池充电失败",
+      "english": "Dock cover moving. Charging aircraft battery failed"
+    },
+    {
+      "code": "0x19117022",
+      "name": "dock_tip_0x19117022",
+      "message": "机场升级中，飞行器电池充电失败",
+      "english": "Updating dock. Charging aircraft battery failed"
+    },
+    {
+      "code": "0x19117023",
+      "name": "dock_tip_0x19117023",
+      "message": "未检测到飞行器",
+      "english": "No aircraft found"
+    },
+    {
+      "code": "0x19117024",
+      "name": "dock_tip_0x19117024",
+      "message": "机场充电模块检测到金属异物，飞行器电池充电失败",
+      "english": "Metal foreign objects detected in dock charging module. Charging aircraft battery failed"
+    },
+    {
+      "code": "0x19117025",
+      "name": "dock_tip_0x19117025",
+      "message": "检测到机场舱盖已打开，飞行器充电失败",
+      "english": "Dock cover opened. Charging aircraft battery failed"
+    },
+    {
+      "code": "0x19117041",
+      "name": "dock_tip_0x19117041",
+      "message": "飞行器未连接",
+      "english": "Aircraft not connected"
+    },
+    {
+      "code": "0x19117043",
+      "name": "dock_tip_0x19117043",
+      "message": "飞行器严重低电量，无法开机",
+      "english": "Aircraft battery level critically low. Unable to power on aircraft"
+    },
+    {
+      "code": "0x19117045",
+      "name": "dock_tip_0x19117045",
+      "message": "飞行器电池故障，无法充电或开机",
+      "english": "Aircraft battery error. Unable to charge battery or power on aircraft"
+    },
+    {
+      "code": "0x19117046",
+      "name": "dock_tip_0x19117046",
+      "message": "飞行器电池通信异常",
+      "english": "Aircraft battery communication error"
+    },
+    {
+      "code": "0x19117047",
+      "name": "dock_tip_0x19117047",
+      "message": "飞行器电量较高，无需充电",
+      "english": "Aircraft battery level high. No battery charging required"
+    },
+    {
+      "code": "0x19117048",
+      "name": "dock_tip_0x19117048",
+      "message": "飞行器无线充电模块异常",
+      "english": "Aircraft wireless charging module error"
+    },
+    {
+      "code": "0x19117061",
+      "name": "dock_tip_0x19117061",
+      "message": "飞行器充电模块唤醒失败",
+      "english": "Waking aircraft charging module failed"
+    },
+    {
+      "code": "0x19117202",
+      "name": "dock_tip_0x19117202",
+      "message": "飞行器开机超时",
+      "english": "Powering on aircraft timed out"
+    },
+    {
+      "code": "0x19117221",
+      "name": "dock_tip_0x19117221",
+      "message": "机场连接飞行器蓝牙失败",
+      "english": "Failed to connect dock to aircraft Bluetooth"
+    },
+    {
+      "code": "0x19117222",
+      "name": "dock_tip_0x19117222",
+      "message": "机场蓝牙模块链路故障",
+      "english": "Dock Bluetooth link error"
+    },
+    {
+      "code": "0x19117223",
+      "name": "dock_tip_0x19117223",
+      "message": "飞行器蓝牙模块信号弱",
+      "english": "Aircraft Bluetooth signal weak"
+    },
+    {
+      "code": "0x19117321",
+      "name": "dock_tip_0x19117321",
+      "message": "飞行器图传链路异常，关机失败",
+      "english": "Aircraft image transmission link error. Powering off failed"
+    },
+    {
+      "code": "0x19117322",
+      "name": "dock_tip_0x19117322",
+      "message": "飞行器关机超时",
+      "english": "Powering off aircraft timed out"
+    },
+    {
+      "code": "0x19117460",
+      "name": "dock_tip_0x19117460",
+      "message": "机场充电电源模块电压过低",
+      "english": "Battery voltage of dock charging module too low"
+    },
+    {
+      "code": "0x19117461",
+      "name": "dock_tip_0x19117461",
+      "message": "机场充电电源模块电流过大",
+      "english": "Electric current of dock charging module too large"
+    },
+    {
+      "code": "0x19117462",
+      "name": "dock_tip_0x19117462",
+      "message": "飞行器充电模块线圈电流过大",
+      "english": "Aircraft charging module coil overcurrent"
+    },
+    {
+      "code": "0x19117463",
+      "name": "dock_tip_0x19117463",
+      "message": "飞行器充电电源故障",
+      "english": "Aircraft charging module error"
+    },
+    {
+      "code": "0x19117464",
+      "name": "dock_tip_0x19117464",
+      "message": "飞行器充电电源过压",
+      "english": "Battery voltage of aircraft charging module too high"
+    },
+    {
+      "code": "0x19117465",
+      "name": "dock_tip_0x19117465",
+      "message": "机场充电电源过压",
+      "english": "Battery voltage of dock charging module too high"
+    },
+    {
+      "code": "0x19117470",
+      "name": "dock_tip_0x19117470",
+      "message": "飞行器充电电源故障",
+      "english": "Aircraft charging module error"
+    },
+    {
+      "code": "0x19117480",
+      "name": "dock_tip_0x19117480",
+      "message": "机场充电模块温度过高",
+      "english": "Dock charging module temperature too high"
+    },
+    {
+      "code": "0x19117481",
+      "name": "dock_tip_0x19117481",
+      "message": "机场充电模块充电电流过大",
+      "english": "Electric current of dock charging module too large"
+    },
+    {
+      "code": "0x191174A0",
+      "name": "dock_tip_0x191174A0",
+      "message": "机场充电模块线圈温度过高",
+      "english": "Temperature of dock charging module coil too high"
+    },
+    {
+      "code": "0x191174B0",
+      "name": "dock_tip_0x191174B0",
+      "message": "机场无线充电模块温度检测异常",
+      "english": "Temperature of dock wireless charging module error"
+    },
+    {
+      "code": "0x191174B1",
+      "name": "dock_tip_0x191174B1",
+      "message": "机场充电模块线圈温度传感器未连接",
+      "english": "Temperature sensor of dock charging module coil not connected"
+    },
+    {
+      "code": "0x191174B2",
+      "name": "dock_tip_0x191174B2",
+      "message": "机场充电模块线圈温度传感器异常",
+      "english": "Temperature sensor of dock charging module coil error"
+    },
+    {
+      "code": "0x191174C0",
+      "name": "dock_tip_0x191174C0",
+      "message": "飞行器充电模块线圈温度过高",
+      "english": "Temperature of aircraft charging module coil too high"
+    },
+    {
+      "code": "0x191174D0",
+      "name": "dock_tip_0x191174D0",
+      "message": "飞行器无线充电模块温度检测异常",
+      "english": "Temperature of aircraft wireless charging module error"
+    },
+    {
+      "code": "0x191174D1",
+      "name": "dock_tip_0x191174D1",
+      "message": "飞行器充电模块线圈温度传感器未连接",
+      "english": "Temperature sensor of aircraft charging module coil not connected"
+    },
+    {
+      "code": "0x191174D2",
+      "name": "dock_tip_0x191174D2",
+      "message": "飞行器充电模块线圈温度传感器异常",
+      "english": "Temperature sensor of aircraft charging module coil error"
+    }
+  ],
+  "waylineInterrupts": [
+    {
+      "code": "-19",
+      "name": "FILE_TRANSFER_FAIL",
+      "description": "文件传输失败"
+    },
+    {
+      "code": "-18",
+      "name": "SDR_CHANGE_FAIL",
+      "description": "SDR更改失败"
+    },
+    {
+      "code": "-17",
+      "name": "LOCK_MOTOR_RECOVERY_FAIL",
+      "description": "电机锁恢复失败"
+    },
+    {
+      "code": "-16",
+      "name": "LOCK_MOTOR_FAIL",
+      "description": "电机锁定失败"
+    },
+    {
+      "code": "-15",
+      "name": "UPLOAD_CANCEL_BY_USER",
+      "description": "用户取消上传"
+    },
+    {
+      "code": "-14",
+      "name": "MOTOR_STATE_ERROR",
+      "description": "电机状态错误"
+    },
+    {
+      "code": "-13",
+      "name": "PRECISE_FILE_MD5_CHECK_FAIL",
+      "description": "精确文件MD5校验失败"
+    },
+    {
+      "code": "-12",
+      "name": "FILE_NOT_EXIST",
+      "description": "文件不存在"
+    },
+    {
+      "code": "-11",
+      "name": "CANT_EXCUTE_IN_CURRENT_STATUS",
+      "description": "当前状态下无法执行"
+    },
+    {
+      "code": "-10",
+      "name": "QUERY_EXCUTION_STATUS_INVALID",
+      "description": "查询执行状态无效"
+    },
+    {
+      "code": "-9",
+      "name": "QUERY_NO_THIS_BREAK_POINT",
+      "description": "查询不存在该断点"
+    },
+    {
+      "code": "-8",
+      "name": "QUERY_NO_THIS_MISSION",
+      "description": "查询不存在该任务"
+    },
+    {
+      "code": "-7",
+      "name": "PARSE_RETURN_PACK_FAILED",
+      "description": "解析返回包失败"
+    },
+    {
+      "code": "-6",
+      "name": "INVALID_PARAM",
+      "description": "无效参数"
+    },
+    {
+      "code": "-5",
+      "name": "SEND_PACK_TIMEOUT",
+      "description": "发送包超时"
+    },
+    {
+      "code": "-4",
+      "name": "SEND_PACK_FAILED",
+      "description": "发送包失败"
+    },
+    {
+      "code": "-3",
+      "name": "SYSTEM_ERROR",
+      "description": "系统错误"
+    },
+    {
+      "code": "-2",
+      "name": "UPLOAD_FILE_FAILED",
+      "description": "上传文件失败"
+    },
+    {
+      "code": "-1",
+      "name": "REQUEST_HANDLER_NOT_FOUND",
+      "description": "请求处理器未找到"
+    },
+    {
+      "code": "773",
+      "name": "NO_ERROR",
+      "description": "无错误"
+    },
+    {
+      "code": "1",
+      "name": "MISSION_ID_NOT_EXIST",
+      "description": "任务ID不存在"
+    },
+    {
+      "code": "2",
+      "name": "WAYLINE_INFO_ERROR",
+      "description": "航线信息错误"
+    },
+    {
+      "code": "3",
+      "name": "WPMZ_FILE_VERSION_NOT_MATCH",
+      "description": "WPMZ文件版本不匹配"
+    },
+    {
+      "code": "4",
+      "name": "WPMZ_FILE_LOAD_ERROR",
+      "description": "WPMZ文件加载错误"
+    },
+    {
+      "code": "5",
+      "name": "NO_BREAK_INFO",
+      "description": "无断点信息"
+    },
+    {
+      "code": "6",
+      "name": "CMD_INVALID",
+      "description": "命令无效"
+    },
+    {
+      "code": "257",
+      "name": "CANNOT_START_WAYLINE_WHEN_WAYLINE_RUNNING",
+      "description": "航线运行时无法启动航线"
+    },
+    {
+      "code": "258",
+      "name": "CANNOT_BREAK_WAYLINE_IN_CUR_STATE",
+      "description": "当前状态无法中断航线"
+    },
+    {
+      "code": "259",
+      "name": "CANNOT_STOP_WAYLINE_WHEN_WAYLINE_NOT_RUNNING",
+      "description": "航线未运行时无法停止"
+    },
+    {
+      "code": "260",
+      "name": "CANNOT_BREAK_WAYLINE_WHEN_WAYLINE_NOT_RUNNING",
+      "description": "航线未运行时无法中断"
+    },
+    {
+      "code": "261",
+      "name": "CANNOT_REQUEST_DRONE_CONTROL",
+      "description": "无法请求无人机控制"
+    },
+    {
+      "code": "262",
+      "name": "CANNOT_RESUME_WAYLINE_IN_CUR_STATE",
+      "description": "当前状态无法恢复航线"
+    },
+    {
+      "code": "513",
+      "name": "HEIGHT_LIMIT",
+      "description": "高度限制"
+    },
+    {
+      "code": "514",
+      "name": "RADIUS_LIMIT",
+      "description": "半径限制"
+    },
+    {
+      "code": "515",
+      "name": "CROSS_FLYLIMIT_AERA",
+      "description": "穿越飞行限制区域"
+    },
+    {
+      "code": "516",
+      "name": "LOW_LIMIT",
+      "description": "低限制"
+    },
+    {
+      "code": "517",
+      "name": "OBSTACAL_STOP",
+      "description": "障碍停止"
+    },
+    {
+      "code": "518",
+      "name": "RTK_DISCONNECT",
+      "description": "RTK断开"
+    },
+    {
+      "code": "519",
+      "name": "BOUNDARY_LIMIT",
+      "description": "边界限制"
+    },
+    {
+      "code": "520",
+      "name": "RC_PITCH_ROLL_BREAK",
+      "description": "遥控器俯仰/横滚中断"
+    },
+    {
+      "code": "521",
+      "name": "AIRPORT_HEIGHT_LIMIT",
+      "description": "机场高度限制"
+    },
+    {
+      "code": "522",
+      "name": "REQUEST_TAKEOFF_FAIL",
+      "description": "请求起飞失败"
+    },
+    {
+      "code": "523",
+      "name": "AUTOTAKEOFF_RUN_FAIL",
+      "description": "自动起飞运行失败"
+    },
+    {
+      "code": "524",
+      "name": "REQUEST_WAYLINE_FAIL",
+      "description": "请求航线失败"
+    },
+    {
+      "code": "525",
+      "name": "AGRO_PLAN_FAIL",
+      "description": "农田规划失败"
+    },
+    {
+      "code": "526",
+      "name": "REQUEST_QUICK_TAKEOFF_ASSIST_FAIL",
+      "description": "请求快速起飞辅助失败"
+    },
+    {
+      "code": "527",
+      "name": "QUICK_TAKEOFF_ASSIST_RUN_FAIL",
+      "description": "快速起飞辅助运行失败"
+    },
+    {
+      "code": "528",
+      "name": "VFENCE_LIMIT",
+      "description": "虚拟围栏限制"
+    },
+    {
+      "code": "769",
+      "name": "GPS_INVALID",
+      "description": "GPS无效"
+    },
+    {
+      "code": "770",
+      "name": "CANNOT_START_AT_CURRENT_RC_MODE",
+      "description": "当前遥控模式下无法启动"
+    },
+    {
+      "code": "771",
+      "name": "HOME_POINT_NOT_RECORDED",
+      "description": "未记录返航点"
+    },
+    {
+      "code": "772",
+      "name": "LOWER_BATTERY",
+      "description": "电池电量低"
+    },
+    {
+      "code": "773",
+      "name": "RETURN_HOME",
+      "description": "返航"
+    },
+    {
+      "code": "774",
+      "name": "ADSB_ERROR",
+      "description": "ADSB错误"
+    },
+    {
+      "code": "775",
+      "name": "RC_LOST",
+      "description": "遥控器信号丢失"
+    },
+    {
+      "code": "776",
+      "name": "RTK_NOT_READY",
+      "description": "RTK未准备就绪"
+    },
+    {
+      "code": "777",
+      "name": "DRONE_IS_MOVING",
+      "description": "无人机正在移动"
+    },
+    {
+      "code": "778",
+      "name": "DRONE_ON_GROUND_MOTOR_ON",
+      "description": "无人机在地面且电机开启"
+    },
+    {
+      "code": "779",
+      "name": "SURFACE_FOLLOW_CAMERA_INVALID",
+      "description": "表面跟随摄像头无效"
+    },
+    {
+      "code": "780",
+      "name": "SURFACE_FOLLOW_HEIGHT_INVALID",
+      "description": "表面跟随高度无效"
+    },
+    {
+      "code": "781",
+      "name": "SURFACE_FOLLOW_MAP_WRONG",
+      "description": "表面跟随地图错误"
+    },
+    {
+      "code": "782",
+      "name": "HOMEPOINT_NOT_MATCH_RTK",
+      "description": "返航点与RTK不匹配"
+    },
+    {
+      "code": "784",
+      "name": "STRONG_WIND_GOHOME",
+      "description": "强风返航"
+    },
+    {
+      "code": "1025",
+      "name": "CANNOT_FIND_PAYLOAD",
+      "description": "无法找到有效载荷"
+    },
+    {
+      "code": "1026",
+      "name": "ACTION_EXECUTION_FAILED",
+      "description": "动作执行失败"
+    },
+    {
+      "code": "1281",
+      "name": "USER_EXIT",
+      "description": "用户退出"
+    },
+    {
+      "code": "1282",
+      "name": "USER_BREAK",
+      "description": "用户中断"
+    },
+    {
+      "code": "1283",
+      "name": "USER_SET_GOHOME",
+      "description": "用户设置返航"
+    },
+    {
+      "code": "1536",
+      "name": "TRAJ_INIT_FAIL",
+      "description": "轨迹初始化失败"
+    },
+    {
+      "code": "1537",
+      "name": "TRAJ_JOB_EXIT_BUT_MIS_RUNNING",
+      "description": "轨迹任务退出但任务仍在运行"
+    },
+    {
+      "code": "1538",
+      "name": "TRAJ_ON_GROUND_MOTOR_ON_CANNOT_GO",
+      "description": "地面电机开启无法前进"
+    },
+    {
+      "code": "1539",
+      "name": "TRAJ_INVALID_START_INDEX_OR_PROG",
+      "description": "无效的起始索引或进度"
+    },
+    {
+      "code": "1540",
+      "name": "TRAJ_INVALID_CSYS_MODE",
+      "description": "无效的坐标系统模式"
+    },
+    {
+      "code": "1541",
+      "name": "TRAJ_INVALID_HEIGHT_MODE",
+      "description": "无效的高度模式"
+    },
+    {
+      "code": "1542",
+      "name": "TRAJ_INVALID_FLY_WP_MODE",
+      "description": "无效的飞行航点模式"
+    },
+    {
+      "code": "1543",
+      "name": "TRAJ_INVALID_YAW_MODE",
+      "description": "无效的偏航模式"
+    },
+    {
+      "code": "1544",
+      "name": "TRAJ_INVALID_TURN_DIR_MODE",
+      "description": "无效的转弯方向模式"
+    },
+    {
+      "code": "1545",
+      "name": "TRAJ_INVALID_WP_TYPE",
+      "description": "无效的航点类型"
+    },
+    {
+      "code": "1546",
+      "name": "TRAJ_FIR_LAS_WP_TYPE_ERROR",
+      "description": "首尾航点类型错误"
+    },
+    {
+      "code": "1547",
+      "name": "TRAJ_GLOB_VEL_OUT_OF_RANGE",
+      "description": "全局速度超出范围"
+    },
+    {
+      "code": "1548",
+      "name": "TRAJ_WP_NUM_OUT_OF_RANGE",
+      "description": "航点数量超出范围"
+    },
+    {
+      "code": "1549",
+      "name": "TRAJ_LAT_LONG_OUT_OF_RANGE",
+      "description": "经纬度超出范围"
+    },
+    {
+      "code": "1550",
+      "name": "TRAJ_DAMP_DIS_OUT_OF_RANGE",
+      "description": "阻尼距离超出范围"
+    },
+    {
+      "code": "1551",
+      "name": "TRAJ_MAX_VEL_OUT_OF_RANGE",
+      "description": "最大速度超出范围"
+    },
+    {
+      "code": "1552",
+      "name": "TRAJ_VEL_OUT_OF_RANGE",
+      "description": "速度超出范围"
+    },
+    {
+      "code": "1553",
+      "name": "TRAJ_WP_YAW_OUT_OF_RANGE",
+      "description": "航点偏航超出范围"
+    },
+    {
+      "code": "1554",
+      "name": "TRAJ_INVALID_YAW_MODE_IN_VERT_SEGM",
+      "description": "垂直段中的无效偏航模式"
+    },
+    {
+      "code": "1555",
+      "name": "TRAJ_WP_BREAK_INFO_MISSION_ID_CHANGED",
+      "description": "航点中断信息任务ID已更改"
+    },
+    {
+      "code": "1556",
+      "name": "TRAJ_WP_BREAK_INFO_PROGRESS_OUT_OF_RANGE",
+      "description": "航点中断信息进度超出范围"
+    },
+    {
+      "code": "1557",
+      "name": "TRAJ_WP_BREAK_INFO_INVALID_MISSION_STATE",
+      "description": "航点中断信息任务状态无效"
+    },
+    {
+      "code": "1558",
+      "name": "TRAJ_WP_BREAK_INFO_WP_INDEX_OUT_OF_RANGE",
+      "description": "航点中断信息航点索引超出范围"
+    },
+    {
+      "code": "1559",
+      "name": "TRAJ_BREAK_LAT_LONG_OUT_OF_RANGE",
+      "description": "中断经纬度超出范围"
+    },
+    {
+      "code": "1560",
+      "name": "TRAJ_BREAK_INFO_WP_YAW_OUT_OF_RANGE",
+      "description": "中断信息航点偏航超出范围"
+    },
+    {
+      "code": "1561",
+      "name": "TRAJ_INVALID_BREAK_INFO_FLAG",
+      "description": "无效的中断信息标志"
+    },
+    {
+      "code": "1562",
+      "name": "TRAJ_GET_TRAJ_INFO_FAILED",
+      "description": "获取轨迹信息失败"
+    },
+    {
+      "code": "1563",
+      "name": "TRAJ_GENERATE_FAIL",
+      "description": "轨迹生成失败"
+    },
+    {
+      "code": "1564",
+      "name": "TRAJ_LIB_RUN_FAIL",
+      "description": "轨迹库运行失败"
+    },
+    {
+      "code": "1565",
+      "name": "TRAJ_LIB_EMERGENCY_BRAKE",
+      "description": "轨迹库紧急刹车"
+    },
+    {
+      "code": "1588",
+      "name": "ACTION_COMMON_ACTION_NOT_FOUND",
+      "description": "未找到通用动作"
+    },
+    {
+      "code": "1591",
+      "name": "ACTION_COMMON_ACTION_INDEX_REPEATED",
+      "description": "通用动作索引重复"
+    },
+    {
+      "code": "1592",
+      "name": "ACTION_COMMON_ACTION_INFO_SIZE_TOO_LONG_OR_TOO_SHORT",
+      "description": "通用动作信息大小过长或过短"
+    },
+    {
+      "code": "1593",
+      "name": "ACTION_COMMON_ACTION_TREE_EMPTY",
+      "description": "通用动作树为空"
+    },
+    {
+      "code": "1594",
+      "name": "ACTION_COMMON_ACTION_TREE_LAYER_EMPTY",
+      "description": "通用动作树层为空"
+    },
+    {
+      "code": "1595",
+      "name": "ACTION_COMMON_ACTION_ID_REPEATED",
+      "description": "通用动作ID重复"
+    },
+    {
+      "code": "1596",
+      "name": "ACTION_COMMON_ACTION_NODE_CHILDREN_NUM_LT_2",
+      "description": "通用动作节点子节点数量少于2"
+    },
+    {
+      "code": "1597",
+      "name": "ACTION_COMMON_ACTION_INDEX_OUT_OF_RANGE",
+      "description": "通用动作索引超出范围"
+    },
+    {
+      "code": "1598",
+      "name": "ACTION_COMMON_ACTION_ID_IS_65535",
+      "description": "通用动作ID为65535"
+    },
+    {
+      "code": "1599",
+      "name": "ACTION_COMMON_ACTION_NODE_CHILDNUM_SUM_NOT_EQ_NEXT_LAYER_SIZE",
+      "description": "通用动作节点子节点总和不等于下一层大小"
+    },
+    {
+      "code": "1600",
+      "name": "ACTION_COMMON_ACTION_TREE_LAYER_NUM_TOO_MORE",
+      "description": "通用动作树层数过多"
+    },
+    {
+      "code": "1601",
+      "name": "ACTION_COMMON_ACTION_TREE_LAYER_NUM_TOO_LESS",
+      "description": "通用动作树层数过少"
+    },
+    {
+      "code": "1602",
+      "name": "ACTION_COMMON_ACTION_GROUP_NUM_OUT_OF_RANGE",
+      "description": "通用动作组数量超出范围"
+    },
+    {
+      "code": "1603",
+      "name": "ACTION_COMMON_ACTION_GROUP_VALID_RANGE_ERROR",
+      "description": "通用动作组有效范围错误"
+    },
+    {
+      "code": "1604",
+      "name": "ACTION_COMMON_ACTION_TREE_ROOT_STATUS_INVALID",
+      "description": "通用动作树根状态无效"
+    },
+    {
+      "code": "1605",
+      "name": "ACTION_COMMON_ACTION_TREE_NODE_STATUS_INVALID",
+      "description": "通用动作树节点状态无效"
+    },
+    {
+      "code": "1606",
+      "name": "ACTION_COMMON_BREAK_INFO_ACTION_GROUP_ID_OUT_OF_RANGE",
+      "description": "中断信息动作组ID超出范围"
+    },
+    {
+      "code": "1607",
+      "name": "ACTION_COMMON_ACTION_STATUS_TREE_SIZE_ERROR",
+      "description": "通用动作状态树大小错误"
+    },
+    {
+      "code": "1608",
+      "name": "ACTION_COMMON_BREAK_INFO_TRIGGER_RUN_RESULT_INVALID",
+      "description": "中断信息触发运行结果无效"
+    },
+    {
+      "code": "1609",
+      "name": "ACTION_COMMON_BREAK_INFO_ACTION_GROUP_ID_REPEATED",
+      "description": "中断信息动作组ID重复"
+    },
+    {
+      "code": "1610",
+      "name": "ACTION_COMMON_BREAK_INFO_ACTION_LOCATION_REPEATED",
+      "description": "中断信息动作位置重复"
+    },
+    {
+      "code": "1611",
+      "name": "ACTION_COMMON_BREAK_INFO_ACTION_LOCATION_OUT_OF_RANGE",
+      "description": "中断信息动作位置超出范围"
+    },
+    {
+      "code": "1612",
+      "name": "ACTION_COMMON_RESUME_ID_NOT_IN_BREAK_INFO",
+      "description": "恢复ID不在中断信息中"
+    },
+    {
+      "code": "1613",
+      "name": "ACTION_COMMON_RESUME_INFO_MODIFY_ACTION_STATUS_FROM_NO_INTERRUPT_TO_INTERRUPT",
+      "description": "恢复信息将动作状态从无中断修改为有中断"
+    },
+    {
+      "code": "1614",
+      "name": "ACTION_COMMON_ACTION_RESUME_FAIL_FOR_INVALID_RESUME_INFO",
+      "description": "由于恢复信息无效，动作恢复失败"
+    },
+    {
+      "code": "1634",
+      "name": "ACTUATOR_COMMON_ACTUATOR_NOT_FOUND",
+      "description": "未找到执行器"
+    },
+    {
+      "code": "1650",
+      "name": "TRIGGER_SINGLE_TIME_CHECK_FAIL",
+      "description": "单次触发检查失败"
+    },
+    {
+      "code": "26225",
+      "name": "TRIGGER_NOT_FOUND",
+      "description": "未找到触发器"
+    },
+    {
+      "code": "65535",
+      "name": "UNKNOWN",
+      "description": "未知错误"
+    },
+    {
+      "code": "-1",
+      "name": "COMMAND_CAN_NOT_EXECUTE",
+      "description": "命令无法执行"
+    },
+    {
+      "code": "-2",
+      "name": "COMMAND_EXECUTION_FAILED",
+      "description": "命令执行失败"
+    },
+    {
+      "code": "-3",
+      "name": "INVALID_PARAMETERS",
+      "description": "无效参数"
+    },
+    {
+      "code": "-4",
+      "name": "TIMEOUT",
+      "description": "超时"
+    },
+    {
+      "code": "-5",
+      "name": "PRODUCT_CONNECT_FAILED",
+      "description": "产品连接失败"
+    },
+    {
+      "code": "-6",
+      "name": "SYSTEM_BUSY",
+      "description": "系统繁忙"
+    },
+    {
+      "code": "-7",
+      "name": "OPERATION_CANCEL_BY_USER",
+      "description": "用户取消操作"
+    },
+    {
+      "code": "-8",
+      "name": "UPLOAD_MEDIA_FILE_FAILED",
+      "description": "上传媒体文件失败"
+    },
+    {
+      "code": "-9",
+      "name": "SDR_LINK_RESERVE_FAILED",
+      "description": "SDR链路保留失败"
+    },
+    {
+      "code": "-10",
+      "name": "CHECK_PHOTOS_STORAGE_PACK_ERROR",
+      "description": "检查照片存储包错误"
+    },
+    {
+      "code": "-11",
+      "name": "SDR_LINK_RESERVE_FAILED_CAUSE_MOTOR_ON",
+      "description": "因电机启动SDR链路保留失败"
+    },
+    {
+      "code": "-12",
+      "name": "ACTION_TRIGGER_NOT_MATCH_ACTUATOR",
+      "description": "动作触发器与执行器不匹配"
+    },
+    {
+      "code": "-13",
+      "name": "INTERRUPT_REASON_AVOID",
+      "description": "中断原因：避障"
+    },
+    {
+      "code": "-14",
+      "name": "INTERRUPT_REASON_AVOID_RADIUS_LIMIT",
+      "description": "中断原因：避障半径限制"
+    },
+    {
+      "code": "-15",
+      "name": "INTERRUPT_REASON_AVOID_HEIGHT_LIMIT",
+      "description": "中断原因：避障高度限制"
+    },
+    {
+      "code": "-16",
+      "name": "INTERRUPT_REASON_AVOID_RTK_UNHEALTHY",
+      "description": "中断原因：RTK不健康"
+    },
+    {
+      "code": "-17",
+      "name": "INTERRUPT_REASON_AVOID_USER_REQ_BREAK",
+      "description": "中断原因：用户请求中断"
+    },
+    {
+      "code": "-18",
+      "name": "INTERRUPT_REASON_AVOID_AIRPORT_LIMIT",
+      "description": "中断原因：机场限制"
+    },
+    {
+      "code": "-19",
+      "name": "INTERRUPT_REASON_AVOID_EMERGENCY_BREAK",
+      "description": "中断原因：紧急制动"
+    },
+    {
+      "code": "-20",
+      "name": "INTERRUPT_REASON_GPS_BAD",
+      "description": "中断原因：GPS信号差"
+    },
+    {
+      "code": "-21",
+      "name": "INTERRUPT_REASON_HOME_STATUS_ERROR",
+      "description": "中断原因：返航点状态错误"
+    },
+    {
+      "code": "-22",
+      "name": "INTERRUPT_REASON_RC_STICK",
+      "description": "中断原因：遥控杆"
+    },
+    {
+      "code": "-100",
+      "name": "TRANJECTORY_REPLAY_INVALID_LOCATION",
+      "description": "轨迹回放位置无效"
+    },
+    {
+      "code": "-101",
+      "name": "TRANJECTORY_REPLAY_NO_WAYPOINT_TO_REMOVE",
+      "description": "轨迹回放无航点可移除"
+    },
+    {
+      "code": "-102",
+      "name": "TRANJECTORY_REPLAY_GIMBAL_ATTI_ERROR",
+      "description": "轨迹回放云台姿态错误"
+    },
+    {
+      "code": "-1001",
+      "name": "INVALID_INPUT_DATA_FC_LENGTH",
+      "description": "输入数据FC长度无效"
+    },
+    {
+      "code": "-1002",
+      "name": "INVALID_INPUT_DATA_FLOAT_NUMBER",
+      "description": "输入数据浮点数无效"
+    },
+    {
+      "code": "-2001",
+      "name": "INIT_MISSION_COUNT_OVER_RANGE",
+      "description": "初始化任务次数超出范围"
+    },
+    {
+      "code": "-2002",
+      "name": "INIT_MISSION_COUNT_TOO_LESS",
+      "description": "初始化任务次数太少"
+    },
+    {
+      "code": "-2003",
+      "name": "INIT_MISSION_END_INDEX_INVALID",
+      "description": "初始化任务结束索引无效"
+    },
+    {
+      "code": "-2004",
+      "name": "INIT_MISSION_GLOBAL_MAX_SPEED_INVALID",
+      "description": "初始化任务全局最大速度无效"
+    },
+    {
+      "code": "-2005",
+      "name": "INIT_MISSION_CRUISE_SPEED_INVALID",
+      "description": "初始化任务巡航速度无效"
+    },
+    {
+      "code": "-2006",
+      "name": "INIT_MISSION_GOTO_FIRST_WAYPOINT_INVALID",
+      "description": "初始化任务前往第一个航点无效"
+    },
+    {
+      "code": "-2007",
+      "name": "INIT_MISSION_FINISHED_ACTION_INVALID",
+      "description": "初始化任务完成动作无效"
+    },
+    {
+      "code": "-2008",
+      "name": "INIT_MISSION_RC_LOST_CONTROL_ACTION_INVALID",
+      "description": "初始化任务遥控失控动作无效"
+    },
+    {
+      "code": "-2009",
+      "name": "INIT_MISSION_REFERENCE_LOCATION_INVALID",
+      "description": "初始化任务参考位置无效"
+    },
+    {
+      "code": "-2010",
+      "name": "INIT_MISSION_EXIST_RUNNING",
+      "description": "存在正在运行的初始化任务"
+    },
+    {
+      "code": "-2011",
+      "name": "UPLOAD_MISSION_INDEX_INVALID",
+      "description": "上传任务索引无效"
+    },
+    {
+      "code": "-2012",
+      "name": "UPLOAD_MISSION_COUNT_OVER_INIT_TOTAL_COUNT",
+      "description": "上传任务次数超过初始化总次数"
+    },
+    {
+      "code": "-2013",
+      "name": "UPLOAD_MISSION_START_INDEX_NOT_IN_END_OF_LAST_UPLOAD",
+      "description": "上传任务起始索引不在上次上传的末端"
+    },
+    {
+      "code": "-2014",
+      "name": "UPLOAD_MISSION_DISTANCE_TOO_CLOSE",
+      "description": "上传任务距离太近"
+    },
+    {
+      "code": "-2015",
+      "name": "UPLOAD_MISSION_DISTANCE_TO_FAR",
+      "description": "上传任务距离太远"
+    },
+    {
+      "code": "-2016",
+      "name": "UPLOAD_MISSION_MAX_CRUISE_SPEED_OVER_GLOBAL_MAX_SPEED",
+      "description": "上传任务最大巡航速度超过全局最大速度"
+    },
+    {
+      "code": "-2017",
+      "name": "UPLOAD_MISSION_CRUISE_SPEED_OVER_LOCAL_MAX_SPEED",
+      "description": "上传任务巡航速度超过局部最大速度"
+    },
+    {
+      "code": "-2018",
+      "name": "UPLOAD_MISSION_CRUISE_SPEED_OVER_GLOBAL_MAX_SPEED",
+      "description": "上传任务巡航速度超过全局最大速度"
+    },
+    {
+      "code": "-2019",
+      "name": "UPLOAD_MISSION_YAW_MODE_INVALID",
+      "description": "上传任务偏航模式无效"
+    },
+    {
+      "code": "-2020",
+      "name": "UPLOAD_MISSION_YAW_CONTROL_DEGREE_INVALID",
+      "description": "上传任务偏航控制角度无效"
+    },
+    {
+      "code": "-2021",
+      "name": "UPLOAD_MISSION_YAW_CONTROL_DIRECTION_INVALID",
+      "description": "上传任务偏航控制方向无效"
+    },
+    {
+      "code": "-2022",
+      "name": "UPLOAD_MISSION_WAYPOINT_TYPE_INVALID",
+      "description": "上传任务航点类型无效"
+    },
+    {
+      "code": "-2023",
+      "name": "UPLOAD_MISSION_DAMPING_DISTANCE_INVALID",
+      "description": "上传任务阻尼距离无效"
+    },
+    {
+      "code": "-2024",
+      "name": "UPLOAD_MISSION_CANNOT_SET_EXIT_LINE_TYPE",
+      "description": "上传任务无法设置退出航线类型"
+    },
+    {
+      "code": "-2025",
+      "name": "UPLOAD_MISSION_INDEX_NOT_CONTINUE",
+      "description": "上传任务索引不连续"
+    },
+    {
+      "code": "-2026",
+      "name": "UPLOAD_MISSION_ENTER_LINE_TYPE_SET_TO_START_POINT_INVALID",
+      "description": "上传任务进入航线类型设置为起点无效"
+    },
+    {
+      "code": "-2027",
+      "name": "UPLOAD_MISSION_DAMPING_INVALID",
+      "description": "上传任务阻尼无效"
+    },
+    {
+      "code": "-2028",
+      "name": "UPLOAD_MISSION_COORDINATE_INVALID",
+      "description": "上传任务坐标无效"
+    },
+    {
+      "code": "-2029",
+      "name": "FIRST_WAYPOINT_TYPE_INVALID",
+      "description": "第一个航点类型无效"
+    },
+    {
+      "code": "-2030",
+      "name": "MISSION_FLYING_RADIUS_LIMIT",
+      "description": "任务飞行半径限制"
+    },
+    {
+      "code": "-2031",
+      "name": "MISSION_FLYING_HEIGHT_LIMIT",
+      "description": "任务飞行高度限制"
+    },
+    {
+      "code": "-2032",
+      "name": "MISSION_VERSION_NOT_MATCHED",
+      "description": "任务版本不匹配"
+    },
+    {
+      "code": "-3001",
+      "name": "DOWNLOAD_MISSION_RANGE_OVER_STORAGE_COUNT",
+      "description": "下载任务范围超出存储计数"
+    },
+    {
+      "code": "-3002",
+      "name": "DOWNLOAD_MISSION_NOT_INITIALIZED",
+      "description": "下载任务未初始化"
+    },
+    {
+      "code": "-3003",
+      "name": "DOWNLOAD_MISSION_NOT_UPLOADED",
+      "description": "下载任务未上传"
+    },
+    {
+      "code": "-4001",
+      "name": "MISSION_CONTROL_START_CURRENT_POINT_TO_FIRST_POINT_TOO_FAR",
+      "description": "任务控制起始点到第一个点太远"
+    },
+    {
+      "code": "-4002",
+      "name": "MISSION_CONTROL_START_STOP_INVALID",
+      "description": "任务控制启动停止无效"
+    },
+    {
+      "code": "-4003",
+      "name": "MISSION_CONTROL_PAUSE_RESUME_INVALID",
+      "description": "任务控制暂停恢复无效"
+    },
+    {
+      "code": "-4004",
+      "name": "MISSION_CONTROL_INTERRUPT_RECOVER_INVALID",
+      "description": "任务控制中断恢复无效"
+    },
+    {
+      "code": "-4005",
+      "name": "MISSION_CONTROL_UPLOADED_POINT_TOO_LESS",
+      "description": "任务控制上传点太少"
+    },
+    {
+      "code": "-4006",
+      "name": "MISSION_CONTROL_STARTED_NO_IN_RUNNING",
+      "description": "任务控制启动但未运行"
+    },
+    {
+      "code": "-4007",
+      "name": "MISSION_CONTROL_ALREADY_STARTED",
+      "description": "任务控制已启动"
+    },
+    {
+      "code": "-4008",
+      "name": "MISSION_CONTROL_ALREADY_STOPPED",
+      "description": "任务控制已停止"
+    },
+    {
+      "code": "-4009",
+      "name": "MISSION_CONTROL_MISSION_ALREADY_PAUSED",
+      "description": "任务控制任务已暂停"
+    },
+    {
+      "code": "-4010",
+      "name": "MISSION_CONTROL_NO_RUNNING_MISSION_FOR_RESUME",
+      "description": "任务控制无正在运行的任务可恢复"
+    },
+    {
+      "code": "-4011",
+      "name": "MISSION_CONTROL_NO_RUNNING_MISSION_FOR_RECOVER",
+      "description": "任务控制无正在运行的任务可恢复"
+    },
+    {
+      "code": "-4012",
+      "name": "MISSION_CONTROL_ALREADY_INTERRUPT",
+      "description": "任务控制已中断"
+    },
+    {
+      "code": "-4013",
+      "name": "MISSION_CONTROL_NOT_SUPPORT_PAUSE_RESUME",
+      "description": "任务控制不支持暂停恢复"
+    },
+    {
+      "code": "-4014",
+      "name": "MISSION_CONTROL_NOT_SUPPORT_INTERRUPT_RESUME",
+      "description": "任务控制不支持中断恢复"
+    },
+    {
+      "code": "-4015",
+      "name": "MISSION_CONTROL_BREAK_POINT_NOT_RECORD",
+      "description": "任务控制断点未记录"
+    },
+    {
+      "code": "-4016",
+      "name": "MISSION_CONTROL_PROJECTION_POINT_NOT_IN_CURRENT_WAYPOINT_LINE",
+      "description": "任务控制投影点不在当前航线"
+    },
+    {
+      "code": "-4017",
+      "name": "MISSION_CONTROL_PROJECTION_POINT_NOT_NEXT_WAYPOINT_LINE",
+      "description": "任务控制投影点不在下一个航线"
+    },
+    {
+      "code": "-4018",
+      "name": "MISSION_CONTROL_PROJECTION_POINT_NOT_NEXT_NEXT_WAYPOINT_LINE",
+      "description": "任务控制投影点不在下下个航线"
+    },
+    {
+      "code": "-5001",
+      "name": "MISSION_STATE_AIRCRAFT_FLYING_STATUS_BAD",
+      "description": "任务状态飞行器飞行状态不佳"
+    },
+    {
+      "code": "-5002",
+      "name": "MISSION_STATE_HOME_POINT_NOT_RECORD",
+      "description": "任务状态返航点未记录"
+    },
+    {
+      "code": "-5003",
+      "name": "MISSION_STATE_GPS_SIGNAL_WEAK",
+      "description": "任务状态GPS信号弱"
+    },
+    {
+      "code": "-5004",
+      "name": "MISSION_STATE_RTK_NOT_READY",
+      "description": "任务状态RTK未就绪"
+    },
+    {
+      "code": "-6001",
+      "name": "MISSION_SECURE_STATE_NFZ_ZONE_CROSS",
+      "description": "任务安全状态NFZ区域穿越"
+    },
+    {
+      "code": "-6002",
+      "name": "MISSION_SECURE_STATE_AIRCRAFT_LOW_BATTERY",
+      "description": "任务安全状态飞行器电量低"
+    },
+    {
+      "code": "-7001",
+      "name": "UPLOAD_ACTION_ID_DUPLICATED",
+      "description": "上传动作ID重复"
+    },
+    {
+      "code": "-7002",
+      "name": "UPLOAD_ACTION_ITEMS_SPACE_NOT_ENOUGH",
+      "description": "上传动作项空间不足"
+    },
+    {
+      "code": "-7003",
+      "name": "UPLOAD_ACTION_BUFFER_NOT_ENOUGH",
+      "description": "上传动作缓冲区不足"
+    },
+    {
+      "code": "-7004",
+      "name": "DOWNLOAD_ACTION_ID_NOT_FOUND",
+      "description": "下载动作ID未找到"
+    },
+    {
+      "code": "-7005",
+      "name": "DOWNLOAD_ACTION_ID_OVER_RANGE",
+      "description": "下载动作ID超出范围"
+    },
+    {
+      "code": "-7006",
+      "name": "DOWNLOAD_ACTION_NO_ACTION_STORED",
+      "description": "下载动作无动作存储"
+    },
+    {
+      "code": "-8001",
+      "name": "UPLOAD_ACTION_TRIGGER_TYPE_INVALID",
+      "description": "上传动作触发类型无效"
+    },
+    {
+      "code": "-8002",
+      "name": "UPLOAD_ACTION_TRIGGER_REACH_END_INDEX_LESS_START_INDEX",
+      "description": "上传动作触发结束索引小于起始索引"
+    },
+    {
+      "code": "-8003",
+      "name": "UPLOAD_ACTION_TRIGGER_REACH_INTERVAL_COUNT_INVALID",
+      "description": "上传动作触发间隔计数无效"
+    },
+    {
+      "code": "-8004",
+      "name": "UPLOAD_ACTION_TRIGGER_REACH_AUTO_TERMINATE_INVALID",
+      "description": "上传动作触发自动终止无效"
+    },
+    {
+      "code": "-8005",
+      "name": "UPLOAD_ACTION_TRIGGER_ASSOCIATE_TYPE_INVALID",
+      "description": "上传动作触发关联类型无效"
+    },
+    {
+      "code": "-8006",
+      "name": "UPLOAD_ACTION_TRIGGER_SIMPLE_INTERVAL_TYPE_INVALID",
+      "description": "上传动作简单间隔类型无效"
+    },
+    {
+      "code": "-9001",
+      "name": "UPLOAD_ACTION_ACTUATOR_EXECUTE_NOT_SUPPORT",
+      "description": "上传动作执行器不支持执行"
+    },
+    {
+      "code": "-9002",
+      "name": "UPLOAD_ACTION_ACTUATOR_TYPE_INVALID",
+      "description": "上传动作执行器类型无效"
+    },
+    {
+      "code": "-9003",
+      "name": "UPLOAD_ACTION_ACTUATOR_FUNCTION_INVALID",
+      "description": "上传动作执行器功能无效"
+    },
+    {
+      "code": "-10001",
+      "name": "UPLOAD_ACTION_ACTUATOR_SPRAY_EXTERNAL_SPRAY_MODE_INVALID",
+      "description": "上传动作执行器喷洒外部喷洒模式无效"
+    },
+    {
+      "code": "-10002",
+      "name": "UPLOAD_ACTION_ACTUATOR_SPRAY_FLOW_SPEED_INVALID",
+      "description": "上传动作执行器喷洒流速无效"
+    },
+    {
+      "code": "-10003",
+      "name": "UPLOAD_ACTION_ACTUATOR_SPRAY_FLOW_SPEED_PRE_MU_INVALID",
+      "description": "上传动作执行器喷洒流速单位无效"
+    },
+    {
+      "code": "-11001",
+      "name": "ACTION_ACTUATOR_GIMBAL_ANGLE_INVALID",
+      "description": "动作执行器云台角度无效"
+    },
+    {
+      "code": "-11002",
+      "name": "ACTION_ACTUATOR_GIMBAL_DURATION_INVALID",
+      "description": "动作执行器云台持续时间无效"
+    },
+    {
+      "code": "-11003",
+      "name": "ACTION_ACTUATOR_GIMBAL_ARRIVE_TAG_ANGLE_FAILED",
+      "description": "动作执行器云台到达目标角度失败"
+    },
+    {
+      "code": "-11004",
+      "name": "ACTION_ACTUATOR_GIMBAL_SEND_COMMAND_TO_GIMBAL_FAILED",
+      "description": "动作执行器向云台发送命令失败"
+    },
+    {
+      "code": "-12001",
+      "name": "ACTION_ACTUATOR_FLIGHT_YAW_ANGLE_INVALID",
+      "description": "动作执行器飞行偏航角度无效"
+    },
+    {
+      "code": "-12002",
+      "name": "ACTION_ACTUATOR_FLIGHT_YAW_TO_TARGET_TIMEOUT",
+      "description": "动作执行器飞行偏航到目标超时"
+    },
+    {
+      "code": "-12003",
+      "name": "ACTION_ACTUATOR_FLIGHT_YAW_OCCUPIED",
+      "description": "动作执行器飞行偏航被占用"
+    },
+    {
+      "code": "-12004",
+      "name": "ACTION_ACTUATOR_FLIGHT_CUR_AND_TARGET_STATE_EQUAL",
+      "description": "动作执行器当前和目标状态相等"
+    },
+    {
+      "code": "-13001",
+      "name": "ACTION_ACTUATOR_PAYLOAD_FAIL_TO_SNED_CMD_TO_PAYLOAD",
+      "description": "动作执行器向有效载荷发送命令失败"
+    },
+    {
+      "code": "-13002",
+      "name": "ACTION_ACTUATOR_PAYLOAD_EXEC_FAILED",
+      "description": "动作执行器有效载荷执行失败"
+    },
+    {
+      "code": "-14001",
+      "name": "OVER_STOP_BY_USER",
+      "description": "任务因用户停止"
+    },
+    {
+      "code": "-14002",
+      "name": "OVER_ON_GROUND_MOTOR_ON",
+      "description": "任务因地面电机开启停止"
+    },
+    {
+      "code": "-14003",
+      "name": "OVER_AUTO_TAKEOFF_TIMEOUT",
+      "description": "任务因自动起飞超时停止"
+    },
+    {
+      "code": "-14004",
+      "name": "OVER_AUTO_TAKEOFF_FAIL_TO_ARRIVE_TARGET_HEIGHT",
+      "description": "任务因自动起飞未到达目标高度停止"
+    },
+    {
+      "code": "-14005",
+      "name": "OVER_AUTO_TAKEOFF_NOT_EXEC_OR_INTERRUPT",
+      "description": "任务因自动起飞未执行或中断停止"
+    },
+    {
+      "code": "-14006",
+      "name": "OVER_BY_HIGH_PRIORITY_MISSION",
+      "description": "任务因高优先级任务停止"
+    },
+    {
+      "code": "-14007",
+      "name": "OVER_UNKNOWN_REASON",
+      "description": "任务因未知原因停止"
+    },
+    {
+      "code": "-14008",
+      "name": "OVER_GS_FAIL_TO_GENERATE_TRAJ",
+      "description": "任务因GS生成轨迹失败停止"
+    }
+  ]
+}

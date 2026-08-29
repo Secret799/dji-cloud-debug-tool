@@ -1,4 +1,5 @@
 import type {
+  DeviceProvider,
   DeviceType,
   TelemetryDeviceLayout,
   TelemetryLayoutConfig,
@@ -18,7 +19,7 @@ import {
 } from './dji-field-metadata'
 import { getDjiDock3FieldMetadata } from './dji-dock3-field-metadata'
 import { FIELD_LABELS, type DeviceTelemetry } from './dji'
-import { SUPERDOCK_FIELDS, getSuperDockFieldOverride } from './superdock-field-metadata'
+import { SUPERDOCK_FIELDS, getSuperDockFieldMetadata, getSuperDockFieldOverride } from './superdock-field-metadata'
 
 const STORAGE_KEY = 'dji-cloud-studio.telemetry-layout.v1'
 
@@ -101,11 +102,26 @@ export interface TelemetryFieldMetadataResolution {
 const telemetryOfficialFieldMetadataResolution = (
   deviceType: DeviceType,
   path: string,
+  provider?: DeviceProvider,
 ): TelemetryFieldMetadataResolution => {
   const key = normalizeTelemetryFieldKey(path)
   if (deviceType === 'dock') {
     const superDockMetadata = getSuperDockFieldOverride(key)
     const djiMetadata = getDjiFieldMetadata(key)
+    if (provider === 'dji') {
+      if (!djiMetadata) return { source: 'default' }
+      return {
+        metadata: djiMetadata,
+        source: getDjiDock3FieldMetadata(key) ? 'dji-dock2-dock3' : 'dji-dock2',
+      }
+    }
+    if (provider === 'superdock') {
+      if (superDockMetadata) return { metadata: superDockMetadata, source: 'superdock' }
+      const compatibleMetadata = getSuperDockFieldMetadata(key)
+      return compatibleMetadata
+        ? { metadata: compatibleMetadata, source: 'dji-superdock' }
+        : { source: 'default' }
+    }
     if (djiMetadata) {
       return {
         metadata: djiMetadata,
@@ -149,12 +165,24 @@ export const resolveTelemetryFieldMetadata = (
   deviceType: DeviceType,
   path: string,
   field?: TelemetryLayoutField,
+  provider?: DeviceProvider,
 ): TelemetryFieldMetadataResolution => {
-  const official = telemetryOfficialFieldMetadataResolution(deviceType, path)
+  const official = telemetryOfficialFieldMetadataResolution(deviceType, path, provider)
   if (official.metadata) return official
 
   const custom = telemetryCustomPropertyMetadata(field)
   return custom ? { metadata: custom, source: 'custom' } : { source: 'default' }
+}
+
+export const telemetryFieldSupportsProvider = (
+  deviceType: DeviceType,
+  path: string,
+  provider: DeviceProvider,
+): boolean => {
+  if (provider === 'superdock' && deviceType !== 'dock') return false
+  if (provider === 'superdock' || deviceType !== 'dock') return true
+  const key = normalizeTelemetryFieldKey(path)
+  return Boolean(getDjiFieldMetadata(key)) || !getSuperDockFieldOverride(key)
 }
 
 export const telemetryBaseField = (

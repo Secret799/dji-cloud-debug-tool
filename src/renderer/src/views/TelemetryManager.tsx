@@ -14,6 +14,7 @@ import {
   Upload,
 } from 'lucide-react'
 import type {
+  DeviceProvider,
   DeviceType,
   TelemetryDeviceLayout,
   TelemetryLayoutConfig,
@@ -34,11 +35,13 @@ import { SUPERDOCK_PROPERTY_DOC_DATE } from '../lib/superdock'
 import {
   createDefaultTelemetryLayout,
   resolveTelemetryFieldMetadata,
+  telemetryFieldSupportsProvider,
   type TelemetryMetadataSource,
   updateTelemetryLayoutTimestamp,
 } from '../lib/telemetry-layout'
 
 interface TelemetryManagerProps {
+  provider?: DeviceProvider
   config: TelemetryLayoutConfig
   onChange: (config: TelemetryLayoutConfig) => void
   onNotify: (message: string, tone?: 'info' | 'success' | 'error') => void
@@ -81,12 +84,13 @@ export const telemetryMetadataSourceLabel = (source: TelemetryMetadataSource): s
   }
   if (source === 'dji-dock2') return `DJI Dock 2 设备属性 · ${DJI_DOCK2_PROPERTY_DOC_DATE}`
   if (source === 'dji-aircraft') return `DJI 飞行器设备属性（通用字段） · ${DJI_AIRCRAFT_PROPERTY_DOC_DATE}`
-  if (source === 'custom') return '遥测项管理 · 自定义属性设置'
+  if (source === 'custom') return '监测项管理 · 自定义属性设置'
   return '未关联官方物模型元数据'
 }
 
-export function TelemetryManager({ config, onChange, onNotify }: TelemetryManagerProps) {
-  const [deviceType, setDeviceType] = useState<DeviceType>('aircraft')
+export function TelemetryManager({ provider = 'dji', config, onChange, onNotify }: TelemetryManagerProps) {
+  const availableDeviceTypes: DeviceType[] = provider === 'superdock' ? ['dock'] : ['dock', 'aircraft', 'pilot']
+  const [deviceType, setDeviceType] = useState<DeviceType>('dock')
   const [selectedTabId, setSelectedTabId] = useState('')
   const [selectedSectionId, setSelectedSectionId] = useState('')
   const [selectedFieldKey, setSelectedFieldKey] = useState('')
@@ -99,21 +103,28 @@ export function TelemetryManager({ config, onChange, onNotify }: TelemetryManage
     () => new Map(layout.fields.map((field) => [field.key, field])),
     [layout.fields],
   )
+  const supportedFieldKeys = useMemo(
+    () => new Set(layout.fields
+      .filter((field) => telemetryFieldSupportsProvider(deviceType, field.key, provider))
+      .map((field) => field.key)),
+    [deviceType, layout.fields, provider],
+  )
   const sectionFields = (selectedSection?.fieldKeys ?? []).flatMap((key) => {
+    if (!supportedFieldKeys.has(key)) return []
     const field = fieldsByKey.get(key)
     return field ? [field] : []
   })
   const query = search.trim().toLocaleLowerCase()
   const filteredFields = sectionFields.filter((field) => {
     if (!query) return true
-    const { metadata } = resolveTelemetryFieldMetadata(deviceType, field.key, field)
+    const { metadata } = resolveTelemetryFieldMetadata(deviceType, field.key, field, provider)
     return `${field.label} ${field.key} ${field.description} ${djiAccessModeLabel(metadata?.accessMode) ?? ''} ${metadata?.type ?? ''}`
       .toLocaleLowerCase()
       .includes(query)
   })
   const selectedField = fieldsByKey.get(selectedFieldKey) ?? sectionFields[0]
   const selectedMetadataResolution = selectedField
-    ? resolveTelemetryFieldMetadata(deviceType, selectedField.key, selectedField)
+    ? resolveTelemetryFieldMetadata(deviceType, selectedField.key, selectedField, provider)
     : { source: 'default' as const }
   const selectedMetadata = selectedMetadataResolution.metadata
   const selectedOfficialMetadata = selectedMetadataResolution.source !== 'custom'
@@ -127,6 +138,22 @@ export function TelemetryManager({ config, onChange, onNotify }: TelemetryManage
     constraint: '',
   }
   const metadataSource = telemetryMetadataSourceLabel(selectedMetadataResolution.source)
+  const fieldLabelForProvider = (
+    field: TelemetryLayoutField,
+    metadata = resolveTelemetryFieldMetadata(deviceType, field.key, field, provider).metadata,
+  ): string => {
+    if (provider !== 'superdock' || !metadata?.label) return field.label || metadata?.label || field.key
+    const djiMetadata = resolveTelemetryFieldMetadata(deviceType, field.key, field, 'dji').metadata
+    return !field.label || field.label === djiMetadata?.label ? metadata.label : field.label
+  }
+  const fieldDescriptionForProvider = (field: TelemetryLayoutField): string => {
+    const metadata = resolveTelemetryFieldMetadata(deviceType, field.key, field, provider).metadata
+    if (provider !== 'superdock' || !metadata?.description) return field.description
+    const djiMetadata = resolveTelemetryFieldMetadata(deviceType, field.key, field, 'dji').metadata
+    return !field.description || field.description === djiMetadata?.description
+      ? metadata.description
+      : field.description
+  }
 
   useEffect(() => {
     setSelectedTabId(layout.tabs[0]?.id ?? '')
@@ -275,7 +302,7 @@ export function TelemetryManager({ config, onChange, onNotify }: TelemetryManage
     try {
       const imported = parseTelemetryLayoutConfig(result.data)
       onChange({ ...imported, updatedAt: Date.now() })
-      onNotify('遥测项配置已导入', 'success')
+      onNotify('监测项配置已导入', 'success')
     } catch (error) {
       onNotify(error instanceof Error ? error.message : String(error), 'error')
     }
@@ -283,27 +310,27 @@ export function TelemetryManager({ config, onChange, onNotify }: TelemetryManage
 
   const handleExport = async (): Promise<void> => {
     const result = await window.djiApi.dialogs.exportTelemetryLayout(config)
-    onNotify(result.ok ? '遥测项配置已导出' : result.error ?? '导出失败', result.ok ? 'success' : 'error')
+    onNotify(result.ok ? '监测项配置已导出' : result.error ?? '导出失败', result.ok ? 'success' : 'error')
   }
 
   const reset = (): void => {
-    if (!window.confirm('恢复默认遥测项配置？当前编辑内容将被替换。')) return
+    if (!window.confirm('恢复默认监测项配置？当前编辑内容将被替换。')) return
     onChange(createDefaultTelemetryLayout())
-    onNotify('已恢复默认遥测项配置', 'success')
+    onNotify('已恢复默认监测项配置', 'success')
   }
 
   return (
     <div className="telemetry-manager">
       <header className="telemetry-manager-toolbar">
         <div className="segmented telemetry-device-segmented">
-          {(Object.keys(deviceLabels) as DeviceType[]).map((type) => (
+          {availableDeviceTypes.map((type) => (
             <button key={type} className={deviceType === type ? 'active' : ''} onClick={() => setDeviceType(type)}>
               {deviceLabels[type]}
             </button>
           ))}
         </div>
         <span className="telemetry-manager-summary">
-          {layout.tabs.length} 个一级页签 · {layout.tabs.reduce((count, tab) => count + tab.sections.length, 0)} 个二级页签 · {layout.fields.length} 个字段
+          {layout.tabs.length} 个一级页签 · {layout.tabs.reduce((count, tab) => count + tab.sections.length, 0)} 个二级页签 · {supportedFieldKeys.size} 个字段
         </span>
         <span className="toolbar-spacer" />
         <Tooltip label="导入配置">
@@ -325,7 +352,7 @@ export function TelemetryManager({ config, onChange, onNotify }: TelemetryManage
               {layout.tabs.map((tab, index) => (
                 <div className={`telemetry-config-block ${selectedTab?.id === tab.id ? 'selected' : ''}`} key={tab.id}>
                   <button className="telemetry-config-select" onClick={() => setSelectedTabId(tab.id)}>
-                    <strong>{tab.name || '未命名页签'}</strong><small>{tab.sections.reduce((count, item) => count + item.fieldKeys.length, 0)}</small>
+                    <strong>{tab.name || '未命名页签'}</strong><small>{tab.sections.reduce((count, item) => count + item.fieldKeys.filter((key) => supportedFieldKeys.has(key)).length, 0)}</small>
                   </button>
                   <span className="telemetry-config-actions">
                     <button disabled={index === 0} onClick={() => commit({ ...cloneLayout(layout), tabs: move(layout.tabs, index, -1) })}><ArrowUp size={13} /></button>
@@ -346,7 +373,7 @@ export function TelemetryManager({ config, onChange, onNotify }: TelemetryManage
               {selectedTab?.sections.map((section, index) => (
                 <div className={`telemetry-config-block ${selectedSection?.id === section.id ? 'selected' : ''}`} key={section.id}>
                   <button className="telemetry-config-select" onClick={() => setSelectedSectionId(section.id)}>
-                    <strong>{section.name || '未命名页签'}</strong><small>{section.fieldKeys.length}</small>
+                    <strong>{section.name || '未命名页签'}</strong><small>{section.fieldKeys.filter((key) => supportedFieldKeys.has(key)).length}</small>
                   </button>
                   <span className="telemetry-config-actions">
                     <button disabled={index === 0} onClick={() => updateTab(selectedTab.id, (tab) => ({ ...tab, sections: move(tab.sections, index, -1) }))}><ArrowUp size={13} /></button>
@@ -369,14 +396,14 @@ export function TelemetryManager({ config, onChange, onNotify }: TelemetryManage
           <div className="telemetry-field-config-list">
             {filteredFields.map((field) => {
               const index = selectedSection?.fieldKeys.indexOf(field.key) ?? -1
-              const { metadata } = resolveTelemetryFieldMetadata(deviceType, field.key, field)
+              const { metadata } = resolveTelemetryFieldMetadata(deviceType, field.key, field, provider)
               return (
                 <div className={`telemetry-field-config-row ${selectedField?.key === field.key ? 'selected' : ''}`} key={field.key}>
                   <button className="telemetry-field-config-main" onClick={() => setSelectedFieldKey(field.key)}>
                     {field.visible ? <Eye size={14} /> : <EyeOff size={14} />}
                     <span>
                       <span className="telemetry-field-config-title">
-                        <strong>{field.label || field.key}</strong>
+                        <strong>{fieldLabelForProvider(field, metadata)}</strong>
                         {metadata?.accessMode && (
                           <small className={`telemetry-property-badge ${metadata.accessMode}`}>
                             {djiAccessModeLabel(metadata.accessMode)}
@@ -401,13 +428,13 @@ export function TelemetryManager({ config, onChange, onNotify }: TelemetryManage
           {selectedField ? (
             <>
               <header>
-                <div><span>指标项</span><strong>{selectedField.label || selectedField.key}</strong></div>
+                <div><span>指标项</span><strong>{fieldLabelForProvider(selectedField, selectedMetadata)}</strong></div>
                 <button className={`visibility-toggle ${selectedField.visible ? 'active' : ''}`} onClick={() => updateField(selectedField.key, (field) => ({ ...field, visible: !field.visible }))}>{selectedField.visible ? <Eye size={15} /> : <EyeOff size={15} />}{selectedField.visible ? '显示' : '隐藏'}</button>
               </header>
               <div className="telemetry-field-editor-form">
                 <label><span>原始字段名</span><code>{selectedField.key}</code></label>
-                <label><span>显示名称</span><input value={selectedField.label} onChange={(event) => updateField(selectedField.key, (field) => ({ ...field, label: event.target.value }))} /></label>
-                <label><span>字段描述</span><textarea rows={8} value={selectedField.description} onChange={(event) => updateField(selectedField.key, (field) => ({ ...field, description: event.target.value }))} placeholder="输入悬浮提示中展示的字段说明" /></label>
+                <label><span>显示名称</span><input value={fieldLabelForProvider(selectedField, selectedMetadata)} onChange={(event) => updateField(selectedField.key, (field) => ({ ...field, label: event.target.value }))} /></label>
+                <label><span>字段描述</span><textarea rows={8} value={fieldDescriptionForProvider(selectedField)} onChange={(event) => updateField(selectedField.key, (field) => ({ ...field, description: event.target.value }))} placeholder="输入悬浮提示中展示的字段说明" /></label>
                 <label><span>所属页签</span><select value={JSON.stringify([selectedTab?.id ?? '', selectedSection?.id ?? ''])} onChange={(event) => {
                   const [tabId, sectionId] = JSON.parse(event.target.value) as [string, string]
                   moveFieldTo(selectedField.key, tabId, sectionId)

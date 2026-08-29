@@ -7,6 +7,7 @@ import {
   commandTemplatesForProvider,
   commandTransactions,
   discoveredAircraftForProfile,
+  defaultDeviceName,
   DJI_COMMANDS,
   DJI_PRODUCT_NAMES,
   SUPERDOCK_PRODUCT_NAMES,
@@ -29,6 +30,12 @@ import {
 } from './dji'
 
 describe('DJI protocol helpers', () => {
+  it('uses device-type-specific default names', () => {
+    expect(defaultDeviceName('dock')).toBe('新机场')
+    expect(defaultDeviceName('aircraft')).toBe('新飞机')
+    expect(defaultDeviceName('pilot')).toBe('新遥控器')
+  })
+
   it('extracts a device SN from DJI topics', () => {
     expect(extractTopicSn('thing/product/DOCK-001/osd')).toBe('DOCK-001')
     expect(extractTopicSn('sys/product/GATEWAY/status')).toBe('GATEWAY')

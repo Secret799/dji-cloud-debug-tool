@@ -741,7 +741,7 @@ const telemetryFieldPresentation = (
     : telemetryCustomPropertyMetadata(layoutField)
   const officialMetadata = dockMetadata ?? aircraftMetadata ?? configuredMetadata
   const metadataSourceLabel = configuredMetadata
-    ? '遥测项管理 · 自定义属性设置'
+    ? '监测项管理 · 自定义属性设置'
     : usesSuperDockMetadata && dockMetadata
       ? `SuperDock 机场设备属性 · ${SUPERDOCK_PROPERTY_DOC_DATE}`
       : usesDock3Metadata && dockMetadata

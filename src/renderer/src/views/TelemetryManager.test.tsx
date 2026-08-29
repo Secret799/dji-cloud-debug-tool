@@ -3,9 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { createDefaultTelemetryLayout } from '../lib/telemetry-layout'
 import { TelemetryManager, telemetryMetadataSourceLabel } from './TelemetryManager'
 
-const renderManager = (config: ReturnType<typeof createDefaultTelemetryLayout>): string =>
+const renderManager = (
+  config: ReturnType<typeof createDefaultTelemetryLayout>,
+  provider: 'dji' | 'superdock' = 'dji',
+): string =>
   renderToStaticMarkup(
-    <TelemetryManager config={config} onChange={() => undefined} onNotify={() => undefined} />,
+    <TelemetryManager provider={provider} config={config} onChange={() => undefined} onNotify={() => undefined} />,
   )
 
 describe('TelemetryManager property metadata', () => {
@@ -16,28 +19,28 @@ describe('TelemetryManager property metadata', () => {
     expect(telemetryMetadataSourceLabel('dji-dock2')).toContain('DJI Dock 2 设备属性')
     expect(telemetryMetadataSourceLabel('dji-dock2-dock3')).toContain('DJI Dock 2 / Dock 3 设备属性')
     expect(telemetryMetadataSourceLabel('dji-aircraft')).toContain('DJI 飞行器设备属性')
-    expect(telemetryMetadataSourceLabel('custom')).toBe('遥测项管理 · 自定义属性设置')
+    expect(telemetryMetadataSourceLabel('custom')).toBe('监测项管理 · 自定义属性设置')
     expect(telemetryMetadataSourceLabel('default')).toBe('未关联官方物模型元数据')
   })
 
   it('shows official permissions, type, constraints and source as managed metadata', () => {
     const config = createDefaultTelemetryLayout()
-    const firstSection = config.devices.aircraft.tabs[0].sections[0]
-    firstSection.fieldKeys = ['rth_altitude']
+    const firstSection = config.devices.dock.tabs[0].sections[0]
+    firstSection.fieldKeys = ['silent_mode']
 
     const markup = renderManager(config)
 
     expect(markup).toContain('属性设置')
     expect(markup).toContain('可读写')
-    expect(markup).toContain('<code>int</code>')
-    expect(markup).toContain('&quot;max&quot;:500')
-    expect(markup).toContain('DJI 飞行器设备属性')
+    expect(markup).toContain('<code>enum_int</code>')
+    expect(markup).toContain('&quot;1&quot;:&quot;静音模式&quot;')
+    expect(markup).toContain('DJI Dock 2 / Dock 3 设备属性')
     expect(markup).not.toContain('允许通过 property/set 设置')
   })
 
   it('renders editable property settings for a custom field', () => {
     const config = createDefaultTelemetryLayout()
-    config.devices.aircraft.fields.push({
+    config.devices.dock.fields.push({
       key: 'custom_level',
       label: '自定义等级',
       description: '',
@@ -49,15 +52,28 @@ describe('TelemetryManager property metadata', () => {
         constraint: '{"0":"关闭","1":"开启"}',
       },
     })
-    config.devices.aircraft.tabs[0].sections[0].fieldKeys = ['custom_level']
+    config.devices.dock.tabs[0].sections[0].fieldKeys = ['custom_level']
 
     const markup = renderManager(config)
 
     expect(markup).toContain('允许通过 property/set 设置')
     expect(markup).toContain('value="custom_control.level"')
     expect(markup).toContain('<option value="enum_int" selected="">整数枚举</option>')
-    expect(markup).toContain('遥测项管理 · 自定义属性设置')
+    expect(markup).toContain('监测项管理 · 自定义属性设置')
     expect(markup).not.toContain('添加字段')
     expect(markup).not.toContain('删除字段')
+  })
+
+  it('defaults to the dock and uses SuperDock metadata for the strawberry brand', () => {
+    const config = createDefaultTelemetryLayout()
+    config.devices.dock.tabs[0].sections[0].fieldKeys = ['air_transfer_enable']
+
+    const markup = renderManager(config, 'superdock')
+
+    expect(markup).toContain('>机场</button>')
+    expect(markup).not.toContain('>飞机</button>')
+    expect(markup).not.toContain('>遥控器</button>')
+    expect(markup).toContain('空中回传（无人机到机场）')
+    expect(markup).toContain('SuperDock 机场设备属性')
   })
 })

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Check, Trash2, X } from 'lucide-react'
 import type { DeviceProvider, DeviceType, DjiDevice, DockModel } from '../../../shared/contracts'
+import { defaultDeviceName } from '../lib/dji'
 import { SUPERDOCK_MODELS, defaultDockModel, deviceProvider } from '../lib/superdock'
 import { Tooltip } from './Tooltip'
 
@@ -16,13 +17,19 @@ interface DeviceModalProps {
 export function DeviceModal({ device, isNew, gatewayDevices, onClose, onSave, onRemove }: DeviceModalProps) {
   const [draft, setDraft] = useState(device)
   const [error, setError] = useState('')
+  const [nameEdited, setNameEdited] = useState(false)
 
   useEffect(() => {
     setDraft(device)
     setError('')
+    setNameEdited(false)
   }, [device])
 
   if (!draft) return null
+
+  const deviceTypeOptions: [DeviceType, string][] = isNew
+    ? [['dock', '机场'], ['pilot', '遥控器']]
+    : [['dock', '机场'], ['aircraft', '飞机'], ['pilot', '遥控器']]
 
   const update = <K extends keyof DjiDevice>(key: K, value: DjiDevice[K]): void => {
     setDraft((current) => (current ? { ...current, [key]: value } : current))
@@ -32,6 +39,7 @@ export function DeviceModal({ device, isNew, gatewayDevices, onClose, onSave, on
     setDraft((current) => (current ? {
       ...current,
       type,
+      name: isNew && !nameEdited ? defaultDeviceName(type) : current.name,
       provider: type === 'dock' ? deviceProvider(current) : 'dji',
       dockModel: type === 'dock' ? current.dockModel ?? defaultDockModel(deviceProvider(current)) : undefined,
       parentSn: type === 'aircraft' ? current.parentSn : undefined,
@@ -47,6 +55,10 @@ export function DeviceModal({ device, isNew, gatewayDevices, onClose, onSave, on
   }
 
   const submit = async (): Promise<void> => {
+    if (isNew && draft.type === 'aircraft') {
+      setError('不支持直接添加飞机，请添加机场或遥控器网关')
+      return
+    }
     if (!draft.name.trim() || !draft.sn.trim()) {
       setError('设备名称和序列号不能为空')
       return
@@ -67,7 +79,7 @@ export function DeviceModal({ device, isNew, gatewayDevices, onClose, onSave, on
         <header className="modal-header">
           <div>
             <span className="eyebrow">CLOUD API DEVICE</span>
-            <h2>{isNew ? '添加设备' : '设备设置'}</h2>
+            <h2>{isNew ? '添加网关' : '设备设置'}</h2>
           </div>
           <Tooltip label="关闭">
             <button className="icon-button" onClick={onClose}><X size={18} /></button>
@@ -77,13 +89,7 @@ export function DeviceModal({ device, isNew, gatewayDevices, onClose, onSave, on
           <label className="field">
             <span>设备类型</span>
             <div className="segmented">
-              {(
-                [
-                  ['dock', '机场'],
-                  ['aircraft', '飞机'],
-                  ['pilot', 'Pilot'],
-                ] as [DeviceType, string][]
-              ).map(([type, label]) => (
+              {deviceTypeOptions.map(([type, label]) => (
                 <button
                   type="button"
                   key={type}
@@ -141,7 +147,7 @@ export function DeviceModal({ device, isNew, gatewayDevices, onClose, onSave, on
           )}
           <label className="field">
             <span>设备名称</span>
-            <input value={draft.name} onChange={(event) => update('name', event.target.value)} autoFocus />
+            <input value={draft.name} onChange={(event) => { setNameEdited(true); update('name', event.target.value) }} autoFocus />
           </label>
           <label className="field">
             <span>设备 SN</span>
@@ -176,7 +182,7 @@ export function DeviceModal({ device, isNew, gatewayDevices, onClose, onSave, on
           ) : <span />}
           <div className="footer-actions">
             <button className="button secondary" onClick={onClose}>取消</button>
-            <button className="button primary" onClick={() => void submit()}><Check size={16} />保存设备</button>
+            <button className="button primary" onClick={() => void submit()}><Check size={16} />{isNew ? '保存网关' : '保存设备'}</button>
           </div>
         </footer>
       </section>
