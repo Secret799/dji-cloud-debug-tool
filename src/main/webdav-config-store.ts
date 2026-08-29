@@ -1,19 +1,28 @@
-import { app, safeStorage } from 'electron'
+import { app } from 'electron'
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type { WebDavActivity, WebDavConfig, WebDavVersion } from '../shared/contracts'
+import { encryptCredential, type CredentialContext } from './credential-crypto'
+import { hasStoredCredential, migrateStoredCredential, resolveStoredCredential } from './stored-credential'
 import type { WebDavSyncFingerprint } from './webdav-sync-merge'
 
 interface StoredWebDavConfig extends Omit<
   WebDavConfig,
   'secret' | 'hasStoredSecret' | 'clearStoredSecret'
 > {
+  storedSecret?: string
   encryptedSecret?: string
 }
 
 interface ConfigDocument {
   version: 1
   config?: StoredWebDavConfig
+}
+
+const secretContext: CredentialContext = {
+  store: 'webdav',
+  recordId: 'singleton',
+  field: 'secret',
 }
 
 export interface SyncStateDocument {
@@ -43,7 +52,7 @@ export class WebDavConfigStore {
       if (!document.config) return undefined
       return {
         ...this.toPublicConfig(document.config),
-        secret: this.decryptSecret(document.config.encryptedSecret),
+        secret: this.decryptSecret(document.config),
       }
     })
   }
@@ -112,7 +121,19 @@ export class WebDavConfigStore {
       if (parsed.version !== 1 || (parsed.config !== undefined && typeof parsed.config !== 'object')) {
         throw new Error('WebDAV 配置版本无效')
       }
-      return parsed as ConfigDocument
+      const document = parsed as ConfigDocument
+      if (document.config) {
+        const migration = migrateStoredCredential({
+          encrypted: document.config.encryptedSecret,
+          plaintext: document.config.storedSecret,
+        }, secretContext, 'WebDAV 密钥')
+        if (migration.migrated) {
+          document.config.encryptedSecret = migration.encrypted
+          delete document.config.storedSecret
+          await this.writeJson(this.configPath, document)
+        }
+      }
+      return document
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
       return { version: 1 }
@@ -154,12 +175,18 @@ export class WebDavConfigStore {
       secret,
       hasStoredSecret: _hasStoredSecret,
       clearStoredSecret,
+      storedSecret: _storedSecret,
+      encryptedSecret: _inputEncryptedSecret,
       ...plain
-    } = config
-    let encryptedSecret = clearStoredSecret ? undefined : existing?.encryptedSecret
-    if (secret) {
-      if (!safeStorage.isEncryptionAvailable()) throw new Error('系统安全存储当前不可用，WebDAV 密钥无法保存')
-      encryptedSecret = safeStorage.encryptString(secret).toString('base64')
+    } = config as WebDavConfig & {
+      storedSecret?: unknown
+      encryptedSecret?: unknown
+    }
+    let encryptedSecret = existing?.encryptedSecret
+    if (clearStoredSecret) encryptedSecret = undefined
+    else if (secret) encryptedSecret = encryptCredential(secret, secretContext)
+    else if (!encryptedSecret && existing?.storedSecret) {
+      encryptedSecret = encryptCredential(existing.storedSecret, secretContext)
     }
     return {
       ...plain,
@@ -171,20 +198,26 @@ export class WebDavConfigStore {
   }
 
   private toPublicConfig(config: StoredWebDavConfig): WebDavConfig {
-    const { encryptedSecret, ...plain } = config
+    const {
+      storedSecret,
+      encryptedSecret,
+      clearStoredSecret: _clearStoredSecret,
+      ...plain
+    } = config as StoredWebDavConfig & { clearStoredSecret?: boolean }
     return {
       ...plain,
       autoSync: config.autoSync !== false,
       syncStrategy: config.syncStrategy ?? 'smart-merge',
       secret: '',
-      hasStoredSecret: Boolean(encryptedSecret),
+      hasStoredSecret: hasStoredCredential({ encrypted: encryptedSecret, plaintext: storedSecret }),
     }
   }
 
-  private decryptSecret(value: string | undefined): string {
-    if (!value) return ''
-    if (!safeStorage.isEncryptionAvailable()) throw new Error('系统安全存储当前不可用，无法读取 WebDAV 密钥')
-    return safeStorage.decryptString(Buffer.from(value, 'base64'))
+  private decryptSecret(config: StoredWebDavConfig): string {
+    return resolveStoredCredential({
+      encrypted: config.encryptedSecret,
+      plaintext: config.storedSecret,
+    }, secretContext, 'WebDAV 密钥')
   }
 
   private async writeJson(path: string, value: unknown): Promise<void> {

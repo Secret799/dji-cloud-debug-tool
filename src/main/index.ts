@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { IPC_CHANNELS } from '../shared/channels'
 import type { OperationResult } from '../shared/contracts'
 import { parseTelemetryLayoutConfig } from '../shared/telemetry-layout'
@@ -14,6 +15,7 @@ import {
   validateProfileId,
   validatePublishRequest,
   validateQos,
+  validateRemoteLogUploadRequest,
   validateRtmpRelayId,
   validateRtmpRelayStartRequest,
   validateSeiMessageDetailRequest,
@@ -36,9 +38,15 @@ import { RtmpRelayManager } from './rtmp-relay-manager'
 import { SeiParserManager } from './sei-parser-manager'
 import { DeviceArchiveStore } from './device-archive-store'
 import { FirmwareUploadManager } from './firmware-upload-manager'
+import { RemoteLogUploadManager } from './remote-log-upload-manager'
 import { AppUpdateManager } from './app-update-manager'
 import { WebDavConfigStore } from './webdav-config-store'
 import { WebDavBackupManager } from './webdav-backup-manager'
+import {
+  isSameRendererFrame,
+  isTrustedRendererUrl,
+  validateDevelopmentRendererUrl,
+} from './renderer-security'
 
 const PRODUCT_NAME = 'DJI Cloud Studio'
 
@@ -54,10 +62,38 @@ let seiParserManager: SeiParserManager
 let objectStorageStore: ObjectStorageStore
 let deviceArchiveStore: DeviceArchiveStore
 let firmwareUploadManager: FirmwareUploadManager
+let remoteLogUploadManager: RemoteLogUploadManager
 let appUpdateManager: AppUpdateManager
+let webDavConfigStore: WebDavConfigStore
 let webDavBackupManager: WebDavBackupManager
+let trustedRendererUrl: string | null = null
 let quitCleanupStarted = false
 let quitCleanupComplete = false
+
+const assertTrustedRenderer = (event: Electron.IpcMainInvokeEvent): void => {
+  const expectedFrame = mainWindow?.webContents.mainFrame
+  if (
+    !mainWindow
+    || mainWindow.isDestroyed()
+    || !expectedFrame
+    || event.sender !== mainWindow.webContents
+    || !isSameRendererFrame(event.senderFrame, expectedFrame)
+    || !trustedRendererUrl
+    || !event.senderFrame
+    || !isTrustedRendererUrl(event.senderFrame.url, trustedRendererUrl)
+  ) {
+    throw new Error('拒绝来自非受信页面的凭据访问')
+  }
+}
+
+type IpcHandler = Parameters<typeof ipcMain.handle>[1]
+
+const handleTrusted = (channel: string, listener: IpcHandler): void => {
+  ipcMain.handle(channel, (event, ...args) => {
+    assertTrustedRenderer(event)
+    return listener(event, ...args)
+  })
+}
 
 const developmentIconPath = app.isPackaged ? undefined : join(__dirname, '../../build/icon.png')
 
@@ -88,7 +124,10 @@ const createWindow = (): void => {
     if (!window.isDestroyed()) window.show()
   })
   window.on('closed', () => {
-    if (mainWindow === window) mainWindow = null
+    if (mainWindow === window) {
+      mainWindow = null
+      trustedRendererUrl = null
+    }
     void mqttManager?.disconnectAll().catch((error) => {
       console.warn('Unable to disconnect MQTT connections after window close:', error)
     })
@@ -106,21 +145,32 @@ const createWindow = (): void => {
   })
   window.webContents.on('will-navigate', (event) => event.preventDefault())
 
-  if (process.env.ELECTRON_RENDERER_URL) {
-    void window.loadURL(process.env.ELECTRON_RENDERER_URL)
+  if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
+    const rendererUrl = validateDevelopmentRendererUrl(process.env.ELECTRON_RENDERER_URL)
+    trustedRendererUrl = rendererUrl
+    window.webContents.on('will-redirect', (event, url) => {
+      if (!isTrustedRendererUrl(url, rendererUrl)) event.preventDefault()
+    })
+    void window.loadURL(rendererUrl)
   } else {
-    void window.loadFile(join(__dirname, '../renderer/index.html'))
+    const rendererPath = join(__dirname, '../renderer/index.html')
+    trustedRendererUrl = pathToFileURL(rendererPath).toString()
+    window.webContents.on('will-redirect', (event) => event.preventDefault())
+    void window.loadFile(rendererPath)
   }
 }
 
 const registerIpc = (): void => {
-  ipcMain.handle(IPC_CHANNELS.profilesList, () => profileStore.list())
-  ipcMain.handle(IPC_CHANNELS.profilesSave, async (_event, profile: unknown) => {
+  handleTrusted(IPC_CHANNELS.profilesList, () => profileStore.list())
+  handleTrusted(IPC_CHANNELS.profilesResolve, (_event, rawProfileId: unknown) => {
+    return profileStore.resolve(validateProfileId(rawProfileId))
+  })
+  handleTrusted(IPC_CHANNELS.profilesSave, async (_event, profile: unknown) => {
     const saved = await profileStore.save(validateConnectionProfile(profile))
     webDavBackupManager.notifyLocalChange()
     return saved
   })
-  ipcMain.handle(IPC_CHANNELS.profilesRemove, async (_event, rawProfileId: unknown) => {
+  handleTrusted(IPC_CHANNELS.profilesRemove, async (_event, rawProfileId: unknown) => {
     try {
       const profileId = validateProfileId(rawProfileId)
       await mqttManager.disconnect(profileId)
@@ -133,15 +183,15 @@ const registerIpc = (): void => {
     }
   })
 
-  ipcMain.handle(IPC_CHANNELS.deviceArchivesList, () => deviceArchiveStore.list())
-  ipcMain.handle(IPC_CHANNELS.deviceArchivesReplaceProfile, async (_event, rawProfileId: unknown, rawArchives: unknown) => {
+  handleTrusted(IPC_CHANNELS.deviceArchivesList, () => deviceArchiveStore.list())
+  handleTrusted(IPC_CHANNELS.deviceArchivesReplaceProfile, async (_event, rawProfileId: unknown, rawArchives: unknown) => {
     const profileId = validateProfileId(rawProfileId)
     if (!await profileStore.get(profileId)) throw new Error('设备档案对应的连接配置不存在')
     const archives = await deviceArchiveStore.replaceProfile(profileId, validateDeviceArchives(profileId, rawArchives))
     return archives
   })
-  ipcMain.handle(IPC_CHANNELS.mqttRuntime, () => mqttManager.getRuntime())
-  ipcMain.handle(IPC_CHANNELS.mqttConnect, async (_event, rawProfileId: unknown, rawSessionPassword?: unknown) => {
+  handleTrusted(IPC_CHANNELS.mqttRuntime, () => mqttManager.getRuntime())
+  handleTrusted(IPC_CHANNELS.mqttConnect, async (_event, rawProfileId: unknown, rawSessionPassword?: unknown) => {
     try {
       const profileId = validateProfileId(rawProfileId)
       const sessionPassword = validateSessionPassword(rawSessionPassword)
@@ -152,21 +202,21 @@ const registerIpc = (): void => {
       return operationFailure(error)
     }
   })
-  ipcMain.handle(IPC_CHANNELS.mqttDisconnect, async (_event, rawProfileId: unknown) => {
+  handleTrusted(IPC_CHANNELS.mqttDisconnect, async (_event, rawProfileId: unknown) => {
     try {
       return await mqttManager.disconnect(validateProfileId(rawProfileId))
     } catch (error) {
       return operationFailure(error)
     }
   })
-  ipcMain.handle(IPC_CHANNELS.mqttPublish, async (_event, rawRequest: unknown) => {
+  handleTrusted(IPC_CHANNELS.mqttPublish, async (_event, rawRequest: unknown) => {
     try {
       return await mqttManager.publish(validatePublishRequest(rawRequest))
     } catch (error) {
       return operationFailure(error)
     }
   })
-  ipcMain.handle(
+  handleTrusted(
     IPC_CHANNELS.mqttSubscribe,
     async (_event, rawProfileId: unknown, rawTopic: unknown, rawQos: unknown) => {
       try {
@@ -180,7 +230,7 @@ const registerIpc = (): void => {
       }
     },
   )
-  ipcMain.handle(IPC_CHANNELS.mqttUnsubscribe, async (_event, rawProfileId: unknown, rawTopic: unknown) => {
+  handleTrusted(IPC_CHANNELS.mqttUnsubscribe, async (_event, rawProfileId: unknown, rawTopic: unknown) => {
     try {
       return await mqttManager.unsubscribe(
         validateProfileId(rawProfileId),
@@ -191,7 +241,7 @@ const registerIpc = (): void => {
     }
   })
 
-  ipcMain.handle(IPC_CHANNELS.dialogPickCertificate, async () => {
+  handleTrusted(IPC_CHANNELS.dialogPickCertificate, async () => {
     const result = await dialog.showOpenDialog({
       title: '选择证书文件',
       properties: ['openFile'],
@@ -199,7 +249,7 @@ const registerIpc = (): void => {
     })
     return result.canceled ? null : result.filePaths[0]
   })
-  ipcMain.handle(IPC_CHANNELS.dialogExportMessages, async (_event, rawOptions: unknown) => {
+  handleTrusted(IPC_CHANNELS.dialogExportMessages, async (_event, rawOptions: unknown) => {
     try {
       const options = validateExportMessageOptions(rawOptions)
       const safeName = options.profileName.replace(/[^\w\u4e00-\u9fa5-]+/g, '-')
@@ -215,7 +265,7 @@ const registerIpc = (): void => {
       return operationFailure(error)
     }
   })
-  ipcMain.handle(IPC_CHANNELS.dialogImportTelemetryLayout, async () => {
+  handleTrusted(IPC_CHANNELS.dialogImportTelemetryLayout, async () => {
     try {
       const result = await dialog.showOpenDialog({
         title: '导入遥测项配置',
@@ -232,7 +282,7 @@ const registerIpc = (): void => {
       return { canceled: false, error: errorMessage(error) }
     }
   })
-  ipcMain.handle(IPC_CHANNELS.dialogExportTelemetryLayout, async (_event, rawConfig: unknown) => {
+  handleTrusted(IPC_CHANNELS.dialogExportTelemetryLayout, async (_event, rawConfig: unknown) => {
     try {
       const serialized = JSON.stringify(rawConfig)
       if (Buffer.byteLength(serialized, 'utf8') > 5 * 1024 * 1024) {
@@ -252,13 +302,16 @@ const registerIpc = (): void => {
     }
   })
 
-  ipcMain.handle(IPC_CHANNELS.mediaServersList, () => mediaServerStore.list())
-  ipcMain.handle(IPC_CHANNELS.mediaServersSave, async (_event, rawProfile: unknown) => {
+  handleTrusted(IPC_CHANNELS.mediaServersList, () => mediaServerStore.list())
+  handleTrusted(IPC_CHANNELS.mediaServersResolve, (_event, rawProfileId: unknown) => {
+    return mediaServerStore.getWithSecret(validateProfileId(rawProfileId))
+  })
+  handleTrusted(IPC_CHANNELS.mediaServersSave, async (_event, rawProfile: unknown) => {
     const saved = await mediaServerStore.save(validateMediaServerProfile(rawProfile))
     webDavBackupManager.notifyLocalChange()
     return saved
   })
-  ipcMain.handle(IPC_CHANNELS.mediaServersRemove, async (_event, rawProfileId: unknown) => {
+  handleTrusted(IPC_CHANNELS.mediaServersRemove, async (_event, rawProfileId: unknown) => {
     try {
       const removed = await mediaServerStore.remove(validateProfileId(rawProfileId))
       if (removed) webDavBackupManager.notifyLocalChange()
@@ -267,48 +320,48 @@ const registerIpc = (): void => {
       return operationFailure(error)
     }
   })
-  ipcMain.handle(IPC_CHANNELS.mediaServersCheck, (_event, rawProfileId: unknown) =>
+  handleTrusted(IPC_CHANNELS.mediaServersCheck, (_event, rawProfileId: unknown) =>
     mediaServerManager.check(validateProfileId(rawProfileId)),
   )
-  ipcMain.handle(IPC_CHANNELS.mediaLocalStart, () => mediaServerManager.startLocal())
-  ipcMain.handle(IPC_CHANNELS.mediaLocalStop, () => mediaServerManager.stopLocal())
-  ipcMain.handle(IPC_CHANNELS.mediaLocalRuntime, () => mediaServerManager.getLocalRuntime())
-  ipcMain.handle(IPC_CHANNELS.mediaWhepOffer, async (_event, rawRequest: unknown) => {
+  handleTrusted(IPC_CHANNELS.mediaLocalStart, () => mediaServerManager.startLocal())
+  handleTrusted(IPC_CHANNELS.mediaLocalStop, () => mediaServerManager.stopLocal())
+  handleTrusted(IPC_CHANNELS.mediaLocalRuntime, () => mediaServerManager.getLocalRuntime())
+  handleTrusted(IPC_CHANNELS.mediaWhepOffer, async (_event, rawRequest: unknown) => {
     try {
       return await negotiateWhep(validateWhepOfferRequest(rawRequest))
     } catch (error) {
       return operationFailure(error)
     }
   })
-  ipcMain.handle(IPC_CHANNELS.mediaRtmpRelayStart, (_event, rawRequest: unknown) => {
+  handleTrusted(IPC_CHANNELS.mediaRtmpRelayStart, (_event, rawRequest: unknown) => {
     try {
       return rtmpRelayManager.start(validateRtmpRelayStartRequest(rawRequest).url)
     } catch (error) {
       return operationFailure(error)
     }
   })
-  ipcMain.handle(IPC_CHANNELS.mediaRtmpRelayStop, (_event, rawRelayId: unknown) => {
+  handleTrusted(IPC_CHANNELS.mediaRtmpRelayStop, (_event, rawRelayId: unknown) => {
     try {
       return rtmpRelayManager.stop(validateRtmpRelayId(rawRelayId))
     } catch (error) {
       return operationFailure(error)
     }
   })
-  ipcMain.handle(IPC_CHANNELS.mediaSeiParserStart, (_event, rawRequest: unknown) => {
+  handleTrusted(IPC_CHANNELS.mediaSeiParserStart, (_event, rawRequest: unknown) => {
     try {
       return seiParserManager.start(validateSeiParserStartRequest(rawRequest))
     } catch (error) {
       return operationFailure(error)
     }
   })
-  ipcMain.handle(IPC_CHANNELS.mediaSeiParserStop, (_event, rawSessionId: unknown) => {
+  handleTrusted(IPC_CHANNELS.mediaSeiParserStop, (_event, rawSessionId: unknown) => {
     try {
       return seiParserManager.stop(validateSeiParserId(rawSessionId))
     } catch (error) {
       return operationFailure(error)
     }
   })
-  ipcMain.handle(IPC_CHANNELS.mediaSeiMessageDetail, (_event, rawRequest: unknown) => {
+  handleTrusted(IPC_CHANNELS.mediaSeiMessageDetail, (_event, rawRequest: unknown) => {
     try {
       const request = validateSeiMessageDetailRequest(rawRequest)
       return seiParserManager.getMessageDetail(request.sessionId, request.messageId)
@@ -317,13 +370,13 @@ const registerIpc = (): void => {
     }
   })
 
-  ipcMain.handle(IPC_CHANNELS.objectStorageList, () => objectStorageStore.list())
-  ipcMain.handle(IPC_CHANNELS.objectStorageSave, async (_event, rawProfile: unknown) => {
+  handleTrusted(IPC_CHANNELS.objectStorageList, () => objectStorageStore.list())
+  handleTrusted(IPC_CHANNELS.objectStorageSave, async (_event, rawProfile: unknown) => {
     const saved = await objectStorageStore.save(validateObjectStorageProfile(rawProfile))
     webDavBackupManager.notifyLocalChange()
     return saved
   })
-  ipcMain.handle(IPC_CHANNELS.objectStorageRemove, async (_event, rawProfileId: unknown) => {
+  handleTrusted(IPC_CHANNELS.objectStorageRemove, async (_event, rawProfileId: unknown) => {
     try {
       const removed = await objectStorageStore.remove(validateProfileId(rawProfileId))
       if (removed) webDavBackupManager.notifyLocalChange()
@@ -332,10 +385,17 @@ const registerIpc = (): void => {
       return operationFailure(error)
     }
   })
-  ipcMain.handle(IPC_CHANNELS.objectStorageResolve, (_event, rawProfileId: unknown) =>
-    objectStorageStore.resolve(validateProfileId(rawProfileId)),
-  )
-  ipcMain.handle(IPC_CHANNELS.firmwarePickPackage, async () => {
+  handleTrusted(IPC_CHANNELS.objectStorageResolve, (_event, rawProfileId: unknown) => {
+    return objectStorageStore.resolve(validateProfileId(rawProfileId))
+  })
+  handleTrusted(IPC_CHANNELS.remoteLogStartUpload, async (_event, rawRequest: unknown) => {
+    try {
+      return await remoteLogUploadManager.start(validateRemoteLogUploadRequest(rawRequest))
+    } catch (error) {
+      return operationFailure(error)
+    }
+  })
+  handleTrusted(IPC_CHANNELS.firmwarePickPackage, async () => {
     try {
       const result = await dialog.showOpenDialog({
         title: '选择本地固件包',
@@ -351,31 +411,34 @@ const registerIpc = (): void => {
       return { canceled: false, error: errorMessage(error) }
     }
   })
-  ipcMain.handle(IPC_CHANNELS.firmwareUploadPackage, (_event, rawRequest: unknown) =>
+  handleTrusted(IPC_CHANNELS.firmwareUploadPackage, (_event, rawRequest: unknown) =>
     firmwareUploadManager.upload(validateFirmwareUploadRequest(rawRequest)),
   )
-  ipcMain.handle(IPC_CHANNELS.appUpdateState, () => appUpdateManager.getState())
-  ipcMain.handle(IPC_CHANNELS.appUpdateCheck, () => appUpdateManager.check())
-  ipcMain.handle(IPC_CHANNELS.appUpdateDownload, () => appUpdateManager.download())
-  ipcMain.handle(IPC_CHANNELS.appUpdateOpenInstaller, () => appUpdateManager.openInstaller())
-  ipcMain.handle(IPC_CHANNELS.webdavOverview, () => webDavBackupManager.getOverview())
-  ipcMain.handle(IPC_CHANNELS.webdavSaveConfig, (_event, rawConfig: unknown) =>
+  handleTrusted(IPC_CHANNELS.appUpdateState, () => appUpdateManager.getState())
+  handleTrusted(IPC_CHANNELS.appUpdateCheck, () => appUpdateManager.check())
+  handleTrusted(IPC_CHANNELS.appUpdateDownload, () => appUpdateManager.download())
+  handleTrusted(IPC_CHANNELS.appUpdateOpenInstaller, () => appUpdateManager.openInstaller())
+  handleTrusted(IPC_CHANNELS.webdavOverview, () => webDavBackupManager.getOverview())
+  handleTrusted(IPC_CHANNELS.webdavResolveConfig, () => {
+    return webDavConfigStore.resolve()
+  })
+  handleTrusted(IPC_CHANNELS.webdavSaveConfig, (_event, rawConfig: unknown) =>
     webDavBackupManager.saveConfig(validateWebDavConfig(rawConfig)),
   )
-  ipcMain.handle(IPC_CHANNELS.webdavRemoveConfig, () => webDavBackupManager.removeConfig())
-  ipcMain.handle(IPC_CHANNELS.webdavTest, (_event, rawConfig?: unknown) =>
+  handleTrusted(IPC_CHANNELS.webdavRemoveConfig, () => webDavBackupManager.removeConfig())
+  handleTrusted(IPC_CHANNELS.webdavTest, (_event, rawConfig?: unknown) =>
     webDavBackupManager.test(rawConfig === undefined ? undefined : validateWebDavConfig(rawConfig)),
   )
-  ipcMain.handle(IPC_CHANNELS.webdavSync, (_event, rawRequest: unknown) =>
+  handleTrusted(IPC_CHANNELS.webdavSync, (_event, rawRequest: unknown) =>
     webDavBackupManager.sync(validateWebDavSyncRequest(rawRequest)),
   )
-  ipcMain.handle(IPC_CHANNELS.webdavChanged, (_event, rawRequest: unknown) => {
+  handleTrusted(IPC_CHANNELS.webdavChanged, (_event, rawRequest: unknown) => {
     webDavBackupManager.notifyLocalChange(validateWebDavSyncRequest(rawRequest))
   })
-  ipcMain.handle(IPC_CHANNELS.webdavRestore, (_event, rawVersionId: unknown) =>
+  handleTrusted(IPC_CHANNELS.webdavRestore, (_event, rawVersionId: unknown) =>
     webDavBackupManager.restore(validateWebDavVersionId(rawVersionId)),
   )
-  ipcMain.handle(IPC_CHANNELS.webdavRemoveVersion, (_event, rawVersionId: unknown) =>
+  handleTrusted(IPC_CHANNELS.webdavRemoveVersion, (_event, rawVersionId: unknown) =>
     webDavBackupManager.removeVersion(validateWebDavVersionId(rawVersionId)),
   )
 }
@@ -402,14 +465,16 @@ app.whenReady().then(() => {
     }
   })
   objectStorageStore = new ObjectStorageStore()
+  remoteLogUploadManager = new RemoteLogUploadManager(objectStorageStore, mqttManager, profileStore)
   firmwareUploadManager = new FirmwareUploadManager(objectStorageStore, (progress) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send(IPC_CHANNELS.firmwareUploadProgress, progress)
     }
   })
   deviceArchiveStore = new DeviceArchiveStore()
+  webDavConfigStore = new WebDavConfigStore()
   webDavBackupManager = new WebDavBackupManager(
-    new WebDavConfigStore(),
+    webDavConfigStore,
     profileStore,
     mediaServerStore,
     objectStorageStore,

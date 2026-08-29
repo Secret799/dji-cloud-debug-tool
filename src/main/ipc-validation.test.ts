@@ -9,6 +9,7 @@ import {
   validateMediaServerProfile,
   validateObjectStorageProfile,
   validatePublishRequest,
+  validateRemoteLogUploadRequest,
   validateRtmpRelayId,
   validateRtmpRelayStartRequest,
   validateSeiMessageDetailRequest,
@@ -60,6 +61,34 @@ describe('IPC validation', () => {
   it('accepts the transient clear-password field and an explicit empty session password', () => {
     expect(validateConnectionProfile(createProfile()).clearStoredPassword).toBe(true)
     expect(validateSessionPassword('')).toBe('')
+  })
+
+  it('strips credential-store implementation fields from validated profiles', () => {
+    const mqtt = validateConnectionProfile({
+      ...createProfile(),
+      storedPassword: 'plaintext',
+      encryptedPassword: 'ciphertext',
+    })
+    expect(mqtt).not.toHaveProperty('storedPassword')
+    expect(mqtt).not.toHaveProperty('encryptedPassword')
+
+    const media = validateMediaServerProfile({
+      id: 'srs-1', name: 'SRS', kind: 'remote-srs', host: 'media.example.com',
+      apiProtocol: 'https', apiPort: 1985, httpProtocol: 'https', httpPort: 443,
+      rtmpPort: 1935, rtspPort: 0, webrtcPort: 8000, secret: '', createdAt: 1, updatedAt: 1,
+      storedSecret: 'plaintext', encryptedSecret: 'ciphertext',
+    })
+    expect(media).not.toHaveProperty('storedSecret')
+    expect(media).not.toHaveProperty('encryptedSecret')
+
+    const objectStorage = validateObjectStorageProfile({
+      id: 'storage-1', name: 'Primary OSS', provider: 'ali', bucket: 'bucket', region: 'cn-hangzhou',
+      endpoint: 'https://oss-cn-hangzhou.aliyuncs.com', accessKeyId: 'key', accessKeySecret: 'secret',
+      securityToken: '', expire: 1_900_000_000_000, createdAt: 1, updatedAt: 1,
+      storedAccessKeySecret: 'plaintext', encryptedAccessKeySecret: 'ciphertext',
+    })
+    expect(objectStorage).not.toHaveProperty('storedAccessKeySecret')
+    expect(objectStorage).not.toHaveProperty('encryptedAccessKeySecret')
   })
 
   it('accepts a valid WHEP offer and rejects unsafe URLs or invalid SDP', () => {
@@ -136,6 +165,74 @@ describe('IPC validation', () => {
   it('limits exported record count', () => {
     const records = Array.from({ length: MAX_EXPORT_RECORDS + 1 }, (_, index) => createRecord(String(index)))
     expect(() => validateExportMessageOptions({ profileName: 'Test', records })).toThrow('数量不能超过')
+  })
+
+  it('redacts credentials from NDJSON exports as defense in depth', () => {
+    const result = validateExportMessageOptions({
+      profileName: 'Test',
+      records: [
+        {
+          ...createRecord('structured'),
+          payload: JSON.stringify({
+            access_key_id: 'export-access-id',
+            accessKeySecret: 'export-camel-secret',
+            security_token: 'export-snake-token',
+            sts_token: 'export-sts-token',
+            nested: {
+              device_secret: 'export-device-secret',
+              wrapper: 'access_key_secret=export-wrapped-secret',
+              values: ['sts_token=export-wrapped-token', 'password reset documentation'],
+            },
+          }),
+          properties: {
+            userProperties: {
+              authorization: 'Bearer export-auth-secret',
+              note: 'security_token=export-property-wrapped-token',
+              safeNote: 'security token rotation documentation',
+            },
+          },
+          securityToken: 'unknown-top-level-token',
+        },
+        {
+          ...createRecord('malformed'),
+          payload: 'access_key_secret=export-plain-secret&broken={',
+        },
+      ],
+    })
+
+    expect(result.content).not.toContain('export-access-id')
+    expect(result.content).not.toContain('export-camel-secret')
+    expect(result.content).not.toContain('export-snake-token')
+    expect(result.content).not.toContain('export-sts-token')
+    expect(result.content).not.toContain('export-device-secret')
+    expect(result.content).not.toContain('export-wrapped-secret')
+    expect(result.content).not.toContain('export-wrapped-token')
+    expect(result.content).not.toContain('export-auth-secret')
+    expect(result.content).not.toContain('export-property-wrapped-token')
+    expect(result.content).not.toContain('unknown-top-level-token')
+    expect(result.content).not.toContain('export-plain-secret')
+
+    const [structured, malformed] = result.content.split('\n').map((line) => JSON.parse(line) as MqttMessageRecord)
+    expect(JSON.parse(structured.payload)).toMatchObject({
+      access_key_id: '[REDACTED]',
+      accessKeySecret: '[REDACTED]',
+      security_token: '[REDACTED]',
+      sts_token: '[REDACTED]',
+      nested: {
+        device_secret: '[REDACTED]',
+        wrapper: '[REDACTED]',
+        values: ['[REDACTED]', 'password reset documentation'],
+      },
+    })
+    expect(structured.properties).toEqual({
+      userProperties: {
+        authorization: '[REDACTED]',
+        note: '[REDACTED]',
+        safeNote: 'security token rotation documentation',
+      },
+    })
+    expect(structured).not.toHaveProperty('securityToken')
+    expect(malformed.payload).toBe('[REDACTED: sensitive MQTT payload omitted]')
   })
 
   it('validates that dock model metadata is only configured for dock devices', () => {
@@ -276,5 +373,58 @@ describe('IPC validation', () => {
     expect(() => validateFirmwareUploadRequest({ ...request, selectionToken: 'x'.repeat(257) })).toThrow('过长')
     expect(() => validateFirmwareUploadRequest({ ...request, objectKey: '' })).toThrow('不能为空')
     expect(() => validateFirmwareUploadRequest({ ...request, objectKey: { path: 'firmware.zip' } })).toThrow('字符串')
+  })
+
+  it('validates remote log uploads and strips unselected object keys', () => {
+    const request = {
+      profileId: 'profile-1',
+      gatewaySn: 'DOCK-1',
+      objectStorageProfileId: 'storage-1',
+      files: [{ module: '3', bootIndex: 7 }],
+      objectKeys: { '0': 'logs/unused.log', '3': ' logs/dock.log ' },
+    }
+
+    expect(validateRemoteLogUploadRequest(request)).toEqual({
+      profileId: 'profile-1',
+      gatewaySn: 'DOCK-1',
+      objectStorageProfileId: 'storage-1',
+      files: [{ module: '3', bootIndex: 7 }],
+      objectKeys: { '3': 'logs/dock.log' },
+    })
+  })
+
+  it.each([
+    ['empty files', { files: [] }, '至少选择'],
+    ['invalid module', { files: [{ module: '2', bootIndex: 1 }] }, '模块无效'],
+    ['negative boot index', { files: [{ module: '3', bootIndex: -1 }] }, 'Boot Index'],
+    ['topic injection', { gatewaySn: 'DOCK-1/services/#' }, 'SN 格式'],
+    ['missing object key', { objectKeys: {} }, '对象 Key'],
+    ['parent segment', { objectKeys: { '3': 'logs/../secret.log' } }, '.. 路径段'],
+    ['backslash', { objectKeys: { '3': 'logs\\dock.log' } }, '无效字符'],
+    ['oversized object key', { objectKeys: { '3': 'x'.repeat(1_025) } }, '过长'],
+    ['oversized gateway SN', { gatewaySn: 'D'.repeat(129) }, '过长'],
+    ['unknown request field', { accessKeySecret: 'must-not-cross-ipc' }, '不支持的字段'],
+    ['unknown object key field', { objectKeys: { '3': 'logs/dock.log', security_token: 'nope' } }, '不支持的字段'],
+    ['unknown file field', { files: [{ module: '3', bootIndex: 1, token: 'nope' }] }, '不支持的字段'],
+  ])('rejects remote log uploads with %s', (_label, overrides, error) => {
+    const request = {
+      profileId: 'profile-1',
+      gatewaySn: 'DOCK-1',
+      objectStorageProfileId: 'storage-1',
+      files: [{ module: '3', bootIndex: 7 }],
+      objectKeys: { '3': 'logs/dock.log' },
+      ...overrides,
+    }
+    expect(() => validateRemoteLogUploadRequest(request)).toThrow(error)
+  })
+
+  it('limits remote log upload file count', () => {
+    expect(() => validateRemoteLogUploadRequest({
+      profileId: 'profile-1',
+      gatewaySn: 'DOCK-1',
+      objectStorageProfileId: 'storage-1',
+      files: Array.from({ length: 1_001 }, () => ({ module: '3', bootIndex: 1 })),
+      objectKeys: { '3': 'logs/dock.log' },
+    })).toThrow('数量不能超过')
   })
 })

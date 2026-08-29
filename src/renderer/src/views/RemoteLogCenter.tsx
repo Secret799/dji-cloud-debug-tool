@@ -20,16 +20,16 @@ import type {
 import {
   buildLogCancelPayload,
   buildLogListPayload,
-  buildLogUploadPayload,
   latestLogFileList,
   latestLogProgress,
   latestLogServiceReplies,
   logFileId,
   type DjiLogModule,
 } from '../lib/dji-log'
-import { objectStorageProfileIssues, objectStorageProfileToConfig } from '../lib/object-storage'
+import { objectStorageProfileIssues } from '../lib/object-storage'
 
 interface RemoteLogCenterProps {
+  profileId: string
   gatewaySn: string
   status: ConnectionStatus
   busy: boolean
@@ -68,6 +68,7 @@ const resultLabel = (result: number | undefined): string =>
   result === undefined ? '已响应' : result === 0 ? '成功' : `失败 (${result})`
 
 export function RemoteLogCenter({
+  profileId,
   gatewaySn,
   status,
   busy,
@@ -161,15 +162,14 @@ export function RemoteLogCenter({
     }
     setAction('start')
     try {
-      const resolved = await window.djiApi.objectStorage.resolve(activeObjectStorage.id)
-      if (!resolved) throw new Error('所选对象存储配置已不存在')
-      const expiresAt = resolved.expire < 10_000_000_000 ? resolved.expire * 1000 : resolved.expire
-      if (expiresAt <= Date.now()) throw new Error('所选对象存储的临时凭证已过期，请先更新配置')
-      const payload = buildLogUploadPayload(selectedFiles, {
-        ...objectStorageProfileToConfig(resolved),
+      const result = await window.djiApi.remoteLogs.startUpload({
+        profileId,
+        gatewaySn,
+        objectStorageProfileId: activeObjectStorage.id,
+        files: selectedFiles.map(({ module, bootIndex }) => ({ module, bootIndex })),
         objectKeys,
       })
-      await publish(payload)
+      if (!result.ok) throw new Error(result.error ?? '日志上传请求发送失败')
       onNotify(`已发起 ${selectedFiles.length} 个日志文件上传`, 'success')
     } catch (error) {
       onNotify(error instanceof Error ? error.message : String(error), 'error')

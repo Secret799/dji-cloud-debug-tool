@@ -792,51 +792,6 @@ try {
       })
     }
 
-    if (await window.locator('.device-tabs button').filter({ hasText: '负载' }).count()) {
-      errors.push('dock: should not display the payload workbench tab')
-    }
-
-    const aircraftPayload = JSON.stringify({
-      data: {
-        battery: { capacity_percent: 76 },
-        horizontal_speed: 5.4,
-        latitude: 31.2304,
-        longitude: 121.4737,
-      },
-      gateway: 'DOCK-SMOKE-001',
-    })
-    await electronApp.evaluate(({ BrowserWindow }, event) => {
-      for (const instance of BrowserWindow.getAllWindows()) {
-        instance.webContents.send('runtime:event', event)
-      }
-    }, {
-      type: 'message',
-      profileId,
-      message: {
-        id: 'smoke-aircraft-osd',
-        profileId,
-        direction: 'in',
-        topic: 'thing/product/AIR-SMOKE-001/osd',
-        payload: aircraftPayload,
-        qos: 0,
-        retain: false,
-        timestamp: Date.now(),
-        size: Buffer.byteLength(aircraftPayload),
-      },
-    })
-    await window.locator('.device-row').filter({ hasText: 'AIR-SMOKE-001' }).click()
-    await window.waitForFunction(() => {
-      const telemetryText = document.querySelector('.telemetry-workspace')?.textContent ?? ''
-      return telemetryText.includes('76 %')
-        && telemetryText.includes('5.4 m/s')
-        && telemetryText.includes('31.2304')
-    })
-    const aircraftWorkbenchTabs = window.locator('.device-tabs')
-    for (const hiddenTab of ['事件', '最近指令', '控制中心']) {
-      if (await aircraftWorkbenchTabs.locator('button').filter({ hasText: hiddenTab }).count()) {
-        errors.push(`aircraft: should not display the ${hiddenTab} workbench tab`)
-      }
-    }
     await browserWindow.evaluate((instance) => instance.setContentSize(1440, 800))
     await window.waitForFunction(
       () => window.innerWidth === 1440 && window.innerHeight === 800,
@@ -845,7 +800,7 @@ try {
     )
     const payloadWorkbenchTab = window.locator('.device-tabs button').filter({ hasText: '负载' })
     if (await payloadWorkbenchTab.locator('small').innerText() !== '2') {
-      errors.push('payload: aircraft badge should count distinct gateway psdk_index values')
+      errors.push('payload: dock badge should count distinct psdk_index values')
     }
     await payloadWorkbenchTab.click()
     await window.locator('.payload-workspace').waitFor({ state: 'visible' })
@@ -896,6 +851,48 @@ try {
       undefined,
       { timeout: 5_000 },
     )
+
+    const aircraftPayload = JSON.stringify({
+      data: {
+        battery: { capacity_percent: 76 },
+        horizontal_speed: 5.4,
+        latitude: 31.2304,
+        longitude: 121.4737,
+      },
+      gateway: 'DOCK-SMOKE-001',
+    })
+    await electronApp.evaluate(({ BrowserWindow }, event) => {
+      for (const instance of BrowserWindow.getAllWindows()) {
+        instance.webContents.send('runtime:event', event)
+      }
+    }, {
+      type: 'message',
+      profileId,
+      message: {
+        id: 'smoke-aircraft-osd',
+        profileId,
+        direction: 'in',
+        topic: 'thing/product/AIR-SMOKE-001/osd',
+        payload: aircraftPayload,
+        qos: 0,
+        retain: false,
+        timestamp: Date.now(),
+        size: Buffer.byteLength(aircraftPayload),
+      },
+    })
+    await window.locator('.device-row').filter({ hasText: 'AIR-SMOKE-001' }).click()
+    await window.waitForFunction(() => {
+      const telemetryText = document.querySelector('.telemetry-workspace')?.textContent ?? ''
+      return telemetryText.includes('76 %')
+        && telemetryText.includes('5.4 m/s')
+        && telemetryText.includes('31.2304')
+    })
+    const aircraftWorkbenchTabs = window.locator('.device-tabs')
+    for (const hiddenTab of ['事件', '最近指令', '控制中心', '负载']) {
+      if (await aircraftWorkbenchTabs.locator('button').filter({ hasText: hiddenTab }).count()) {
+        errors.push(`aircraft: should not display the ${hiddenTab} workbench tab`)
+      }
+    }
     await window.getByRole('button', { name: '遥测', exact: true }).click()
     await window.locator('.telemetry-workspace').waitFor({ state: 'visible' })
     const aircraftTelemetry = await window.locator('.telemetry-workspace').textContent() ?? ''
@@ -948,7 +945,8 @@ try {
   if (messagesTabIndex < 0 || historyTabIndex !== messagesTabIndex + 1) {
     errors.push(`overview: recent commands should follow MQTT messages (${JSON.stringify(deviceTabLabels)})`)
   }
-  await window.getByRole('button', { name: '固件升级', exact: true }).click()
+  await window.getByRole('button', { name: '控制中心', exact: true }).click()
+  await window.locator('.control-center-tabs').getByRole('tab', { name: '固件升级', exact: true }).click()
   await window.locator('.firmware-workspace').waitFor({ state: 'visible' })
   if (await window.locator('.firmware-file-picker').count() !== 1) {
     errors.push('firmware: local package picker was not rendered')
@@ -1106,6 +1104,7 @@ try {
     { timeout: 5_000 },
   )
   await window.getByRole('button', { name: '控制中心', exact: true }).click()
+  await window.locator('.control-center-tabs').getByRole('tab', { name: '设备控制', exact: true }).click()
   await window.locator('.command-center').waitFor({ state: 'visible' })
   if (await window.getByText('请求响应记录', { exact: true }).count()) {
     errors.push('commands: duplicated request and response history is still visible')
@@ -1360,6 +1359,7 @@ try {
   await window.getByRole('button', { name: '设备工作台' }).click()
   await window.locator('.overview-view').waitFor({ state: 'visible' })
   await window.getByRole('button', { name: '控制中心', exact: true }).click()
+  await window.locator('.control-center-tabs').getByRole('tab', { name: '设备控制', exact: true }).click()
   await window.getByRole('button', { name: '相机与云台', exact: true }).click()
   const mediaServerOptions = await window.locator('.camera-stream-toolbar select').first().locator('option').allTextContents()
   if (!mediaServerOptions.some((option) => option.includes('冒烟测试流媒体 · 127.0.0.1'))) {

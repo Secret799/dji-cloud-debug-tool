@@ -2,10 +2,11 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ConnectionProfile } from '../shared/contracts'
 
 const electronMocks = vi.hoisted(() => ({
   userDataPath: '',
-  encryptString: vi.fn((value: string) => Buffer.from(value, 'utf8')),
+  encryptionAvailable: true,
   decryptString: vi.fn((value: Buffer) => value.toString('utf8')),
 }))
 
@@ -14,8 +15,7 @@ vi.mock('electron', () => ({
     getPath: () => electronMocks.userDataPath,
   },
   safeStorage: {
-    isEncryptionAvailable: () => true,
-    encryptString: electronMocks.encryptString,
+    isEncryptionAvailable: () => electronMocks.encryptionAvailable,
     decryptString: electronMocks.decryptString,
   },
 }))
@@ -28,8 +28,9 @@ describe('ProfileStore', () => {
   beforeEach(async () => {
     userDataPath = await mkdtemp(join(tmpdir(), 'dji-profile-store-'))
     electronMocks.userDataPath = userDataPath
-    electronMocks.encryptString.mockClear()
-    electronMocks.decryptString.mockClear()
+    electronMocks.encryptionAvailable = true
+    electronMocks.decryptString.mockReset()
+    electronMocks.decryptString.mockImplementation((value: Buffer) => value.toString('utf8'))
   })
 
   afterEach(async () => {
@@ -67,7 +68,7 @@ describe('ProfileStore', () => {
     expect(JSON.parse(await readFile(filePath, 'utf8'))).toMatchObject({ version: 1 })
   })
 
-  it('clears an encrypted password only when explicitly requested', async () => {
+  it('encrypts, resolves and clears a password in the application profile file', async () => {
     const store = new ProfileStore()
     const [base] = await store.list()
     const saved = await store.save({ ...base, password: 'secret' })
@@ -75,6 +76,10 @@ describe('ProfileStore', () => {
     expect(saved.hasStoredPassword).toBe(true)
     expect(await store.resolvePassword(base.id)).toBe('secret')
     expect((await store.getForConnection(base.id, ''))?.password).toBe('')
+    const encrypted = await readFile(join(userDataPath, 'connection-profiles.json'), 'utf8')
+    expect(encrypted).toContain('encryptedPassword')
+    expect(encrypted).toContain('dcdt:v1:k1:')
+    expect(encrypted).not.toContain('secret')
 
     const cleared = await store.save({
       ...saved,
@@ -85,6 +90,115 @@ describe('ProfileStore', () => {
     expect(cleared.hasStoredPassword).toBe(false)
     expect(cleared).not.toHaveProperty('clearStoredPassword')
     expect(await store.resolvePassword(base.id)).toBe('')
-    expect(await readFile(join(userDataPath, 'connection-profiles.json'), 'utf8')).not.toContain('encryptedPassword')
+    const stored = await readFile(join(userDataPath, 'connection-profiles.json'), 'utf8')
+    expect(stored).not.toContain('storedPassword')
+    expect(stored).not.toContain('encryptedPassword')
+  })
+
+  it('migrates plaintext credentials written by the transitional application version', async () => {
+    const store = new ProfileStore()
+    const [base] = await store.list()
+    const filePath = join(userDataPath, 'connection-profiles.json')
+    const document = JSON.parse(await readFile(filePath, 'utf8'))
+    document.profiles[0].storedPassword = 'transitional-secret'
+    await writeFile(filePath, JSON.stringify(document), 'utf8')
+
+    expect(await new ProfileStore().resolvePassword(base.id)).toBe('transitional-secret')
+    const migrated = await readFile(filePath, 'utf8')
+    expect(migrated).toContain('dcdt:v1:k1:')
+    expect(migrated).not.toContain('storedPassword')
+    expect(migrated).not.toContain('transitional-secret')
+  })
+
+  it('migrates legacy safeStorage credentials only when reading the old format', async () => {
+    const store = new ProfileStore()
+    const [base] = await store.list()
+    const filePath = join(userDataPath, 'connection-profiles.json')
+    const document = JSON.parse(await readFile(filePath, 'utf8'))
+    document.profiles[0].encryptedPassword = Buffer.from('legacy-secret', 'utf8').toString('base64')
+    await writeFile(filePath, JSON.stringify(document), 'utf8')
+
+    expect(await new ProfileStore().resolvePassword(base.id)).toBe('legacy-secret')
+    expect(electronMocks.decryptString).toHaveBeenCalledTimes(1)
+    const migrated = await readFile(filePath, 'utf8')
+    expect(migrated).toContain('dcdt:v1:k1:')
+    expect(migrated).not.toContain(Buffer.from('legacy-secret', 'utf8').toString('base64'))
+  })
+
+  it('keeps legacy ciphertext unchanged when system decryption is unavailable', async () => {
+    const store = new ProfileStore()
+    await store.list()
+    const filePath = join(userDataPath, 'connection-profiles.json')
+    const document = JSON.parse(await readFile(filePath, 'utf8'))
+    document.profiles[0].encryptedPassword = Buffer.from('legacy-secret', 'utf8').toString('base64')
+    const legacyDocument = JSON.stringify(document)
+    await writeFile(filePath, legacyDocument, 'utf8')
+    electronMocks.encryptionAvailable = false
+
+    const [profile] = await new ProfileStore().list()
+
+    expect(profile.hasStoredPassword).toBe(true)
+    expect(await readFile(filePath, 'utf8')).toBe(legacyDocument)
+    expect(electronMocks.decryptString).not.toHaveBeenCalled()
+  })
+
+  it('keeps legacy ciphertext unchanged when system decryption fails', async () => {
+    const store = new ProfileStore()
+    await store.list()
+    const filePath = join(userDataPath, 'connection-profiles.json')
+    const document = JSON.parse(await readFile(filePath, 'utf8'))
+    document.profiles[0].encryptedPassword = Buffer.from('legacy-secret', 'utf8').toString('base64')
+    const legacyDocument = JSON.stringify(document)
+    await writeFile(filePath, legacyDocument, 'utf8')
+    electronMocks.decryptString.mockImplementation(() => { throw new Error('denied') })
+
+    const [profile] = await new ProfileStore().list()
+
+    expect(profile.hasStoredPassword).toBe(true)
+    expect(await readFile(filePath, 'utf8')).toBe(legacyDocument)
+    expect(electronMocks.decryptString).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores injected internal fields and removes an empty transitional field', async () => {
+    const store = new ProfileStore()
+    const [base] = await store.list()
+    await store.save({
+      ...base,
+      password: 'real-secret',
+      storedPassword: 'injected-plaintext',
+      encryptedPassword: 'injected-ciphertext',
+    } as ConnectionProfile & { storedPassword: string; encryptedPassword: string })
+    const filePath = join(userDataPath, 'connection-profiles.json')
+    let stored = await readFile(filePath, 'utf8')
+    expect(stored).not.toContain('injected-plaintext')
+    expect(stored).not.toContain('injected-ciphertext')
+
+    const document = JSON.parse(stored)
+    document.profiles[0].storedPassword = ''
+    await writeFile(filePath, JSON.stringify(document), 'utf8')
+
+    expect(await new ProfileStore().resolvePassword(base.id)).toBe('real-secret')
+    stored = await readFile(filePath, 'utf8')
+    expect(stored).not.toContain('storedPassword')
+  })
+
+  it('does not overwrite an unmigratable transitional credential', async () => {
+    const store = new ProfileStore()
+    await store.list()
+    const filePath = join(userDataPath, 'connection-profiles.json')
+    const document = JSON.parse(await readFile(filePath, 'utf8'))
+    document.profiles[0].storedPassword = 'x'.repeat(64 * 1024 + 1)
+    delete document.profiles[0].encryptedPassword
+    const original = JSON.stringify(document)
+    await writeFile(filePath, original, 'utf8')
+
+    const [profile] = await new ProfileStore().list()
+    await expect(new ProfileStore().save({ ...profile, name: 'Changed' })).rejects.toThrow('凭据长度不能超过 64 KiB')
+    expect(await readFile(filePath, 'utf8')).toBe(original)
+
+    const replacementStore = new ProfileStore()
+    await replacementStore.save({ ...profile, password: 'replacement-secret' })
+    expect(await replacementStore.resolvePassword(profile.id)).toBe('replacement-secret')
+    expect(await readFile(filePath, 'utf8')).not.toContain('storedPassword')
   })
 })

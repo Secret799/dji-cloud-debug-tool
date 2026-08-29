@@ -140,7 +140,8 @@ try {
   await browserWindow.evaluate((instance) => instance.setContentSize(1480, 920))
   await window.waitForFunction(() => window.innerWidth === 1480 && window.innerHeight === 920)
   await window.getByRole('button', { name: '设备工作台' }).click()
-  await window.getByRole('button', { name: '远程日志', exact: true }).click()
+  await window.getByRole('button', { name: '控制中心', exact: true }).click()
+  await window.locator('.control-center-tabs').getByRole('tab', { name: '远程日志', exact: true }).click()
   await window.locator('.remote-log-center').waitFor({ state: 'visible' })
   if (await window.getByText('目标机场', { exact: true }).count()) errors.push('Redundant target dock selector is still visible')
   if (await window.locator('.remote-log-file-row').count() !== 2) errors.push('Expected two log file rows')
@@ -153,6 +154,46 @@ try {
   if (await storageSelect.locator('option').count() !== 2) errors.push('Remote logs did not expose both storage profiles')
   await storageSelect.selectOption('smoke-archive')
   if (await storageSelect.inputValue() !== 'smoke-archive') errors.push('Unable to switch the upload target storage')
+
+  await electronApp.evaluate(({ BrowserWindow, ipcMain }, smokeProfileId) => {
+    globalThis.__remoteLogSmokeRequests = []
+    ipcMain.removeHandler('remote-log:start-upload')
+    ipcMain.handle('remote-log:start-upload', (_event, request) => {
+      globalThis.__remoteLogSmokeRequests.push(request)
+      return { ok: true }
+    })
+    for (const instance of BrowserWindow.getAllWindows()) {
+      instance.webContents.send('runtime:event', {
+        type: 'status',
+        profileId: smokeProfileId,
+        status: 'connected',
+        at: Date.now(),
+      })
+    }
+  }, profileId)
+  await window.getByRole('button', { name: '发起上传', exact: true }).click()
+  await window.getByText('已发起 1 个日志文件上传', { exact: true }).waitFor({ state: 'visible' })
+  const remoteLogRequests = await electronApp.evaluate(() => globalThis.__remoteLogSmokeRequests)
+  if (remoteLogRequests.length !== 1) {
+    errors.push(`Expected one remote log upload request (${JSON.stringify(remoteLogRequests)})`)
+  } else {
+    const [request] = remoteLogRequests
+    if (
+      request.profileId !== profileId
+      || request.gatewaySn !== 'DOCK-LOG-SMOKE-001'
+      || request.objectStorageProfileId !== 'smoke-archive'
+      || request.files?.length !== 1
+      || request.files[0]?.module !== '3'
+      || request.files[0]?.bootIndex !== 101
+      || !request.objectKeys?.['3']
+    ) {
+      errors.push(`Remote log upload request shape is invalid (${JSON.stringify(request)})`)
+    }
+    const serializedRequest = JSON.stringify(request)
+    for (const secret of ['smoke-access-key', 'smoke-secret', 'smoke-token']) {
+      if (serializedRequest.includes(secret)) errors.push(`Remote log renderer request exposed ${secret}`)
+    }
+  }
 
   const layout = await window.evaluate(() => {
     const selectors = ['.remote-log-center', '.remote-log-toolbar', '.remote-log-layout', '.remote-log-files', '.remote-log-upload', '.remote-log-progress-panel']
@@ -192,7 +233,7 @@ try {
   await browserWindow.evaluate((instance) => instance.setContentSize(1200, 680))
   await window.waitForFunction(() => window.innerWidth === 1200 && window.innerHeight === 680)
   const compactLayout = await window.evaluate(async () => {
-    const scroller = document.querySelector('.device-tab-content.logs-tab')
+    const scroller = document.querySelector('.device-tab-content.commands-tab')
     const center = document.querySelector('.remote-log-center')
     const progress = document.querySelector('.remote-log-progress-panel')
     if (!(scroller instanceof HTMLElement) || !(center instanceof HTMLElement) || !(progress instanceof HTMLElement)) {

@@ -3,14 +3,16 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const electronMocks = vi.hoisted(() => ({ userDataPath: '' }))
+const electronMocks = vi.hoisted(() => ({
+  userDataPath: '',
+  decryptString: vi.fn((value: Buffer) => value.toString('utf8')),
+}))
 
 vi.mock('electron', () => ({
   app: { getPath: () => electronMocks.userDataPath },
   safeStorage: {
     isEncryptionAvailable: () => true,
-    encryptString: (value: string) => Buffer.from(value, 'utf8'),
-    decryptString: (value: Buffer) => value.toString('utf8'),
+    decryptString: electronMocks.decryptString,
   },
 }))
 
@@ -28,7 +30,7 @@ describe('MediaServerStore', () => {
     await rm(userDataPath, { recursive: true, force: true })
   })
 
-  it('creates one encrypted local ZLMediaKit profile', async () => {
+  it('creates one local ZLMediaKit profile with an application-encrypted secret', async () => {
     const store = new MediaServerStore()
     const profiles = await store.list()
     expect(profiles).toHaveLength(1)
@@ -42,6 +44,7 @@ describe('MediaServerStore', () => {
     })
     const stored = await readFile(join(userDataPath, 'media-servers.json'), 'utf8')
     expect(stored).toContain('encryptedSecret')
+    expect(stored).toContain('dcdt:v1:k1:')
     expect((await store.getWithSecret(LOCAL_ZLM_ID))?.secret).not.toBe('')
   })
 
@@ -66,6 +69,61 @@ describe('MediaServerStore', () => {
     })
     expect(saved).toMatchObject({ secret: '', hasStoredSecret: true })
     expect((await store.getWithSecret('remote-srs-1'))?.secret).toBe('server-secret')
+    expect(await readFile(join(userDataPath, 'media-servers.json'), 'utf8')).not.toContain('server-secret')
+  })
+
+  it('clears a stored API secret only when explicitly requested', async () => {
+    const store = new MediaServerStore()
+    const now = Date.now()
+    const saved = await store.save({
+      id: 'remote-srs-clear', name: 'SRS', kind: 'remote-srs', host: 'media.example.com',
+      apiProtocol: 'https', apiPort: 1985, httpProtocol: 'https', httpPort: 443,
+      rtmpPort: 1935, rtspPort: 0, webrtcPort: 8000, secret: 'server-secret',
+      createdAt: now, updatedAt: now,
+    })
+
+    const cleared = await store.save({ ...saved, clearStoredSecret: true })
+
+    expect(cleared.hasStoredSecret).toBe(false)
+    expect((await store.getWithSecret(saved.id))?.secret).toBe('')
+    const document = JSON.parse(await readFile(join(userDataPath, 'media-servers.json'), 'utf8'))
+    expect(document.servers.find((server: { id: string }) => server.id === saved.id)).not.toHaveProperty('encryptedSecret')
+  })
+
+  it('migrates a transitional plaintext API secret', async () => {
+    const store = new MediaServerStore()
+    await store.list()
+    const filePath = join(userDataPath, 'media-servers.json')
+    const document = JSON.parse(await readFile(filePath, 'utf8'))
+    document.servers[0].storedSecret = 'plain-media-secret'
+    delete document.servers[0].encryptedSecret
+    await writeFile(filePath, JSON.stringify(document), 'utf8')
+
+    expect((await new MediaServerStore().getWithSecret(LOCAL_ZLM_ID))?.secret).toBe('plain-media-secret')
+    const migrated = await readFile(filePath, 'utf8')
+    expect(migrated).not.toContain('storedSecret')
+    expect(migrated).not.toContain('plain-media-secret')
+    expect(migrated).toContain('dcdt:v1:k1:')
+  })
+
+  it('does not overwrite an unmigratable transitional API secret', async () => {
+    const store = new MediaServerStore()
+    await store.list()
+    const filePath = join(userDataPath, 'media-servers.json')
+    const document = JSON.parse(await readFile(filePath, 'utf8'))
+    document.servers[0].storedSecret = 'x'.repeat(64 * 1024 + 1)
+    delete document.servers[0].encryptedSecret
+    const original = JSON.stringify(document)
+    await writeFile(filePath, original, 'utf8')
+
+    const [profile] = await new MediaServerStore().list()
+    await expect(new MediaServerStore().save({ ...profile, name: 'Changed' })).rejects.toThrow('凭据长度不能超过 64 KiB')
+    expect(await readFile(filePath, 'utf8')).toBe(original)
+
+    const replacementStore = new MediaServerStore()
+    await replacementStore.save({ ...profile, secret: 'replacement-secret' })
+    expect((await replacementStore.getWithSecret(profile.id))?.secret).toBe('replacement-secret')
+    expect(await readFile(filePath, 'utf8')).not.toContain('storedSecret')
   })
 
   it('adds a WebRTC port to profiles saved by an older app version', async () => {

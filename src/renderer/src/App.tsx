@@ -192,6 +192,7 @@ export default function App() {
   const [mediaServersLoading, setMediaServersLoading] = useState(true)
   const [telemetryLayout, setTelemetryLayout] = useState<TelemetryLayoutConfig>(() => loadTelemetryLayout())
   const [connectionEditor, setConnectionEditor] = useState<{ profile: ConnectionProfile; isNew: boolean } | null>(null)
+  const connectionEditorLoadGenerationRef = useRef(0)
   const [deviceEditor, setDeviceEditor] = useState<{ device: DjiDevice; isNew: boolean } | null>(null)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [webDavStatus, setWebDavStatus] = useState({ configured: false, connected: false })
@@ -849,6 +850,31 @@ export default function App() {
     return () => window.clearInterval(timer)
   }, [])
 
+  const closeConnectionEditor = (): void => {
+    connectionEditorLoadGenerationRef.current += 1
+    setConnectionEditor(null)
+  }
+
+  const openNewConnectionEditor = (): void => {
+    connectionEditorLoadGenerationRef.current += 1
+    setConnectionEditor({ profile: createProfile(), isNew: true })
+  }
+
+  const openConnectionEditor = async (profile: ConnectionProfile): Promise<void> => {
+    const generation = connectionEditorLoadGenerationRef.current + 1
+    connectionEditorLoadGenerationRef.current = generation
+    try {
+      const resolved = await window.djiApi.profiles.resolve(profile.id)
+      if (connectionEditorLoadGenerationRef.current !== generation) return
+      if (!resolved) throw new Error('连接配置已不存在')
+      setConnectionEditor({ profile: resolved, isNew: false })
+    } catch (error) {
+      if (connectionEditorLoadGenerationRef.current !== generation) return
+      setConnectionEditor({ profile, isNew: false })
+      showToast(`解密已保存密码失败：${errorMessage(error)}，可重新输入后保存`, 'error')
+    }
+  }
+
   const handleSaveProfile = async (profile: ConnectionProfile): Promise<void> => {
     const isNew = !profilesRef.current.some((item) => item.id === profile.id)
     await enqueueProfileOperation(profile.id, async () => {
@@ -867,7 +893,7 @@ export default function App() {
       if (isNew) setActiveProfileId(saved.id)
       if (!(saved.id in statusesRef.current)) setStatusSnapshot(saved.id, 'disconnected')
       if (disconnectError) setStatusSnapshot(saved.id, 'error')
-      setConnectionEditor(null)
+      closeConnectionEditor()
       showToast(
         disconnectError
           ? `连接配置已保存，但旧连接未能断开：${disconnectError}`
@@ -910,7 +936,7 @@ export default function App() {
         setStatuses(nextStatuses)
         subscriptionSyncGenerationRef.current[profileId] = (subscriptionSyncGenerationRef.current[profileId] ?? 0) + 1
         setSubscriptionSyncingSnapshot(profileId, false)
-        setConnectionEditor(null)
+        closeConnectionEditor()
         showToast('连接已删除', 'success')
       })
     } catch (error) {
@@ -1329,7 +1355,7 @@ export default function App() {
       <div className="app-loading">
         <CircleAlert size={28} />
         <span>没有可用连接</span>
-        <button className="button primary" onClick={() => setConnectionEditor({ profile: createProfile(), isNew: true })}>新建连接</button>
+        <button className="button primary" onClick={openNewConnectionEditor}>新建连接</button>
       </div>
     )
   }
@@ -1446,8 +1472,8 @@ export default function App() {
             telemetry={activeTelemetry}
             selectedDeviceSn={selectedDeviceSn}
             onSelectProfile={setActiveProfileId}
-            onAddProfile={() => setConnectionEditor({ profile: createProfile(), isNew: true })}
-            onEditProfile={(profile) => setConnectionEditor({ profile, isNew: false })}
+            onAddProfile={openNewConnectionEditor}
+            onEditProfile={(profile) => void openConnectionEditor(profile)}
             onAddDevice={() => setDeviceEditor({ device: createDevice(), isNew: true })}
             onEditDevice={(device) => setDeviceEditor({ device, isNew: false })}
             onRemoveDevice={handleRemoveDevice}
@@ -1565,7 +1591,7 @@ export default function App() {
         <ConnectionModal
           profile={connectionEditor.profile}
           isNew={connectionEditor.isNew}
-          onClose={() => setConnectionEditor(null)}
+          onClose={closeConnectionEditor}
           onSave={handleSaveProfile}
           onRemove={handleRemoveProfile}
         />

@@ -10,6 +10,7 @@ import type {
   PublishRequest,
 } from '../shared/contracts'
 import { MAX_MQTT_PAYLOAD_BYTES } from '../shared/limits'
+import { redactMqttMessageRecord } from './mqtt-message-redaction'
 
 interface ActiveConnection {
   profile: ConnectionProfile
@@ -71,7 +72,7 @@ export class MqttConnectionManager {
         this.eventSink({
           type: 'message',
           profileId: profile.id,
-          message: {
+          message: redactMqttMessageRecord({
             id: crypto.randomUUID(),
             profileId: profile.id,
             direction: 'in',
@@ -83,7 +84,7 @@ export class MqttConnectionManager {
             timestamp: Date.now(),
             size: payload.byteLength,
             properties,
-          },
+          }),
         })
       })
 
@@ -154,7 +155,7 @@ export class MqttConnectionManager {
           this.eventSink({
             type: 'message',
             profileId: request.profileId,
-            message: {
+            message: redactMqttMessageRecord({
               id: crypto.randomUUID(),
               profileId: request.profileId,
               direction: 'out',
@@ -164,7 +165,7 @@ export class MqttConnectionManager {
               retain: request.retain,
               timestamp: Date.now(),
               size: payloadSize,
-            },
+            }),
           })
           resolve({ ok: true })
         },

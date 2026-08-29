@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Cloud, Eye, EyeOff, FlaskConical, Save, Trash2, X } from 'lucide-react'
+import { Cloud, FlaskConical, Save, Trash2, X } from 'lucide-react'
 import type { OperationResult, WebDavAuthType, WebDavConfig, WebDavOverview } from '../../../shared/contracts'
+import { SecretInput } from './SecretInput'
 import { Tooltip } from './Tooltip'
 
 interface WebDavSettingsModalProps {
@@ -26,7 +27,6 @@ const errorMessage = (error: unknown): string => error instanceof Error ? error.
 
 export function WebDavSettingsModal({ config, onClose, onSave, onRemove, onTest }: WebDavSettingsModalProps) {
   const [draft, setDraft] = useState<WebDavConfig>(() => config ? { ...config } : createConfig())
-  const [showSecret, setShowSecret] = useState(false)
   const [busy, setBusy] = useState<'save' | 'test' | 'remove' | null>(null)
   const [error, setError] = useState('')
   const [testPassed, setTestPassed] = useState(false)
@@ -104,6 +104,22 @@ export function WebDavSettingsModal({ config, onClose, onSave, onRemove, onTest 
     }
   }
 
+  const updateAuthType = (authType: WebDavAuthType): void => {
+    setDraft((current) => {
+      if ((current.authType === 'token') === (authType === 'token')) return { ...current, authType }
+      return {
+        ...current,
+        authType,
+        username: authType === 'token' ? '' : current.username,
+        secret: '',
+        hasStoredSecret: false,
+        clearStoredSecret: true,
+      }
+    })
+    setError('')
+    setTestPassed(false)
+  }
+
   const secretLabel = draft.authType === 'token' ? 'Token' : '密码'
 
   return (
@@ -132,7 +148,7 @@ export function WebDavSettingsModal({ config, onClose, onSave, onRemove, onTest 
             </label>
             <label className="field">
               <span>认证方式</span>
-              <select value={draft.authType} onChange={(event) => update('authType', event.target.value as WebDavAuthType)}>
+              <select value={draft.authType} onChange={(event) => updateAuthType(event.target.value as WebDavAuthType)}>
                 <option value="basic">Basic</option>
                 <option value="digest">Digest</option>
                 <option value="token">Token</option>
@@ -144,34 +160,18 @@ export function WebDavSettingsModal({ config, onClose, onSave, onRemove, onTest 
                 <input value={draft.username} onChange={(event) => update('username', event.target.value)} autoComplete="off" />
               </label>
             )}
-            <div className="field">
-              <span id="webdav-secret-label">{secretLabel}</span>
-              <div className="webdav-secret-input">
-                <input
-                  aria-labelledby="webdav-secret-label"
-                  type={showSecret ? 'text' : 'password'}
-                  value={draft.secret}
-                  onChange={(event) => update('secret', event.target.value)}
-                  placeholder={draft.hasStoredSecret ? `已安全保存，留空则保留原${secretLabel}` : `请输入${secretLabel}`}
-                  autoComplete="new-password"
-                />
-                <Tooltip label={showSecret ? `隐藏${secretLabel}` : `显示${secretLabel}`}>
-                  <button type="button" className="icon-button" onClick={() => setShowSecret((current) => !current)}>
-                    {showSecret ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </Tooltip>
-              </div>
-            </div>
-            {draft.hasStoredSecret && (
-              <label className="check-field">
-                <input
-                  type="checkbox"
-                  checked={Boolean(draft.clearStoredSecret)}
-                  onChange={(event) => update('clearStoredSecret', event.target.checked)}
-                />
-                <span>清除已保存的{secretLabel}</span>
-              </label>
-            )}
+            <SecretInput
+              key={draft.authType === 'token' ? 'token' : 'password'}
+              label={secretLabel}
+              value={draft.secret}
+              onChange={(secret) => setDraft((current) => ({
+                ...current,
+                secret,
+                clearStoredSecret: secret ? false : current.clearStoredSecret,
+              }))}
+              placeholder={draft.clearStoredSecret ? `请输入新${secretLabel}` : draft.hasStoredSecret ? '已加密保存' : `请输入${secretLabel}`}
+              disabled={Boolean(busy)}
+            />
             <label className="check-field webdav-insecure-field">
               <input
                 type="checkbox"

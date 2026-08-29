@@ -1,8 +1,6 @@
 import type { MqttMessageRecord } from '../../../shared/contracts'
-import type { ObjectStorageConfig, ObjectStorageProvider } from './object-storage'
 
 export type DjiLogModule = '0' | '3'
-export type DjiLogProvider = ObjectStorageProvider
 
 export interface DjiLogFile {
   module: DjiLogModule
@@ -11,10 +9,6 @@ export interface DjiLogFile {
   startTime: number
   endTime: number
   size: number
-}
-
-export interface DjiLogUploadConfig extends ObjectStorageConfig {
-  objectKeys: Partial<Record<DjiLogModule, string>>
 }
 
 export interface DjiLogProgress {
@@ -91,44 +85,6 @@ export const buildLogListPayload = (modules: DjiLogModule[]): string =>
 
 export const buildLogCancelPayload = (modules: DjiLogModule[]): string =>
   servicePayload('fileupload_update', { status: 'cancel', module_list: modules })
-
-export const buildLogUploadPayload = (
-  files: DjiLogFile[],
-  config: DjiLogUploadConfig,
-): string => {
-  const grouped = new Map<DjiLogModule, number[]>()
-  files.forEach((file) => {
-    const indexes = grouped.get(file.module) ?? []
-    if (!indexes.includes(file.bootIndex)) indexes.push(file.bootIndex)
-    grouped.set(file.module, indexes)
-  })
-
-  const uploadFiles = [...grouped.entries()].map(([module, indexes]) => {
-    const objectKey = config.objectKeys[module]?.trim()
-    if (!objectKey) throw new Error(`${module === '0' ? '飞行器' : '机场'}对象 Key 不能为空`)
-    return {
-      object_key: objectKey,
-      module,
-      list: indexes.map((bootIndex) => ({ boot_index: bootIndex })),
-    }
-  })
-
-  if (!uploadFiles.length) throw new Error('请至少选择一个日志文件')
-
-  return servicePayload('fileupload_start', {
-    bucket: config.bucket.trim(),
-    region: config.region.trim(),
-    credentials: {
-      access_key_id: config.credentials.accessKeyId.trim(),
-      access_key_secret: config.credentials.accessKeySecret,
-      expire: config.credentials.expire,
-      security_token: config.credentials.securityToken,
-    },
-    endpoint: config.endpoint.trim(),
-    provider: config.provider,
-    params: { files: uploadFiles },
-  })
-}
 
 export const parseLogFileList = (record: MqttMessageRecord): DjiLogFile[] | undefined => {
   if (record.direction !== 'in' || !record.topic.endsWith('/services_reply')) return undefined

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Check, ChevronDown, FileKey2, ShieldCheck, Trash2, X } from 'lucide-react'
 import type { ConnectionProfile, MqttProtocol } from '../../../shared/contracts'
+import { SecretInput } from './SecretInput'
 import { Tooltip } from './Tooltip'
 
 interface ConnectionModalProps {
@@ -146,19 +147,17 @@ export function ConnectionModal({ profile, isNew, onClose, onSave, onRemove }: C
               <span>用户名</span>
               <input value={draft.username} onChange={(event) => update('username', event.target.value)} autoComplete="off" />
             </label>
-            <label className="field">
-              <span>密码</span>
-              <input
-                type="password"
-                value={draft.password}
-                onChange={(event) => {
-                  const password = event.target.value
-                  setDraft((current) => current ? { ...current, password, clearStoredPassword: password ? false : current.clearStoredPassword } : current)
-                }}
-                placeholder={draft.clearStoredPassword ? '已选择清除，输入新密码可替换' : draft.hasStoredPassword ? '已安全保存，留空则保留' : '可选'}
-                autoComplete="new-password"
-              />
-            </label>
+            <SecretInput
+              key={draft.id}
+              label="密码"
+              value={draft.password}
+              onChange={(password) => setDraft((current) => current ? {
+                ...current,
+                password,
+                clearStoredPassword: password ? false : Boolean(current.hasStoredPassword),
+              } : current)}
+              placeholder={draft.clearStoredPassword ? '已选择清除，输入新密码可替换' : draft.hasStoredPassword ? '已加密保存' : '可选'}
+            />
           </div>
 
           {draft.hasStoredPassword && (

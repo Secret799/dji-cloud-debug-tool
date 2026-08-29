@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { ConnectionProfile, MqttMessageRecord } from '../../../shared/contracts'
+import type { ConnectionProfile, DjiDevice, MqttMessageRecord } from '../../../shared/contracts'
 import type { DeviceTelemetry } from './dji'
 import { deviceProvider, superDockSupportsCommand } from './superdock'
 import {
@@ -11,6 +11,7 @@ import {
   DJI_PRODUCT_NAMES,
   SUPERDOCK_PRODUCT_NAMES,
   extractTopicSn,
+  gatewayCapabilitiesForProvider,
   groupDeviceActivities,
   isPayloadActivity,
   isCommandUnsupportedForProvider,
@@ -20,6 +21,7 @@ import {
   parseServiceReply,
   productName,
   refreshServicePayload,
+  resolveGatewayProvider,
   retainRecentMessages,
   serviceMethodFromPayload,
   subscriptionsForDevice,
@@ -254,6 +256,26 @@ describe('DJI protocol helpers', () => {
     expect(isCommandUnsupportedForProvider('superdock', 'vendor_custom_command')).toBe(false)
     expect(isCommandUnsupportedForProvider('dji', 'vendor_custom_command')).toBe(false)
     expect(superDockSupportsCommand({ category: 'payload', method: 'future_registered_command' })).toBe(false)
+  })
+
+  it('resolves gateway capabilities from the reported product enum before configured defaults', () => {
+    const configured = { type: 'dock', provider: 'dji', dockModel: 'other' } as DjiDevice
+    const runtime = {
+      provider: 'dji',
+      identity: { domain: '3', productType: 88105, productSubType: 0 },
+    } as DeviceTelemetry
+
+    expect(resolveGatewayProvider(configured, runtime)).toBe('superdock')
+    expect(gatewayCapabilitiesForProvider('superdock')).toMatchObject({
+      deviceControl: true,
+      payload: true,
+      remoteLogs: false,
+      firmwareUpgrade: false,
+    })
+    expect(gatewayCapabilitiesForProvider(undefined)).toMatchObject({
+      deviceControl: false,
+      payload: false,
+    })
   })
 
   it('reuses an explicit business id across the two SuperDock LTE requests', () => {

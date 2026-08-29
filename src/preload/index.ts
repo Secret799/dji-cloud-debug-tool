@@ -14,6 +14,7 @@ import type {
   MqttRuntimeEvent,
   ObjectStorageProfile,
   PublishRequest,
+  RemoteLogUploadRequest,
   RtmpRelayStartRequest,
   SeiMessageDetailRequest,
   SeiParserEvent,
@@ -28,6 +29,7 @@ import type {
 const api: DjiDesktopApi = {
   profiles: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.profilesList),
+    resolve: (profileId: string) => ipcRenderer.invoke(IPC_CHANNELS.profilesResolve, profileId),
     save: (profile: ConnectionProfile) => ipcRenderer.invoke(IPC_CHANNELS.profilesSave, profile),
     remove: (profileId: string) => ipcRenderer.invoke(IPC_CHANNELS.profilesRemove, profileId),
   },
@@ -57,6 +59,7 @@ const api: DjiDesktopApi = {
   },
   media: {
     listServers: () => ipcRenderer.invoke(IPC_CHANNELS.mediaServersList),
+    resolveServer: (profileId: string) => ipcRenderer.invoke(IPC_CHANNELS.mediaServersResolve, profileId),
     saveServer: (profile: MediaServerProfile) => ipcRenderer.invoke(IPC_CHANNELS.mediaServersSave, profile),
     removeServer: (profileId: string) => ipcRenderer.invoke(IPC_CHANNELS.mediaServersRemove, profileId),
     checkServer: (profileId: string) => ipcRenderer.invoke(IPC_CHANNELS.mediaServersCheck, profileId),
@@ -86,6 +89,9 @@ const api: DjiDesktopApi = {
     remove: (profileId: string) => ipcRenderer.invoke(IPC_CHANNELS.objectStorageRemove, profileId),
     resolve: (profileId: string) => ipcRenderer.invoke(IPC_CHANNELS.objectStorageResolve, profileId),
   },
+  remoteLogs: {
+    startUpload: (request: RemoteLogUploadRequest) => ipcRenderer.invoke(IPC_CHANNELS.remoteLogStartUpload, request),
+  },
   firmware: {
     pickPackage: () => ipcRenderer.invoke(IPC_CHANNELS.firmwarePickPackage),
     uploadPackage: (request: FirmwareUploadRequest) => ipcRenderer.invoke(IPC_CHANNELS.firmwareUploadPackage, request),
@@ -108,6 +114,7 @@ const api: DjiDesktopApi = {
   },
   webdav: {
     getOverview: () => ipcRenderer.invoke(IPC_CHANNELS.webdavOverview),
+    resolveConfig: () => ipcRenderer.invoke(IPC_CHANNELS.webdavResolveConfig),
     saveConfig: (config: WebDavConfig) => ipcRenderer.invoke(IPC_CHANNELS.webdavSaveConfig, config),
     removeConfig: () => ipcRenderer.invoke(IPC_CHANNELS.webdavRemoveConfig),
     test: (config?: WebDavConfig) => ipcRenderer.invoke(IPC_CHANNELS.webdavTest, config),

@@ -66,13 +66,16 @@ import {
 } from '../lib/dji-dock3-field-metadata'
 import {
   FIELD_LABELS,
+  DJI_PRODUCT_NAMES,
   PRODUCT_NAMES,
+  SUPERDOCK_PRODUCT_NAMES,
   type CommandTransaction,
   type DeviceActivity,
   type DeviceTelemetry,
   type ServiceCaller,
   djiProductKey,
-  productName,
+  gatewayCapabilitiesForProvider,
+  resolveGatewayProvider,
   formatValue,
   isPayloadActivity,
   mergeNestedRecords,
@@ -86,7 +89,6 @@ import {
   SUPERDOCK_PROPERTY_DOC_DATE,
   deviceProvider,
   dockModelName,
-  providerFromIdentity,
 } from '../lib/superdock'
 import { findHmsErrorCode, lookupServiceError } from '../lib/dji-error-codes'
 import {
@@ -544,6 +546,7 @@ export function CommandHistory({
 }
 
 type WorkbenchTab = 'remote' | 'payload' | 'events' | 'logs' | 'firmware' | 'history' | 'commands' | 'messages'
+type ControlCenterTab = 'controls' | 'logs' | 'firmware'
 
 const deviceTypeCopy = {
   dock: { label: '机场', model: 'DJI Dock', icon: RadioTower },
@@ -1282,6 +1285,7 @@ export function Overview({
   mediaServers = [],
 }: OverviewProps) {
   const [activeTab, setActiveTab] = useState<WorkbenchTab>('remote')
+  const [activeControlCenterTab, setActiveControlCenterTab] = useState<ControlCenterTab>('controls')
   const [activeTelemetryTab, setActiveTelemetryTab] = useState<TelemetryTabId>('operation')
   const [activeTelemetrySection, setActiveTelemetrySection] = useState<TelemetrySectionId>()
   const [telemetrySearch, setTelemetrySearch] = useState('')
@@ -1296,17 +1300,14 @@ export function Overview({
   const configured = profile.devices.find((device) => device.sn === deviceSn)
   const deviceType = configured?.type ?? selected?.type
   const topologyProductKey = selected?.identity ? djiProductKey(selected.identity) : undefined
-  const selectedProvider = configured
-    ? deviceProvider(configured)
-    : selected?.provider ?? providerFromIdentity(selected?.identity)
-  const usesSuperDockGatewayCapabilities = selectedProvider === 'superdock'
-    || [configured?.parentSn, selected?.gatewaySn].some((gatewaySn) => {
-      if (!gatewaySn) return false
-      const configuredGateway = profile.devices.find((device) => device.sn === gatewaySn)
-      if (configuredGateway) return deviceProvider(configuredGateway) === 'superdock'
-      const runtimeGateway = telemetry.find((device) => device.sn === gatewaySn)
-      return (runtimeGateway?.provider ?? providerFromIdentity(runtimeGateway?.identity)) === 'superdock'
-    })
+  const selectedProvider = resolveGatewayProvider(configured, selected)
+  const gatewaySn = deviceType === 'dock' || deviceType === 'pilot'
+    ? deviceSn
+    : selected?.gatewaySn ?? configured?.parentSn
+  const configuredGateway = gatewaySn ? profile.devices.find((device) => device.sn === gatewaySn) : undefined
+  const runtimeGateway = gatewaySn ? telemetry.find((device) => device.sn === gatewaySn) : undefined
+  const gatewayProvider = resolveGatewayProvider(configuredGateway, runtimeGateway)
+  const gatewayCapabilities = gatewayCapabilitiesForProvider(gatewayProvider)
   const usesSuperDockMetadata = deviceType === 'dock' && selectedProvider === 'superdock'
   const usesDock2Metadata = deviceType === 'dock'
     && !usesSuperDockMetadata
@@ -1412,8 +1413,9 @@ export function Overview({
     const activity = parseDeviceActivity(record)
     return activity ? [activity] : []
   })
-  const payloadGatewaySn = deviceType === 'aircraft' ? selected?.gatewaySn ?? configured?.parentSn : undefined
-  const propertyGatewaySn = deviceType === 'aircraft' ? payloadGatewaySn : deviceSn
+  const aircraftGatewaySn = deviceType === 'aircraft' ? selected?.gatewaySn ?? configured?.parentSn : undefined
+  const propertyGatewaySn = deviceType === 'aircraft' ? aircraftGatewaySn : deviceSn
+  const payloadGatewaySn = deviceType === 'dock' ? deviceSn : aircraftGatewaySn
   const payloadRecords = payloadGatewaySn
     ? records.filter((record) => record.topic.includes(`/${payloadGatewaySn}/`))
     : []
@@ -1458,11 +1460,17 @@ export function Overview({
     : deviceType === 'dock' && selectedProvider === 'superdock'
       ? 'SuperDock 机场'
       : typeMeta.model
-  const identityMatchesProvider = !selected?.identity || providerFromIdentity(selected.identity) === selectedProvider
-  const deviceModel = (identityMatchesProvider ? productName(selected?.identity) : undefined)
-    ?? (identityMatchesProvider && productKey ? PRODUCT_NAMES[productKey] : undefined)
-    ?? (deviceType === 'aircraft' ? '飞机型号待识别' : deviceType === 'dock' ? configuredDockModel : typeMeta.model)
-  const providerName = selectedProvider === 'superdock' ? '草莓创新 SuperDock' : 'DJI'
+  const enumeratedDeviceModel = productKey
+    ? DJI_PRODUCT_NAMES[productKey] ?? SUPERDOCK_PRODUCT_NAMES[productKey]
+    : undefined
+  const deviceModel = (enumeratedDeviceModel
+    ?? (deviceType === 'aircraft' ? '飞机型号待识别' : deviceType === 'dock' ? configuredDockModel : typeMeta.model))
+    .replace(/^SuperDock\s+/, '')
+  const providerName = productKey && DJI_PRODUCT_NAMES[productKey]
+    ? 'DJI'
+    : productKey && SUPERDOCK_PRODUCT_NAMES[productKey]
+      ? '草莓创新'
+      : '未知'
   const identityProtocol = selected?.identity
     ? [selected.identity.thingVersion ? `v${selected.identity.thingVersion}` : undefined, selected.identity.channelIndex ? `通道 ${selected.identity.channelIndex}` : undefined]
       .filter(Boolean)
@@ -1477,26 +1485,30 @@ export function Overview({
     : '尚未上报'
   const tabs: { id: WorkbenchTab; label: string; icon: typeof Activity; count?: number }[] = [
     { id: 'remote', label: '遥测', icon: Activity },
-    { id: 'payload', label: '负载', icon: Box, count: payloadIndexes.length },
     { id: 'events', label: '事件', icon: Bell, count: hmsActivities.length },
-    { id: 'logs', label: '远程日志', icon: FileArchive },
-    { id: 'firmware', label: '固件升级', icon: Package },
     { id: 'commands', label: '控制中心', icon: Command },
+    { id: 'payload', label: '负载', icon: Box, count: payloadIndexes.length },
     { id: 'messages', label: 'MQTT 消息', icon: MessagesSquare, count: deviceRecords.length },
     { id: 'history', label: '最近指令', icon: Clock3, count: transactions.length },
   ]
-  const providerTabs = usesSuperDockGatewayCapabilities
-    ? tabs.filter((tab) => tab.id !== 'logs' && tab.id !== 'firmware')
-    : tabs
   const configuredTabs = configured
-    ? providerTabs
-    : providerTabs.filter((tab) => tab.id !== 'commands')
+    ? tabs.filter((tab) => (
+        (tab.id !== 'commands' || gatewayCapabilities.deviceControl)
+        && (tab.id !== 'payload' || gatewayCapabilities.payload)
+      ))
+    : tabs.filter((tab) => tab.id !== 'commands' && tab.id !== 'payload')
   const visibleTabs = deviceType === 'aircraft'
-    ? configuredTabs.filter((tab) => tab.id !== 'events' && tab.id !== 'logs' && tab.id !== 'history' && tab.id !== 'commands')
+    ? configuredTabs.filter((tab) => tab.id === 'remote' || tab.id === 'messages')
     : deviceType === 'dock'
-      ? configuredTabs.filter((tab) => tab.id !== 'payload')
-      : configuredTabs.filter((tab) => tab.id !== 'payload' && tab.id !== 'firmware')
+      ? configuredTabs
+      : configuredTabs.filter((tab) => tab.id !== 'payload')
   const activeWorkbenchTab = visibleTabs.some((tab) => tab.id === activeTab) ? activeTab : 'remote'
+  const supportsRemoteLogs = deviceType === 'dock' && gatewayCapabilities.remoteLogs
+  const supportsFirmwareUpgrade = deviceType === 'dock' && gatewayCapabilities.firmwareUpgrade
+  const effectiveControlCenterTab = (
+    (activeControlCenterTab === 'logs' && !supportsRemoteLogs)
+    || (activeControlCenterTab === 'firmware' && !supportsFirmwareUpgrade)
+  ) ? 'controls' : activeControlCenterTab
   const renderTelemetryTable = (categoryFields: typeof fields) => {
     type TelemetryField = (typeof fields)[number]
     type TelemetryTreeNode = {
@@ -1951,7 +1963,6 @@ export function Overview({
         </div>
         <div className="device-facts">
           <div><span>设备 SN</span><strong title={deviceSn}>{deviceSn}</strong></div>
-          <div><span>设备状态</span><strong className={deviceOnline ? 'online-text' : 'offline-text'}>{deviceStatus}</strong></div>
           <div><span>设备厂商</span><strong>{providerName}</strong></div>
           <div><span>设备型号</span><strong title={productKey}>{deviceModel}</strong></div>
           <div><span>产品枚举</span><strong title={productKey}>{productKey ?? '尚未上报'}</strong></div>
@@ -2033,55 +2044,73 @@ export function Overview({
           {activeWorkbenchTab === 'events' && (
             <DeviceEventWorkspace activities={generalActivities} onNotify={onNotify} />
           )}
-          {!usesSuperDockGatewayCapabilities && activeWorkbenchTab === 'logs' && onPublish && onNotify && onOpenOssManager && onSelectObjectStorage && (
-            <RemoteLogCenter
-              gatewaySn={deviceSn}
-              status={status}
-              busy={busy}
-              records={records}
-              objectStorageProfiles={objectStorageProfiles}
-              activeObjectStorageId={activeObjectStorageId}
-              onSelectObjectStorage={onSelectObjectStorage}
-              onPublish={onPublish}
-              onNotify={onNotify}
-              onOpenOssManager={onOpenOssManager}
-            />
-          )}
-          {!usesSuperDockGatewayCapabilities && activeWorkbenchTab === 'firmware' && onService && onSelectObjectStorage && onOpenOssManager && (
-            <FirmwareUpgradeCenter
-              profile={profile}
-              gatewaySn={deviceSn}
-              status={status}
-              busy={busy}
-              telemetry={telemetry}
-              records={records}
-              objectStorageProfiles={objectStorageProfiles}
-              activeObjectStorageId={activeObjectStorageId}
-              onSelectObjectStorage={onSelectObjectStorage}
-              onOpenOssManager={onOpenOssManager}
-              onService={onService}
-              onNotify={onNotify}
-            />
-          )}
           {activeWorkbenchTab === 'history' && (
             <CommandHistory transactions={transactions} onNotify={onNotify} />
           )}
-          {onPublish && configured && (
-            <div className="persistent-command-center" hidden={activeWorkbenchTab !== 'commands'}>
-              <CommandCenter
-                profile={profile}
-                status={status}
-                busy={busy}
-                selectedDeviceSn={deviceSn}
-                telemetry={telemetry}
-                onPublish={onPublish}
-                onService={onService}
-                onNotify={onNotify}
-                allowedCategories={['debug', 'flight', 'payload']}
-                mediaServers={mediaServers}
-              />
+          {configured && gatewayCapabilities.deviceControl && <section className="control-center-workspace" hidden={activeWorkbenchTab !== 'commands'}>
+            <nav className="control-center-tabs" aria-label="控制中心功能" role="tablist">
+              <button className={effectiveControlCenterTab === 'controls' ? 'active' : ''} role="tab" aria-selected={effectiveControlCenterTab === 'controls'} onClick={() => setActiveControlCenterTab('controls')}><Command size={15} /><span>设备控制</span></button>
+              {(supportsRemoteLogs || supportsFirmwareUpgrade) && (
+                <>
+                  {supportsRemoteLogs && (
+                  <button className={effectiveControlCenterTab === 'logs' ? 'active' : ''} role="tab" aria-selected={effectiveControlCenterTab === 'logs'} onClick={() => setActiveControlCenterTab('logs')}><FileArchive size={15} /><span>远程日志</span></button>
+                  )}
+                  {supportsFirmwareUpgrade && (
+                  <button className={effectiveControlCenterTab === 'firmware' ? 'active' : ''} role="tab" aria-selected={effectiveControlCenterTab === 'firmware'} onClick={() => setActiveControlCenterTab('firmware')}><Package size={15} /><span>固件升级</span></button>
+                  )}
+                </>
+              )}
+            </nav>
+            <div className={`control-center-content ${effectiveControlCenterTab}`}>
+              {onPublish && configured && (
+                <div className="persistent-command-center" hidden={activeWorkbenchTab !== 'commands' || effectiveControlCenterTab !== 'controls'}>
+                    <CommandCenter
+                      profile={profile}
+                      status={status}
+                      busy={busy}
+                      selectedDeviceSn={deviceSn}
+                      telemetry={telemetry}
+                      onPublish={onPublish}
+                      onService={onService}
+                      onNotify={onNotify}
+                      allowedCategories={['debug', 'flight', 'payload']}
+                      mediaServers={mediaServers}
+                    />
+                </div>
+              )}
+              {supportsRemoteLogs && effectiveControlCenterTab === 'logs' && onPublish && onNotify && onOpenOssManager && onSelectObjectStorage && (
+                <RemoteLogCenter
+                  profileId={profile.id}
+                  gatewaySn={deviceSn}
+                  status={status}
+                  busy={busy}
+                  records={records}
+                  objectStorageProfiles={objectStorageProfiles}
+                  activeObjectStorageId={activeObjectStorageId}
+                  onSelectObjectStorage={onSelectObjectStorage}
+                  onPublish={onPublish}
+                  onNotify={onNotify}
+                  onOpenOssManager={onOpenOssManager}
+                />
+              )}
+              {supportsFirmwareUpgrade && effectiveControlCenterTab === 'firmware' && onService && onSelectObjectStorage && onOpenOssManager && (
+                <FirmwareUpgradeCenter
+                  profile={profile}
+                  gatewaySn={deviceSn}
+                  status={status}
+                  busy={busy}
+                  telemetry={telemetry}
+                  records={records}
+                  objectStorageProfiles={objectStorageProfiles}
+                  activeObjectStorageId={activeObjectStorageId}
+                  onSelectObjectStorage={onSelectObjectStorage}
+                  onOpenOssManager={onOpenOssManager}
+                  onService={onService}
+                  onNotify={onNotify}
+                />
+              )}
             </div>
-          )}
+          </section>}
           {activeWorkbenchTab === 'messages' && onPublish && onExport && onClear && (
             <MqttConsole profile={profile} status={status} busy={busy} records={deviceRecords} selectedDeviceSn={deviceSn} onPublish={onPublish} onExport={onExport} onClear={onClear} />
           )}

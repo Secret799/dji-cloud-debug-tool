@@ -1,9 +1,12 @@
 import type {
   DeviceProvider,
-  DjiDevice,
   DjiDeviceIdentity,
   DockModel,
 } from '../../../shared/contracts'
+import {
+  isSuperDockModel,
+  resolveDeviceProvider,
+} from '../../../shared/device-provider'
 import type { CommandTemplate } from './dji'
 
 export interface SuperDockModelOption {
@@ -34,18 +37,12 @@ export const SUPERDOCK_MODELS: readonly SuperDockModelOption[] = Object.freeze([
 const SUPERDOCK_MODEL_BY_KEY = new Map(SUPERDOCK_MODELS.map((model) => [model.key, model]))
 const SUPERDOCK_MODEL_BY_PRODUCT_TYPE = new Map(SUPERDOCK_MODELS.map((model) => [model.productType, model]))
 
-export const isSuperDockModel = (model: DockModel | undefined): boolean =>
-  Boolean(model && SUPERDOCK_MODEL_BY_KEY.has(model))
+export { isSuperDockModel }
 
 export const defaultDockModel = (provider: DeviceProvider): DockModel =>
   provider === 'superdock' ? 's24m4' : 'dock2'
 
-export const deviceProvider = (device: Pick<DjiDevice, 'type' | 'provider' | 'dockModel'> | undefined): DeviceProvider => {
-  if (device?.type !== 'dock') return 'dji'
-  if (device.provider) return device.provider
-  if (isSuperDockModel(device.dockModel)) return 'superdock'
-  return 'dji'
-}
+export const deviceProvider = resolveDeviceProvider
 
 export const providerFromIdentity = (identity: DjiDeviceIdentity | undefined): DeviceProvider =>
   identity?.domain === '3' && SUPERDOCK_MODEL_BY_PRODUCT_TYPE.has(identity.productType) ? 'superdock' : 'dji'

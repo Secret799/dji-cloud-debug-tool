@@ -19,7 +19,7 @@ import {
   ShieldCheck,
   Trash2,
 } from 'lucide-react'
-import type { WebDavActivity, WebDavOverview, WebDavSyncStrategy, WebDavVersion } from '../../../shared/contracts'
+import type { WebDavActivity, WebDavConfig, WebDavOverview, WebDavSyncStrategy, WebDavVersion } from '../../../shared/contracts'
 import { Tooltip } from '../components/Tooltip'
 import { WebDavSettingsModal } from '../components/WebDavSettingsModal'
 import { applyRendererStorageSnapshot, rendererStorageSnapshot } from '../lib/webdav-sync'
@@ -91,6 +91,8 @@ export function DataVersions({ onNotify, onOverviewChange }: DataVersionsProps) 
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<'sync' | 'refresh' | 'config' | 'test' | `restore:${string}` | `delete:${string}` | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsConfig, setSettingsConfig] = useState<WebDavConfig | undefined>()
+  const settingsLoadGeneration = useRef(0)
   const [strategyOpen, setStrategyOpen] = useState(false)
   const strategyControlRef = useRef<HTMLDivElement>(null)
 
@@ -118,6 +120,8 @@ export function DataVersions({ onNotify, onOverviewChange }: DataVersionsProps) 
     setLoading(false)
   }), [applyOverview])
 
+  useEffect(() => () => { settingsLoadGeneration.current += 1 }, [])
+
   useEffect(() => {
     if (!strategyOpen) return
     const closeOnOutsideClick = (event: MouseEvent): void => {
@@ -134,9 +138,37 @@ export function DataVersions({ onNotify, onOverviewChange }: DataVersionsProps) 
     }
   }, [strategyOpen])
 
+  const openSettings = async (): Promise<void> => {
+    if (busy) return
+    const generation = settingsLoadGeneration.current + 1
+    settingsLoadGeneration.current = generation
+    setBusy('config')
+    try {
+      const resolved = overview.configured ? await window.djiApi.webdav.resolveConfig() : undefined
+      if (settingsLoadGeneration.current !== generation) return
+      setSettingsConfig(resolved ?? overview.config)
+      setSettingsOpen(true)
+    } catch (error) {
+      if (settingsLoadGeneration.current !== generation) return
+      setSettingsConfig(overview.config)
+      setSettingsOpen(true)
+      onNotify(`解密 WebDAV 密钥失败：${error instanceof Error ? error.message : String(error)}，可重新输入后保存`, 'error')
+    } finally {
+      if (settingsLoadGeneration.current === generation) {
+        setBusy((current) => current === 'config' ? null : current)
+      }
+    }
+  }
+
+  const closeSettings = (): void => {
+    settingsLoadGeneration.current += 1
+    setSettingsOpen(false)
+    setSettingsConfig(undefined)
+  }
+
   const syncNow = async (): Promise<void> => {
     if (!overview.configured) {
-      setSettingsOpen(true)
+      await openSettings()
       return
     }
     setBusy('sync')
@@ -257,7 +289,7 @@ export function DataVersions({ onNotify, onOverviewChange }: DataVersionsProps) 
           <strong>{statusTitle}<i /></strong>
           <small>{statusDetail}</small>
         </div>
-        <button className="button secondary compact" onClick={() => setSettingsOpen(true)}>
+        <button className="button secondary compact" disabled={Boolean(busy)} onClick={() => void openSettings()}>
           <Settings size={15} />{overview.configured ? '更改配置' : '配置 WebDAV'}
         </button>
       </section>
@@ -290,7 +322,7 @@ export function DataVersions({ onNotify, onOverviewChange }: DataVersionsProps) 
                   <button className="button secondary compact" disabled={Boolean(busy)} onClick={() => void testConnection()}>
                     <RefreshCw size={14} className={busy === 'test' ? 'spin' : ''} />测试连接
                   </button>
-                  <button className="button secondary compact" onClick={() => setSettingsOpen(true)}><Settings size={14} />编辑</button>
+                  <button className="button secondary compact" disabled={Boolean(busy)} onClick={() => void openSettings()}><Settings size={14} />编辑</button>
                 </div>
               </div>
               <div className="webdav-provider-facts">
@@ -304,7 +336,7 @@ export function DataVersions({ onNotify, onOverviewChange }: DataVersionsProps) 
               <Cloud size={30} />
               <strong>还没有云服务</strong>
               <span>配置 WebDAV 后，MQTT 连接与设备配置、流媒体和 OSS 配置将加密同步。</span>
-              <button className="button primary" onClick={() => setSettingsOpen(true)}><Settings size={15} />配置 WebDAV</button>
+              <button className="button primary" disabled={Boolean(busy)} onClick={() => void openSettings()}><Settings size={15} />配置 WebDAV</button>
             </section>
           )}
         </div>
@@ -443,12 +475,13 @@ export function DataVersions({ onNotify, onOverviewChange }: DataVersionsProps) 
 
       {settingsOpen && (
         <WebDavSettingsModal
-          config={overview.config}
-          onClose={() => setSettingsOpen(false)}
+          key={settingsConfig?.updatedAt ?? 'new'}
+          config={settingsConfig}
+          onClose={closeSettings}
           onSave={async (config) => {
             const next = await window.djiApi.webdav.saveConfig(config)
             applyOverview(next)
-            onNotify('WebDAV 配置已安全保存', 'success')
+            onNotify('WebDAV 配置已加密保存', 'success')
             return next
           }}
           onRemove={async () => {

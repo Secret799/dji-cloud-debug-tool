@@ -163,6 +163,80 @@ describe('MqttConnectionManager', () => {
     }))
   })
 
+  it('publishes the original payload but redacts the outbound message record', async () => {
+    const client = new FakeMqttClient()
+    client.publish.mockImplementation((_topic, _payload, _options, callback) => callback())
+    mqttMocks.connect.mockReturnValue(client)
+    const events: MqttRuntimeEvent[] = []
+    const manager = new MqttConnectionManager((event) => events.push(event))
+    await manager.connect(createProfile(), '')
+    const payload = JSON.stringify({
+      method: 'fileupload_start',
+      data: {
+        access_key_id: 'wire-access-id',
+        access_key_secret: 'wire-access-secret',
+        securityToken: 'wire-security-token',
+        objectKey: 'logs/device.zip',
+      },
+    })
+
+    await expect(manager.publish({
+      profileId: 'profile-1',
+      topic: 'thing/product/DOCK-1/services',
+      payload,
+      qos: 1,
+      retain: false,
+    })).resolves.toEqual({ ok: true })
+
+    expect(client.publish).toHaveBeenCalledWith(
+      'thing/product/DOCK-1/services',
+      payload,
+      { qos: 1, retain: false },
+      expect.any(Function),
+    )
+    const event = events.find((candidate) => candidate.type === 'message' && candidate.message.direction === 'out')
+    if (!event || event.type !== 'message') throw new Error('Outbound message event was not emitted')
+    expect(event.message.payload).not.toContain('wire-access-id')
+    expect(event.message.payload).not.toContain('wire-access-secret')
+    expect(event.message.payload).not.toContain('wire-security-token')
+    expect(JSON.parse(event.message.payload)).toMatchObject({
+      data: {
+        access_key_id: '[REDACTED]',
+        access_key_secret: '[REDACTED]',
+        securityToken: '[REDACTED]',
+        objectKey: 'logs/device.zip',
+      },
+    })
+  })
+
+  it('redacts credentials from inbound payloads and MQTT properties', async () => {
+    const client = new FakeMqttClient()
+    mqttMocks.connect.mockReturnValue(client)
+    const events: MqttRuntimeEvent[] = []
+    const manager = new MqttConnectionManager((event) => events.push(event))
+    await manager.connect(createProfile(), '')
+
+    client.emit('message', 'thing/product/DOCK-1/events', Buffer.from(JSON.stringify({
+      accessKeyId: 'inbound-access-id',
+      accessKeySecret: 'inbound-access-secret',
+      security_token: 'inbound-security-token',
+    })), {
+      qos: 0,
+      retain: false,
+      dup: false,
+      properties: { userProperties: { authorization: 'Bearer inbound-property-secret' } },
+    })
+
+    const event = events.find((candidate) => candidate.type === 'message' && candidate.message.direction === 'in')
+    if (!event || event.type !== 'message') throw new Error('Inbound message event was not emitted')
+    const serialized = JSON.stringify(event.message)
+    expect(serialized).not.toContain('inbound-access-id')
+    expect(serialized).not.toContain('inbound-access-secret')
+    expect(serialized).not.toContain('inbound-security-token')
+    expect(serialized).not.toContain('inbound-property-secret')
+    expect(serialized).toContain('[REDACTED]')
+  })
+
   it('rejects oversized outbound payloads and disconnects on oversized inbound payloads', async () => {
     const client = new FakeMqttClient()
     mqttMocks.connect.mockReturnValue(client)

@@ -1,7 +1,9 @@
-import { app, safeStorage } from 'electron'
+import { app } from 'electron'
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type { ObjectStorageProfile } from '../shared/contracts'
+import { encryptCredential, type CredentialContext } from './credential-crypto'
+import { hasStoredCredential, migrateStoredCredential, resolveStoredCredential } from './stored-credential'
 
 interface StoredObjectStorageProfile extends Omit<
   ObjectStorageProfile,
@@ -12,6 +14,8 @@ interface StoredObjectStorageProfile extends Omit<
   | 'clearStoredAccessKeySecret'
   | 'clearStoredSecurityToken'
 > {
+  storedAccessKeySecret?: string
+  storedSecurityToken?: string
   encryptedAccessKeySecret?: string
   encryptedSecurityToken?: string
 }
@@ -20,6 +24,18 @@ interface StoreDocument {
   version: 1
   profiles: StoredObjectStorageProfile[]
 }
+
+const accessKeySecretContext = (profileId: string): CredentialContext => ({
+  store: 'object-storage',
+  recordId: profileId,
+  field: 'access-key-secret',
+})
+
+const securityTokenContext = (profileId: string): CredentialContext => ({
+  store: 'object-storage',
+  recordId: profileId,
+  field: 'security-token',
+})
 
 export class ObjectStorageStore {
   private readonly filePath = join(app.getPath('userData'), 'object-storage-profiles.json')
@@ -37,8 +53,8 @@ export class ObjectStorageStore {
       const document = await this.readDocument()
       return document.profiles.map((profile) => ({
         ...this.toPublicProfile(profile),
-        accessKeySecret: this.decrypt(profile.encryptedAccessKeySecret, 'Access Key Secret'),
-        securityToken: this.decrypt(profile.encryptedSecurityToken, 'Security Token'),
+        accessKeySecret: this.decryptAccessKeySecret(profile),
+        securityToken: this.decryptSecurityToken(profile),
       }))
     })
   }
@@ -63,8 +79,8 @@ export class ObjectStorageStore {
       if (!profile) return undefined
       return {
         ...this.toPublicProfile(profile),
-        accessKeySecret: this.decrypt(profile.encryptedAccessKeySecret, 'Access Key Secret'),
-        securityToken: this.decrypt(profile.encryptedSecurityToken, 'Security Token'),
+        accessKeySecret: this.decryptAccessKeySecret(profile),
+        securityToken: this.decryptSecurityToken(profile),
       }
     })
   }
@@ -98,7 +114,30 @@ export class ObjectStorageStore {
     try {
       const parsed = JSON.parse(await readFile(this.filePath, 'utf8')) as Partial<StoreDocument>
       if (parsed.version !== 1 || !Array.isArray(parsed.profiles)) throw new Error('对象存储配置版本无效')
-      return parsed as StoreDocument
+      const document = parsed as StoreDocument
+      let migrated = false
+      for (const profile of document.profiles) {
+        const accessKeySecretMigration = migrateStoredCredential({
+          encrypted: profile.encryptedAccessKeySecret,
+          plaintext: profile.storedAccessKeySecret,
+        }, accessKeySecretContext(profile.id), 'Access Key Secret')
+        if (accessKeySecretMigration.migrated) {
+          profile.encryptedAccessKeySecret = accessKeySecretMigration.encrypted
+          delete profile.storedAccessKeySecret
+          migrated = true
+        }
+        const securityTokenMigration = migrateStoredCredential({
+          encrypted: profile.encryptedSecurityToken,
+          plaintext: profile.storedSecurityToken,
+        }, securityTokenContext(profile.id), 'Security Token')
+        if (securityTokenMigration.migrated) {
+          profile.encryptedSecurityToken = securityTokenMigration.encrypted
+          delete profile.storedSecurityToken
+          migrated = true
+        }
+      }
+      if (migrated) await this.writeDocument(document)
+      return document
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
       const document: StoreDocument = { version: 1, profiles: [] }
@@ -118,12 +157,33 @@ export class ObjectStorageStore {
       hasStoredSecurityToken: _hasStoredSecurityToken,
       clearStoredAccessKeySecret,
       clearStoredSecurityToken,
+      storedAccessKeySecret: _storedAccessKeySecret,
+      storedSecurityToken: _storedSecurityToken,
+      encryptedAccessKeySecret: _inputEncryptedAccessKeySecret,
+      encryptedSecurityToken: _inputEncryptedSecurityToken,
       ...plain
-    } = profile
-    let encryptedAccessKeySecret = clearStoredAccessKeySecret ? undefined : existing?.encryptedAccessKeySecret
-    let encryptedSecurityToken = clearStoredSecurityToken ? undefined : existing?.encryptedSecurityToken
-    if (accessKeySecret) encryptedAccessKeySecret = this.encrypt(accessKeySecret, 'Access Key Secret')
-    if (securityToken) encryptedSecurityToken = this.encrypt(securityToken, 'Security Token')
+    } = profile as ObjectStorageProfile & {
+      storedAccessKeySecret?: unknown
+      storedSecurityToken?: unknown
+      encryptedAccessKeySecret?: unknown
+      encryptedSecurityToken?: unknown
+    }
+    let encryptedAccessKeySecret = existing?.encryptedAccessKeySecret
+    let encryptedSecurityToken = existing?.encryptedSecurityToken
+    if (clearStoredAccessKeySecret) {
+      encryptedAccessKeySecret = undefined
+    } else if (accessKeySecret) {
+      encryptedAccessKeySecret = encryptCredential(accessKeySecret, accessKeySecretContext(profile.id))
+    } else if (!encryptedAccessKeySecret && existing?.storedAccessKeySecret) {
+      encryptedAccessKeySecret = encryptCredential(existing.storedAccessKeySecret, accessKeySecretContext(profile.id))
+    }
+    if (clearStoredSecurityToken) {
+      encryptedSecurityToken = undefined
+    } else if (securityToken) {
+      encryptedSecurityToken = encryptCredential(securityToken, securityTokenContext(profile.id))
+    } else if (!encryptedSecurityToken && existing?.storedSecurityToken) {
+      encryptedSecurityToken = encryptCredential(existing.storedSecurityToken, securityTokenContext(profile.id))
+    }
     return {
       ...plain,
       name: profile.name.trim(),
@@ -138,25 +198,39 @@ export class ObjectStorageStore {
   }
 
   private toPublicProfile(profile: StoredObjectStorageProfile): ObjectStorageProfile {
-    const { encryptedAccessKeySecret, encryptedSecurityToken, ...plain } = profile
+    const {
+      storedAccessKeySecret,
+      storedSecurityToken,
+      encryptedAccessKeySecret,
+      encryptedSecurityToken,
+      clearStoredAccessKeySecret: _clearStoredAccessKeySecret,
+      clearStoredSecurityToken: _clearStoredSecurityToken,
+      ...plain
+    } = profile as StoredObjectStorageProfile & {
+      clearStoredAccessKeySecret?: boolean
+      clearStoredSecurityToken?: boolean
+    }
     return {
       ...plain,
       accessKeySecret: '',
       securityToken: '',
-      hasStoredAccessKeySecret: Boolean(encryptedAccessKeySecret),
-      hasStoredSecurityToken: Boolean(encryptedSecurityToken),
+      hasStoredAccessKeySecret: hasStoredCredential({ encrypted: encryptedAccessKeySecret, plaintext: storedAccessKeySecret }),
+      hasStoredSecurityToken: hasStoredCredential({ encrypted: encryptedSecurityToken, plaintext: storedSecurityToken }),
     }
   }
 
-  private encrypt(value: string, label: string): string {
-    if (!safeStorage.isEncryptionAvailable()) throw new Error(`系统安全存储当前不可用，${label} 无法保存`)
-    return safeStorage.encryptString(value).toString('base64')
+  private decryptAccessKeySecret(profile: StoredObjectStorageProfile): string {
+    return resolveStoredCredential({
+      encrypted: profile.encryptedAccessKeySecret,
+      plaintext: profile.storedAccessKeySecret,
+    }, accessKeySecretContext(profile.id), 'Access Key Secret')
   }
 
-  private decrypt(value: string | undefined, label: string): string {
-    if (!value) return ''
-    if (!safeStorage.isEncryptionAvailable()) throw new Error(`系统安全存储当前不可用，无法读取 ${label}`)
-    return safeStorage.decryptString(Buffer.from(value, 'base64'))
+  private decryptSecurityToken(profile: StoredObjectStorageProfile): string {
+    return resolveStoredCredential({
+      encrypted: profile.encryptedSecurityToken,
+      plaintext: profile.storedSecurityToken,
+    }, securityTokenContext(profile.id), 'Security Token')
   }
 
   private async writeDocument(document: StoreDocument): Promise<void> {

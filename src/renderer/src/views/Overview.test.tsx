@@ -297,7 +297,7 @@ describe('Overview DJI field presentation', () => {
     expect(markup).toContain('aria-label="自定义水平速度字段详情"')
   })
 
-  it('uses the configured SuperDock provider ahead of an unknown runtime product type', () => {
+  it('shows an unknown vendor when the product enum is not registered', () => {
     const profile = {
       id: 'profile',
       name: 'SuperDock',
@@ -339,14 +339,16 @@ describe('Overview DJI field presentation', () => {
       />,
     )
 
-    expect(markup).toContain('<span>设备厂商</span><strong>草莓创新 SuperDock</strong>')
-    expect(markup).toContain('<span>设备型号</span><strong title="3-88999-0">SuperDock S24M4</strong>')
-    expect(markup).toContain('aria-label="空中回传（无人机到机场）字段详情"')
-    expect(markup).toContain('aria-label="设置空中回传（无人机到机场）"')
+    expect(markup).toContain('<span>设备厂商</span><strong>未知</strong>')
+    expect(markup).toContain('<span>设备型号</span><strong title="3-88999-0">S24M4</strong>')
+    expect(markup).toContain('air_transfer_enable')
+    expect(markup).not.toContain('aria-label="设置空中回传（无人机到机场）"')
     const deviceTabs = markup.match(/<nav class="device-tabs"[\s\S]*?<\/nav>/)?.[0] ?? ''
-    expect(deviceTabs).toContain('<span>控制中心</span>')
+    expect(deviceTabs).not.toContain('<span>控制中心</span>')
+    expect(deviceTabs).not.toContain('<span>负载</span>')
     expect(deviceTabs).not.toContain('<span>远程日志</span>')
     expect(deviceTabs).not.toContain('<span>固件升级</span>')
+    expect(markup).not.toContain('class="control-center-workspace"')
   })
 
   it('inherits SuperDock workspace restrictions through a configured parent gateway', () => {
@@ -394,6 +396,42 @@ describe('Overview DJI field presentation', () => {
     expect(markup).toContain('aria-label="水平速度字段详情"')
     const deviceTabs = markup.match(/<nav class="device-tabs"[\s\S]*?<\/nav>/)?.[0] ?? ''
     expect(deviceTabs).not.toContain('<span>固件升级</span>')
+  })
+
+  it('uses a SuperDock product enum even when the configured provider defaults to DJI', () => {
+    const profile = {
+      id: 'profile',
+      name: 'Mixed provider',
+      devices: [{
+        id: 'dock', name: '草莓机场', sn: 'SUPERDOCK-1', type: 'dock', dockModel: 'other',
+      }],
+    } as ConnectionProfile
+    const markup = renderToStaticMarkup(
+      <Overview
+        profile={profile}
+        telemetry={[{
+          profileId: 'profile', sn: 'SUPERDOCK-1', type: 'dock', name: '草莓机场', online: true,
+          lastSeenAt: Date.now(), lastTopic: 'sys/product/SUPERDOCK-1/status',
+          identity: { domain: '3', productType: 88105, productSubType: 0 },
+          status: {}, state: {}, osd: {},
+        }]}
+        selectedDeviceSn="SUPERDOCK-1"
+        records={[]}
+        transactions={[]}
+        onPublish={async () => ({ ok: true })}
+      />,
+    )
+
+    expect(markup).toContain('<span>设备厂商</span><strong>草莓创新</strong>')
+    expect(markup).toContain('<span>设备型号</span><strong title="3-88105-0">S25M400</strong>')
+    const deviceTabs = markup.match(/<nav class="device-tabs"[\s\S]*?<\/nav>/)?.[0] ?? ''
+    expect(deviceTabs).toContain('<span>控制中心</span>')
+    expect(deviceTabs).toContain('<span>负载</span>')
+    const controlCenterTabs = markup.match(/<nav class="control-center-tabs"[\s\S]*?<\/nav>/)?.[0] ?? ''
+    expect(controlCenterTabs).not.toContain('<span>远程日志</span>')
+    expect(controlCenterTabs).not.toContain('<span>固件升级</span>')
+    expect(markup).toContain('机场推杆')
+    expect(markup).not.toContain('机场补光灯')
   })
 
   it('inherits SuperDock workspace restrictions through a runtime gateway', () => {
@@ -521,12 +559,13 @@ describe('Overview DJI field presentation', () => {
       />,
     )
 
-    expect(runtimeProviderMarkup).toContain('<span>设备厂商</span><strong>草莓创新 SuperDock</strong>')
-    expect(runtimeProviderMarkup).toContain('<span>设备型号</span><strong title="3-2-0">SuperDock 机场</strong>')
+    expect(runtimeProviderMarkup).toContain('<span>设备厂商</span><strong>DJI</strong>')
+    expect(runtimeProviderMarkup).toContain('<span>设备型号</span><strong title="3-2-0">DJI Dock 2</strong>')
     expect(runtimeProviderMarkup).not.toContain('<span>控制中心</span>')
+    expect(runtimeProviderMarkup).not.toContain('class="control-center-workspace"')
     expect(runtimeProviderMarkup).not.toContain('class="persistent-command-center"')
-    expect(topologyProviderMarkup).toContain('<span>设备厂商</span><strong>草莓创新 SuperDock</strong>')
-    expect(topologyProviderMarkup).toContain('SuperDock S2301')
+    expect(topologyProviderMarkup).toContain('<span>设备厂商</span><strong>草莓创新</strong>')
+    expect(topologyProviderMarkup).toContain('S2301')
   })
 
   it('uses device-type-specific status copy in the summary', () => {
@@ -551,6 +590,10 @@ describe('Overview DJI field presentation', () => {
     expect(markup).toContain('DJI Pilot')
     expect(markup).toContain('<span>固件版本</span><strong title="尚未上报">尚未上报</strong>')
     expect(markup).not.toContain('切换设备')
+    const controlCenterTabs = markup.match(/<nav class="control-center-tabs"[\s\S]*?<\/nav>/)?.[0] ?? ''
+    expect(controlCenterTabs).toContain('<span>设备控制</span>')
+    expect(controlCenterTabs).not.toContain('<span>远程日志</span>')
+    expect(controlCenterTabs).not.toContain('<span>固件升级</span>')
   })
 
   it('maps the aircraft model key instead of displaying a payload index', () => {
@@ -630,7 +673,8 @@ describe('Overview DJI field presentation', () => {
     expect(deviceTabs).toContain('<span>遥测</span>')
     expect(deviceTabs).not.toContain('<span>控制中心</span>')
     expect(deviceTabs).toContain('<span>MQTT 消息</span>')
-    expect(deviceTabs).toContain('<span>负载</span><small>1</small>')
+    expect(deviceTabs).not.toContain('<span>负载</span>')
+    expect(deviceTabs).not.toContain('<span>固件升级</span>')
     expect(deviceTabs).not.toContain('<span>事件</span>')
     expect(deviceTabs).not.toContain('<span>最近指令</span>')
   })
@@ -849,6 +893,15 @@ describe('Overview DJI field presentation', () => {
     expect(markup).toContain('机场在线')
     expect(markup).toContain('DJI Dock 2')
     expect(markup).toContain('控制中心')
+    const deviceTabs = markup.match(/<nav class="device-tabs"[\s\S]*?<\/nav>/)?.[0] ?? ''
+    expect(deviceTabs).not.toContain('<span>远程日志</span>')
+    expect(deviceTabs).not.toContain('<span>固件升级</span>')
+    expect(deviceTabs).toContain('<span>负载</span><small>0</small>')
+    expect(deviceTabs.indexOf('<span>负载</span>')).toBeGreaterThan(deviceTabs.indexOf('<span>控制中心</span>'))
+    const controlCenterTabs = markup.match(/<nav class="control-center-tabs"[\s\S]*?<\/nav>/)?.[0] ?? ''
+    expect(controlCenterTabs).toContain('<span>设备控制</span>')
+    expect(controlCenterTabs).toContain('<span>远程日志</span>')
+    expect(controlCenterTabs).toContain('<span>固件升级</span>')
     expect(markup.match(/最近指令/g)).toHaveLength(1)
     expect(markup).toContain('aria-label="舱盖状态字段详情"')
     expect(markup).toContain('aria-label="搜索遥测字段"')
@@ -912,7 +965,7 @@ describe('Overview DJI field presentation', () => {
     expect(markup).toContain('环境数据')
     expect(markup).toContain('网络与通信')
     expect(markup).toContain('地理位置与备降')
-    expect(markup).not.toContain('>负载</span>')
+    expect(markup).toContain('>负载</span>')
     expect(markup).toContain('负载与云台')
     expect(markup).toContain('机场设备')
     expect(markup).toContain('运维信息')

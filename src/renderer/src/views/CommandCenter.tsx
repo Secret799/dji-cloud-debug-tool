@@ -27,6 +27,7 @@ import {
   buildServicePayload,
   commandTemplatesForProvider,
   isCommandUnsupportedForProvider,
+  resolveGatewayProvider,
   mergeNestedRecords,
   parseServicePayload,
   refreshServicePayload,
@@ -158,7 +159,8 @@ export function CommandCenter({
         : ''
   const [gatewaySn, setGatewaySn] = useState(contextualGatewaySn || gatewayDevices[0]?.sn || '')
   const contextualGateway = gatewayDevices.find((device) => device.sn === gatewaySn) ?? gatewayDevices[0]
-  const provider = deviceProvider(contextualGateway)
+  const gatewayTelemetry = telemetry.find((device) => device.sn === gatewaySn)
+  const provider = resolveGatewayProvider(contextualGateway, gatewayTelemetry) ?? deviceProvider(contextualGateway)
   const isSuperDock = provider === 'superdock'
   const providerCommands = useMemo(() => commandTemplatesForProvider(provider), [provider])
   const commandById = (id: string | undefined): CommandTemplate | undefined =>
@@ -201,7 +203,6 @@ export function CommandCenter({
       ? { ...command.data, psdk_index: defaultPsdkIndex }
       : command.data
   const needsGatewaySelection = !contextualGatewaySn && gatewayDevices.length > 1
-  const gatewayTelemetry = telemetry.find((device) => device.sn === gatewaySn)
   const configuredAircraft = profile.devices.find((device) => device.type === 'aircraft' && device.parentSn === gatewaySn)
   const relatedAircraftTelemetry = telemetry.find((device) =>
     device.type === 'aircraft'

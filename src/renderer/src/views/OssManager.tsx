@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Cloud, Database, KeyRound, Plus, Save, ShieldCheck, Trash2 } from 'lucide-react'
 import type { ObjectStorageProfile, ObjectStorageProvider, OperationResult } from '../../../shared/contracts'
 import { createObjectStorageProfile, objectStorageProfileIssues } from '../lib/object-storage'
+import { SecretInput } from '../components/SecretInput'
 import { Tooltip } from '../components/Tooltip'
 
 interface OssManagerProps {
@@ -33,23 +34,57 @@ export function OssManager({ profiles, selectedId, onSelect, onSave, onRemove, o
   const [expire, setExpire] = useState(selected?.expire ? String(selected.expire) : String(draft.expire))
   const [isNew, setIsNew] = useState(!selected)
   const [saving, setSaving] = useState(false)
+  const resolveGeneration = useRef(0)
+
+  const resolveProfile = async (profile: ObjectStorageProfile, generation: number): Promise<void> => {
+    try {
+      const resolved = await window.djiApi.objectStorage.resolve(profile.id)
+      if (resolveGeneration.current !== generation || !resolved) return
+      setDraft((current) => {
+        if (current.id !== resolved.id) return current
+        return {
+          ...current,
+          accessKeySecret: current.accessKeySecret || current.clearStoredAccessKeySecret
+            ? current.accessKeySecret
+            : resolved.accessKeySecret,
+          securityToken: current.securityToken || current.clearStoredSecurityToken
+            ? current.securityToken
+            : resolved.securityToken,
+          hasStoredAccessKeySecret: resolved.hasStoredAccessKeySecret,
+          hasStoredSecurityToken: resolved.hasStoredSecurityToken,
+        }
+      })
+    } catch (error) {
+      if (resolveGeneration.current !== generation) return
+      onNotify(`解密对象存储凭据失败：${error instanceof Error ? error.message : String(error)}，可重新输入后保存`, 'error')
+    }
+  }
 
   useEffect(() => {
     const current = profiles.find((profile) => profile.id === selectedId)
     if (!current) return
+    const generation = resolveGeneration.current + 1
+    resolveGeneration.current = generation
     setDraft(cloneProfile(current))
     setExpire(String(current.expire))
     setIsNew(false)
+    void resolveProfile(current, generation)
   }, [profiles, selectedId])
 
+  useEffect(() => () => { resolveGeneration.current += 1 }, [])
+
   const editProfile = (profile: ObjectStorageProfile): void => {
+    const generation = resolveGeneration.current + 1
+    resolveGeneration.current = generation
     onSelect(profile.id)
     setDraft(cloneProfile(profile))
     setExpire(String(profile.expire))
     setIsNew(false)
+    if (profile.id === selectedId) void resolveProfile(profile, generation)
   }
 
   const createProfile = (): void => {
+    resolveGeneration.current += 1
     const next = createObjectStorageProfile()
     setDraft(next)
     setExpire(String(next.expire))
@@ -66,6 +101,7 @@ export function OssManager({ profiles, selectedId, onSelect, onSave, onRemove, o
     setSaving(true)
     try {
       const saved = await onSave(next)
+      resolveGeneration.current += 1
       setDraft(cloneProfile(saved))
       setExpire(String(saved.expire))
       setIsNew(false)
@@ -144,14 +180,34 @@ export function OssManager({ profiles, selectedId, onSelect, onSave, onRemove, o
             <div className="oss-form-group-title"><KeyRound size={15} /><span>访问凭证</span></div>
             <div className="field-grid two-columns">
               <label className="field"><span>Access Key ID</span><input value={draft.accessKeyId} onChange={(event) => setDraft((current) => ({ ...current, accessKeyId: event.target.value }))} /></label>
-              <label className="field"><span>Access Key Secret{draft.hasStoredAccessKeySecret && !draft.accessKeySecret ? '（已保存，留空保持不变）' : ''}</span><input type="password" value={draft.accessKeySecret} onChange={(event) => setDraft((current) => ({ ...current, accessKeySecret: event.target.value, clearStoredAccessKeySecret: false }))} /></label>
-              <label className="field"><span>Security Token{draft.hasStoredSecurityToken && !draft.securityToken ? '（已保存，留空保持不变）' : ''}</span><input type="password" value={draft.securityToken} onChange={(event) => setDraft((current) => ({ ...current, securityToken: event.target.value, clearStoredSecurityToken: false }))} /></label>
+              <SecretInput
+                key={`${draft.id}:access-key-secret`}
+                label="Access Key Secret"
+                value={draft.accessKeySecret}
+                onChange={(accessKeySecret) => setDraft((current) => ({
+                  ...current,
+                  accessKeySecret,
+                  clearStoredAccessKeySecret: accessKeySecret ? false : Boolean(current.hasStoredAccessKeySecret),
+                }))}
+                placeholder={draft.clearStoredAccessKeySecret ? '请输入新密钥' : draft.hasStoredAccessKeySecret ? '已加密保存' : '必填'}
+              />
+              <SecretInput
+                key={`${draft.id}:security-token`}
+                label="Security Token"
+                value={draft.securityToken}
+                onChange={(securityToken) => setDraft((current) => ({
+                  ...current,
+                  securityToken,
+                  clearStoredSecurityToken: securityToken ? false : Boolean(current.hasStoredSecurityToken),
+                }))}
+                placeholder={draft.clearStoredSecurityToken ? '保存后清除' : draft.hasStoredSecurityToken ? '已加密保存' : '可选'}
+              />
               <label className="field"><span>凭证过期时间戳</span><input inputMode="numeric" value={expire} onChange={(event) => setExpire(event.target.value)} placeholder="毫秒或秒时间戳" /></label>
             </div>
           </div>
 
           <footer className="oss-config-footer">
-            <span><ShieldCheck size={14} />密钥由系统安全存储加密保存</span>
+            <span><ShieldCheck size={14} />密钥由应用内 AES-256-GCM 加密保存</span>
             <div className="oss-config-actions">
               {!isNew && <button className="button danger-ghost" type="button" disabled={saving} onClick={() => void handleRemove()}><Trash2 size={14} />删除</button>}
               <button className="button primary" type="submit" disabled={saving}><Save size={14} />{saving ? '保存中' : '保存配置'}</button>

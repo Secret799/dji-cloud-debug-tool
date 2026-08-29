@@ -96,7 +96,9 @@ export const objectStorageProfileIssues = (profile: ObjectStorageProfile): strin
   if (profile.provider !== 'minio' && !profile.region.trim()) issues.push('Region')
   if (!profile.endpoint.trim()) issues.push('Endpoint')
   if (!profile.accessKeyId.trim()) issues.push('Access Key ID')
-  if (!profile.accessKeySecret && !profile.hasStoredAccessKeySecret) issues.push('Access Key Secret')
+  if (!profile.accessKeySecret && (!profile.hasStoredAccessKeySecret || profile.clearStoredAccessKeySecret)) {
+    issues.push('Access Key Secret')
+  }
   if (!Number.isInteger(profile.expire) || profile.expire <= 0) issues.push('凭证过期时间戳')
   return issues
 }

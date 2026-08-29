@@ -353,6 +353,21 @@ export interface FirmwareUploadRequest {
   objectKey: string
 }
 
+export type RemoteLogModule = '0' | '3'
+
+export interface RemoteLogUploadFile {
+  module: RemoteLogModule
+  bootIndex: number
+}
+
+export interface RemoteLogUploadRequest {
+  profileId: string
+  gatewaySn: string
+  objectStorageProfileId: string
+  files: RemoteLogUploadFile[]
+  objectKeys: Partial<Record<RemoteLogModule, string>>
+}
+
 export interface FirmwareArtifact {
   selectionToken: string
   objectStorageProfileId: string
@@ -495,6 +510,7 @@ export interface SeiParserEvent {
 export interface DjiDesktopApi {
   profiles: {
     list: () => Promise<ConnectionProfile[]>
+    resolve: (profileId: string) => Promise<ConnectionProfile | undefined>
     save: (profile: ConnectionProfile) => Promise<ConnectionProfile>
     remove: (profileId: string) => Promise<OperationResult>
   }
@@ -518,6 +534,7 @@ export interface DjiDesktopApi {
   }
   media: {
     listServers: () => Promise<MediaServerProfile[]>
+    resolveServer: (profileId: string) => Promise<MediaServerProfile | undefined>
     saveServer: (profile: MediaServerProfile) => Promise<MediaServerProfile>
     removeServer: (profileId: string) => Promise<OperationResult>
     checkServer: (profileId: string) => Promise<MediaServerOperationResult>
@@ -539,6 +556,9 @@ export interface DjiDesktopApi {
     remove: (profileId: string) => Promise<OperationResult>
     resolve: (profileId: string) => Promise<ObjectStorageProfile | undefined>
   }
+  remoteLogs: {
+    startUpload: (request: RemoteLogUploadRequest) => Promise<OperationResult>
+  }
   firmware: {
     pickPackage: () => Promise<FirmwarePackagePickResult>
     uploadPackage: (request: FirmwareUploadRequest) => Promise<FirmwareUploadResult>
@@ -553,6 +573,7 @@ export interface DjiDesktopApi {
   }
   webdav: {
     getOverview: () => Promise<WebDavOverview>
+    resolveConfig: () => Promise<WebDavConfig | undefined>
     saveConfig: (config: WebDavConfig) => Promise<WebDavOverview>
     removeConfig: () => Promise<OperationResult>
     test: (config?: WebDavConfig) => Promise<OperationResult>

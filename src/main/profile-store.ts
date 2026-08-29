@@ -1,9 +1,12 @@
-import { app, safeStorage } from 'electron'
+import { app } from 'electron'
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type { ConnectionProfile } from '../shared/contracts'
+import { encryptCredential, type CredentialContext } from './credential-crypto'
+import { hasStoredCredential, migrateStoredCredential, resolveStoredCredential } from './stored-credential'
 
 interface StoredProfile extends Omit<ConnectionProfile, 'password' | 'hasStoredPassword' | 'clearStoredPassword'> {
+  storedPassword?: string
   encryptedPassword?: string
 }
 
@@ -18,6 +21,11 @@ interface ConnectionCredentials {
 }
 
 const createId = (): string => crypto.randomUUID()
+const passwordContext = (profileId: string): CredentialContext => ({
+  store: 'mqtt',
+  recordId: profileId,
+  field: 'password',
+})
 
 const createDefaultProfile = (): ConnectionProfile => {
   const now = Date.now()
@@ -86,6 +94,14 @@ export class ProfileStore {
     })
   }
 
+  async resolve(profileId: string): Promise<ConnectionProfile | undefined> {
+    return this.runExclusive(async () => {
+      const document = await this.readDocument()
+      const profile = document.profiles.find((item) => item.id === profileId)
+      return profile ? { ...this.toPublicProfile(profile), password: this.decryptPassword(profile) } : undefined
+    })
+  }
+
   async getForConnection(profileId: string, sessionPassword?: string): Promise<ConnectionCredentials | undefined> {
     return this.runExclusive(async () => {
       const document = await this.readDocument()
@@ -145,7 +161,20 @@ export class ProfileStore {
     if (!this.isStoreDocument(parsed)) {
       return this.recoverCorruptDocument(raw, new Error('Unsupported profile store format or version'))
     }
-    return parsed
+    const document = parsed
+    let migrated = false
+    for (const profile of document.profiles) {
+      const migration = migrateStoredCredential({
+        encrypted: profile.encryptedPassword,
+        plaintext: profile.storedPassword,
+      }, passwordContext(profile.id), 'MQTT 密码')
+      if (!migration.migrated) continue
+      profile.encryptedPassword = migration.encrypted
+      delete profile.storedPassword
+      migrated = true
+    }
+    if (migrated) await this.writeDocument(document)
+    return document
   }
 
   private async writeDocument(document: StoreDocument): Promise<void> {
@@ -171,16 +200,20 @@ export class ProfileStore {
       password,
       hasStoredPassword: _hasStoredPassword,
       clearStoredPassword,
+      storedPassword: _storedPassword,
+      encryptedPassword: _inputEncryptedPassword,
       ...plain
-    } = profile
+    } = profile as ConnectionProfile & {
+      storedPassword?: unknown
+      encryptedPassword?: unknown
+    }
     let encryptedPassword = existing?.encryptedPassword
     if (clearStoredPassword) {
       encryptedPassword = undefined
     } else if (password) {
-      if (!safeStorage.isEncryptionAvailable()) {
-        throw new Error('系统安全存储当前不可用，密码未被保存。请清空密码后保存，并在连接时临时输入。')
-      }
-      encryptedPassword = safeStorage.encryptString(password).toString('base64')
+      encryptedPassword = encryptCredential(password, passwordContext(profile.id))
+    } else if (!encryptedPassword && existing?.storedPassword) {
+      encryptedPassword = encryptCredential(existing.storedPassword, passwordContext(profile.id))
     }
 
     return {
@@ -197,6 +230,7 @@ export class ProfileStore {
 
   private toPublicProfile(profile: StoredProfile): ConnectionProfile {
     const {
+      storedPassword,
       encryptedPassword,
       clearStoredPassword: _clearStoredPassword,
       ...plain
@@ -204,7 +238,7 @@ export class ProfileStore {
     return {
       ...plain,
       password: '',
-      hasStoredPassword: Boolean(encryptedPassword),
+      hasStoredPassword: hasStoredCredential({ encrypted: encryptedPassword, plaintext: storedPassword }),
     }
   }
 
@@ -214,6 +248,13 @@ export class ProfileStore {
       const profile = document.profiles.find((item) => item.id === profileId)
       return profile ? this.decryptPassword(profile) : ''
     })
+  }
+
+  private decryptPassword(profile: StoredProfile): string {
+    return resolveStoredCredential({
+      encrypted: profile.encryptedPassword,
+      plaintext: profile.storedPassword,
+    }, passwordContext(profile.id), 'MQTT 密码')
   }
 
   private async createDefaultDocument(): Promise<StoreDocument> {
@@ -238,12 +279,6 @@ export class ProfileStore {
     if (!value || typeof value !== 'object') return false
     const candidate = value as Partial<StoreDocument>
     return candidate.version === 1 && Array.isArray(candidate.profiles)
-  }
-
-  private decryptPassword(profile: StoredProfile): string {
-    if (!profile.encryptedPassword) return ''
-    if (!safeStorage.isEncryptionAvailable()) throw new Error('系统安全存储当前不可用，无法读取已保存密码')
-    return safeStorage.decryptString(Buffer.from(profile.encryptedPassword, 'base64'))
   }
 
   private runExclusive<T>(operation: () => Promise<T>): Promise<T> {

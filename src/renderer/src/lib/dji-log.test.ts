@@ -3,7 +3,6 @@ import type { MqttMessageRecord } from '../../../shared/contracts'
 import {
   buildLogCancelPayload,
   buildLogListPayload,
-  buildLogUploadPayload,
   parseLogFileList,
   parseLogProgress,
   type DjiLogFile,
@@ -33,28 +32,6 @@ describe('DJI remote log protocol', () => {
       method: 'fileupload_update',
       data: { status: 'cancel', module_list: ['3'] },
     })
-  })
-
-  it('groups selected boot indexes by module when starting an upload', () => {
-    const files: DjiLogFile[] = [
-      { module: '3', deviceSn: 'dock', bootIndex: 10, startTime: 1, endTime: 2, size: 3 },
-      { module: '3', deviceSn: 'dock', bootIndex: 11, startTime: 2, endTime: 3, size: 4 },
-      { module: '0', deviceSn: 'drone', bootIndex: 20, startTime: 1, endTime: 2, size: 5 },
-    ]
-    const payload = JSON.parse(buildLogUploadPayload(files, {
-      provider: 'ali',
-      bucket: 'bucket',
-      region: 'cn-hangzhou',
-      endpoint: 'https://oss-cn-hangzhou.aliyuncs.com',
-      credentials: { accessKeyId: 'id', accessKeySecret: 'secret', securityToken: 'token', expire: 1_700_000_300_000 },
-      objectKeys: { '0': 'logs/aircraft.log', '3': 'logs/dock.log' },
-    }))
-
-    expect(payload.method).toBe('fileupload_start')
-    expect(payload.data.params.files).toEqual([
-      { object_key: 'logs/dock.log', module: '3', list: [{ boot_index: 10 }, { boot_index: 11 }] },
-      { object_key: 'logs/aircraft.log', module: '0', list: [{ boot_index: 20 }] },
-    ])
   })
 
   it('parses file list replies and tolerates the documented end_ime typo', () => {

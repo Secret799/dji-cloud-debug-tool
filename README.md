@@ -11,7 +11,7 @@ DJI Cloud Studio 是一款面向 macOS 和 Windows 的机场上云 API、MQTT、
 - 保存多个连接配置，支持 `mqtt`、`mqtts`、`ws` 和 `wss`。
 - 支持 MQTT 3.1.1 / 5.0、QoS 0/1/2、Clean Session、Keep Alive 和自动重连。
 - 支持用户名密码、CA 证书、客户端证书和私钥。
-- 连接配置中的密码通过 Electron `safeStorage` 加密保存。
+- 连接密码使用应用内固定密钥和 AES-256-GCM 加密后保存；新保存的凭据不依赖系统密码软件。
 - 支持按设备管理订阅、自定义 Topic、消息发布、Retain 与 NDJSON 导出。
 - 消息列表可按方向、Topic 和关键字筛选，并检查 JSON Payload。
 
@@ -45,7 +45,7 @@ DJI Cloud Studio 是一款面向 macOS 和 Windows 的机场上云 API、MQTT、
 ### 固件、日志与对象存储
 
 - 管理阿里云 OSS、Amazon S3 和 MinIO 配置。
-- Access Key、Secret Key 和 Session Token 由主进程通过 `safeStorage` 加密保存。
+- Access Key、Secret Key 和 Session Token 由主进程使用应用内固定密钥和 AES-256-GCM 加密保存。
 - 固件升级工作台可选择本地固件包，上传到指定对象存储，并自动计算 MD5 和文件大小。
 - 核对目标设备、版本、下载 URL 和文件信息后发送 `ota_create`。
 - 处理 `ota_progress` 升级进度，并自动发送 `events_reply`。
@@ -72,11 +72,14 @@ DJI Cloud Studio 是一款面向 macOS 和 Windows 的机场上云 API、MQTT、
 
 - 支持 Basic、Digest 和 Bearer Token 认证，可按需忽略自签名证书错误。
 - 将连接配置、设备档案、对象存储、媒体服务、遥测数据和界面设置聚合为可移植版本。
-- 数据使用 WebDAV 密码或 Token 派生的密钥进行 AES-256-GCM 加密后上传，端点凭据由 `safeStorage` 保存。
+- 数据使用 WebDAV 密码或 Token 派生的独立密钥进行 AES-256-GCM 加密后上传；端点凭据则使用应用内固定密钥加密保存。
 - 本地数据变更后会防抖自动同步，并每 30 秒检查其他客户端上传的更新。
 - 多客户端通过 WebDAV 条件锁串行提交，再按记录执行三方合并，避免整库相互覆盖。
 - 可查看本地与云端最新版本、同步活动和云端历史，并恢复或删除指定版本。
 - WebDAV 密码或 Token 变更后无法解密用旧密钥创建的历史版本；轮换凭据前请保留旧密钥或先恢复所需版本。
+
+> 应用内固定密钥可避免凭据以明文出现在 JSON 中，但密钥会随应用发布包分发，不能防御同时获得应用包和用户数据的本机攻击者。
+> 从旧版本升级时，应用会尝试读取原有 `safeStorage` 密文并立即迁移；迁移完成后的日常读写不再使用系统密码软件。
 
 ### 应用更新
 

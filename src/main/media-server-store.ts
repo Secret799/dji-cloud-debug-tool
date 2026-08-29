@@ -1,11 +1,14 @@
-import { app, safeStorage } from 'electron'
+import { app } from 'electron'
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { networkInterfaces } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { MediaServerProfile } from '../shared/contracts'
+import { encryptCredential, type CredentialContext } from './credential-crypto'
+import { hasStoredCredential, migrateStoredCredential, resolveStoredCredential } from './stored-credential'
 
 interface StoredMediaServerProfile extends Omit<MediaServerProfile, 'secret' | 'hasStoredSecret' | 'clearStoredSecret' | 'webrtcPort'> {
   webrtcPort?: number
+  storedSecret?: string
   encryptedSecret?: string
 }
 
@@ -15,6 +18,11 @@ interface StoreDocument {
 }
 
 export const LOCAL_ZLM_ID = 'local-zlmediakit'
+const secretContext = (profileId: string): CredentialContext => ({
+  store: 'media',
+  recordId: profileId,
+  field: 'api-secret',
+})
 
 const localLanAddress = (): string => {
   for (const addresses of Object.values(networkInterfaces())) {
@@ -131,12 +139,21 @@ export class MediaServerStore {
     try {
       const parsed = JSON.parse(await readFile(this.filePath, 'utf8')) as Partial<StoreDocument>
       if (parsed.version !== 1 || !Array.isArray(parsed.servers)) throw new Error('媒体服务配置版本无效')
+      let migrated = false
       if (!parsed.servers.some((server) => server.id === LOCAL_ZLM_ID)) {
         parsed.servers.unshift(this.toStoredProfile(createLocalProfile()))
-        await this.writeDocument(parsed as StoreDocument)
+        migrated = true
       }
-      let migrated = false
       for (const server of parsed.servers) {
+        const secretMigration = migrateStoredCredential({
+          encrypted: server.encryptedSecret,
+          plaintext: server.storedSecret,
+        }, secretContext(server.id), '媒体服务 API Secret')
+        if (secretMigration.migrated) {
+          server.encryptedSecret = secretMigration.encrypted
+          delete server.storedSecret
+          migrated = true
+        }
         if (server.webrtcPort === undefined || (server.kind === 'local-zlm' && server.webrtcPort === 0)) {
           server.webrtcPort = 8000
           migrated = true
@@ -165,12 +182,22 @@ export class MediaServerStore {
   }
 
   private toStoredProfile(profile: MediaServerProfile, existing?: StoredMediaServerProfile): StoredMediaServerProfile {
-    const { secret, hasStoredSecret: _hasStoredSecret, clearStoredSecret, ...plain } = profile
+    const {
+      secret,
+      hasStoredSecret: _hasStoredSecret,
+      clearStoredSecret,
+      storedSecret: _storedSecret,
+      encryptedSecret: _inputEncryptedSecret,
+      ...plain
+    } = profile as MediaServerProfile & {
+      storedSecret?: unknown
+      encryptedSecret?: unknown
+    }
     let encryptedSecret = existing?.encryptedSecret
     if (profile.kind === 'remote-easymedia' || clearStoredSecret) encryptedSecret = undefined
-    else if (secret) {
-      if (!safeStorage.isEncryptionAvailable()) throw new Error('系统安全存储当前不可用，API 密钥无法保存')
-      encryptedSecret = safeStorage.encryptString(secret).toString('base64')
+    else if (secret) encryptedSecret = encryptCredential(secret, secretContext(profile.id))
+    else if (!encryptedSecret && existing?.storedSecret) {
+      encryptedSecret = encryptCredential(existing.storedSecret, secretContext(profile.id))
     }
     return {
       ...plain,
@@ -182,19 +209,25 @@ export class MediaServerStore {
   }
 
   private toPublicProfile(profile: StoredMediaServerProfile): MediaServerProfile {
-    const { encryptedSecret, ...plain } = profile
+    const {
+      storedSecret,
+      encryptedSecret,
+      clearStoredSecret: _clearStoredSecret,
+      ...plain
+    } = profile as StoredMediaServerProfile & { clearStoredSecret?: boolean }
     return {
       ...plain,
       webrtcPort: profile.webrtcPort ?? 8000,
       secret: '',
-      hasStoredSecret: Boolean(encryptedSecret),
+      hasStoredSecret: hasStoredCredential({ encrypted: encryptedSecret, plaintext: storedSecret }),
     }
   }
 
   private decryptSecret(profile: StoredMediaServerProfile): string {
-    if (!profile.encryptedSecret) return ''
-    if (!safeStorage.isEncryptionAvailable()) throw new Error('系统安全存储当前不可用，无法读取 API 密钥')
-    return safeStorage.decryptString(Buffer.from(profile.encryptedSecret, 'base64'))
+    return resolveStoredCredential({
+      encrypted: profile.encryptedSecret,
+      plaintext: profile.storedSecret,
+    }, secretContext(profile.id), '媒体服务 API Secret')
   }
 
   private async writeDocument(document: StoreDocument): Promise<void> {

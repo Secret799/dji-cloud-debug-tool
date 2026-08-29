@@ -2378,6 +2378,57 @@ textarea {
   min-height: 100%;
 }
 
+.control-center-workspace {
+  display: grid;
+  min-height: 100%;
+  grid-template-rows: 46px minmax(0, 1fr);
+}
+
+.control-center-workspace[hidden] {
+  display: none;
+}
+
+.control-center-tabs {
+  display: flex;
+  align-items: end;
+  gap: 4px;
+  padding: 8px 18px 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.control-center-tabs button {
+  display: flex;
+  min-height: 37px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 13px;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.control-center-tabs button:hover,
+.control-center-tabs button.active {
+  color: var(--accent);
+  background: var(--surface-soft);
+}
+
+.control-center-tabs button.active {
+  border-bottom-color: var(--accent);
+}
+
+.control-center-content {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
 .device-toolbar {
   display: flex;
   min-width: 0;
@@ -9469,13 +9520,13 @@ textarea {
   font-size: 11px;
 }
 
-.webdav-secret-input {
+.secret-input {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 34px;
   gap: 6px;
 }
 
-.webdav-secret-input .icon-button {
+.secret-input .icon-button {
   width: 34px;
   height: 34px;
   border: 1px solid var(--line-strong);

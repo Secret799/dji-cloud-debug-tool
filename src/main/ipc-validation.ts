@@ -10,6 +10,8 @@ import type {
   MediaServerProfile,
   ObjectStorageProfile,
   PublishRequest,
+  RemoteLogModule,
+  RemoteLogUploadRequest,
   RtmpRelayStartRequest,
   SeiMessageDetailRequest,
   SeiParserStartRequest,
@@ -24,6 +26,8 @@ import {
   MAX_MQTT_PAYLOAD_BYTES,
   MAX_PROFILE_DOCUMENT_BYTES,
 } from '../shared/limits'
+import { redactMqttMessageRecord } from './mqtt-message-redaction'
+import { normalizeRemoteLogObjectKey } from './remote-log-upload-manager'
 
 const MAX_PROFILE_ID_BYTES = 256
 const MAX_TOPIC_BYTES = 65_535
@@ -36,6 +40,8 @@ const MAX_SUBSCRIPTIONS = 5_000
 const MAX_DEVICE_PRODUCT_TYPE = 4_294_967_295
 const MAX_WHEP_SDP_BYTES = 256 * 1024
 const MAX_WEBDAV_BACKUP_BYTES = 16 * 1024 * 1024
+const MAX_REMOTE_LOG_FILES = 1_000
+const MAX_REMOTE_LOG_BOOT_INDEX = 4_294_967_295
 const ALLOWED_RENDERER_STORAGE_KEYS = new Set([
   'dji-cloud-studio.sidebar-width',
   'dji-cloud-studio.telemetry-cache.v1',
@@ -62,6 +68,12 @@ const byteLength = (value: string): number => Buffer.byteLength(value, 'utf8')
 const requireRecord = (value: unknown, label: string): Record<string, unknown> => {
   if (!isRecord(value)) throw new IpcValidationError(`${label}格式无效`)
   return value
+}
+
+const requireOnlyKeys = (value: Record<string, unknown>, allowed: readonly string[], label: string): void => {
+  const allowedKeys = new Set(allowed)
+  const unknownKey = Object.keys(value).find((key) => !allowedKeys.has(key))
+  if (unknownKey) throw new IpcValidationError(`${label}包含不支持的字段：${unknownKey}`)
 }
 
 const requireString = (
@@ -393,18 +405,21 @@ export const validateSeiMessageDetailRequest = (value: unknown): SeiMessageDetai
 export const validateMediaServerProfile = (value: unknown): MediaServerProfile => {
   const profile = requireRecord(value, '媒体服务配置')
   const id = validateProfileId(profile.id)
-  requireString(profile.name, '媒体服务名称', { maxBytes: 256 })
+  const name = requireString(profile.name, '媒体服务名称', { maxBytes: 256 })
   if (profile.kind !== 'local-zlm' && profile.kind !== 'remote-zlm' && profile.kind !== 'remote-srs' && profile.kind !== 'remote-easymedia') {
     throw new IpcValidationError('媒体服务类型无效')
   }
-  requireString(profile.host, '媒体服务主机', { maxBytes: 512 })
+  const kind = profile.kind
+  const host = requireString(profile.host, '媒体服务主机', { maxBytes: 512 })
   if (profile.apiProtocol !== 'http' && profile.apiProtocol !== 'https') throw new IpcValidationError('API 协议无效')
   if (profile.httpProtocol !== 'http' && profile.httpProtocol !== 'https') throw new IpcValidationError('播放协议无效')
-  requireInteger(profile.apiPort, 'API 端口', 1, 65_535)
-  requireInteger(profile.httpPort, 'HTTP 端口', 1, 65_535)
-  requireInteger(profile.rtmpPort, 'RTMP 端口', 1, 65_535)
-  requireInteger(profile.rtspPort, 'RTSP 端口', 0, 65_535)
-  requireInteger(profile.webrtcPort, 'WebRTC 端口', profile.kind === 'local-zlm' || profile.kind === 'remote-easymedia' ? 1 : 0, 65_535)
+  const apiProtocol = profile.apiProtocol
+  const httpProtocol = profile.httpProtocol
+  const apiPort = requireInteger(profile.apiPort, 'API 端口', 1, 65_535)
+  const httpPort = requireInteger(profile.httpPort, 'HTTP 端口', 1, 65_535)
+  const rtmpPort = requireInteger(profile.rtmpPort, 'RTMP 端口', 1, 65_535)
+  const rtspPort = requireInteger(profile.rtspPort, 'RTSP 端口', 0, 65_535)
+  const webrtcPort = requireInteger(profile.webrtcPort, 'WebRTC 端口', kind === 'local-zlm' || kind === 'remote-easymedia' ? 1 : 0, 65_535)
   if (profile.kind === 'local-zlm' && profile.apiPort !== profile.httpPort) {
     throw new IpcValidationError('本地 ZLMediaKit 的 API 端口必须与 HTTP 端口一致')
   }
@@ -414,24 +429,43 @@ export const validateMediaServerProfile = (value: unknown): MediaServerProfile =
       throw new IpcValidationError('SecretEMS 的 WHIP/WHEP 协议和端口必须保持一致')
     }
   }
-  requireString(profile.secret, 'API 密钥', { allowEmpty: true, allowNullCharacter: true, maxBytes: 4_096 })
+  const secret = requireString(profile.secret, 'API 密钥', { allowEmpty: true, allowNullCharacter: true, maxBytes: 4_096 })
   requireOptionalBoolean(profile.isDefault, '默认媒体服务标记')
   requireOptionalBoolean(profile.hasStoredSecret, '已保存 API 密钥标记')
   requireOptionalBoolean(profile.clearStoredSecret, '清除 API 密钥标记')
-  requireFiniteNumber(profile.createdAt, '创建时间')
-  requireFiniteNumber(profile.updatedAt, '更新时间')
-  return { ...profile, id } as unknown as MediaServerProfile
+  const createdAt = requireFiniteNumber(profile.createdAt, '创建时间')
+  const updatedAt = requireFiniteNumber(profile.updatedAt, '更新时间')
+  return {
+    id,
+    name,
+    kind,
+    host,
+    apiProtocol,
+    apiPort,
+    httpProtocol,
+    httpPort,
+    rtmpPort,
+    rtspPort,
+    webrtcPort,
+    secret,
+    isDefault: profile.isDefault as boolean | undefined,
+    hasStoredSecret: profile.hasStoredSecret as boolean | undefined,
+    clearStoredSecret: profile.clearStoredSecret as boolean | undefined,
+    createdAt,
+    updatedAt,
+  }
 }
 
 export const validateObjectStorageProfile = (value: unknown): ObjectStorageProfile => {
   const profile = requireRecord(value, '对象存储配置')
   const id = validateProfileId(profile.id)
-  requireString(profile.name, '对象存储名称', { maxBytes: 256 })
+  const name = requireString(profile.name, '对象存储名称', { maxBytes: 256 })
   if (profile.provider !== 'ali' && profile.provider !== 'aws' && profile.provider !== 'minio') {
     throw new IpcValidationError('对象存储厂商无效')
   }
-  requireString(profile.bucket, 'Bucket', { maxBytes: 1_024 })
-  requireString(profile.region, 'Region', { allowEmpty: profile.provider === 'minio', maxBytes: 1_024 })
+  const provider = profile.provider
+  const bucket = requireString(profile.bucket, 'Bucket', { maxBytes: 1_024 })
+  const region = requireString(profile.region, 'Region', { allowEmpty: provider === 'minio', maxBytes: 1_024 })
   const endpoint = requireString(profile.endpoint, 'Endpoint', { maxBytes: 4_096 }).trim()
   let parsedEndpoint: URL
   try {
@@ -443,13 +477,13 @@ export const validateObjectStorageProfile = (value: unknown): ObjectStorageProfi
     throw new IpcValidationError('Endpoint 仅支持 HTTP 或 HTTPS')
   }
   if (parsedEndpoint.username || parsedEndpoint.password) throw new IpcValidationError('Endpoint 不能包含认证信息')
-  requireString(profile.accessKeyId, 'Access Key ID', { maxBytes: 4_096 })
-  requireString(profile.accessKeySecret, 'Access Key Secret', {
+  const accessKeyId = requireString(profile.accessKeyId, 'Access Key ID', { maxBytes: 4_096 })
+  const accessKeySecret = requireString(profile.accessKeySecret, 'Access Key Secret', {
     allowEmpty: true,
     allowNullCharacter: true,
     maxBytes: 65_535,
   })
-  requireString(profile.securityToken, 'Security Token', {
+  const securityToken = requireString(profile.securityToken, 'Security Token', {
     allowEmpty: true,
     allowNullCharacter: true,
     maxBytes: 65_535,
@@ -458,10 +492,27 @@ export const validateObjectStorageProfile = (value: unknown): ObjectStorageProfi
   requireOptionalBoolean(profile.hasStoredSecurityToken, '已保存 Security Token 标记')
   requireOptionalBoolean(profile.clearStoredAccessKeySecret, '清除 Access Key Secret 标记')
   requireOptionalBoolean(profile.clearStoredSecurityToken, '清除 Security Token 标记')
-  requireInteger(profile.expire, '凭证过期时间戳', 1, Number.MAX_SAFE_INTEGER)
-  requireFiniteNumber(profile.createdAt, '创建时间')
-  requireFiniteNumber(profile.updatedAt, '更新时间')
-  return { ...profile, id, endpoint } as unknown as ObjectStorageProfile
+  const expire = requireInteger(profile.expire, '凭证过期时间戳', 1, Number.MAX_SAFE_INTEGER)
+  const createdAt = requireFiniteNumber(profile.createdAt, '创建时间')
+  const updatedAt = requireFiniteNumber(profile.updatedAt, '更新时间')
+  return {
+    id,
+    name,
+    provider,
+    bucket,
+    region,
+    endpoint,
+    accessKeyId,
+    accessKeySecret,
+    securityToken,
+    expire,
+    hasStoredAccessKeySecret: profile.hasStoredAccessKeySecret as boolean | undefined,
+    hasStoredSecurityToken: profile.hasStoredSecurityToken as boolean | undefined,
+    clearStoredAccessKeySecret: profile.clearStoredAccessKeySecret as boolean | undefined,
+    clearStoredSecurityToken: profile.clearStoredSecurityToken as boolean | undefined,
+    createdAt,
+    updatedAt,
+  }
 }
 
 export const validateFirmwareUploadRequest = (value: unknown): FirmwareUploadRequest => {
@@ -472,11 +523,60 @@ export const validateFirmwareUploadRequest = (value: unknown): FirmwareUploadReq
   return { selectionToken, objectStorageProfileId, objectKey }
 }
 
+export const validateRemoteLogUploadRequest = (value: unknown): RemoteLogUploadRequest => {
+  const request = requireRecord(value, '远程日志上传请求')
+  requireOnlyKeys(
+    request,
+    ['profileId', 'gatewaySn', 'objectStorageProfileId', 'files', 'objectKeys'],
+    '远程日志上传请求',
+  )
+  const profileId = validateProfileId(request.profileId)
+  const gatewaySn = requireString(request.gatewaySn, '机场 SN', { maxBytes: 128 }).trim()
+  if (!/^[A-Za-z0-9_-]+$/.test(gatewaySn)) throw new IpcValidationError('机场 SN 格式无效')
+  const objectStorageProfileId = validateProfileId(request.objectStorageProfileId)
+  const rawFiles = requireArray(request.files, '远程日志文件', MAX_REMOTE_LOG_FILES)
+  if (!rawFiles.length) throw new IpcValidationError('请至少选择一个远程日志文件')
+
+  const files = rawFiles.map((value, index) => {
+    const file = requireRecord(value, `远程日志文件 ${index + 1}`)
+    requireOnlyKeys(file, ['module', 'bootIndex'], `远程日志文件 ${index + 1}`)
+    const rawModule = file.module
+    if (rawModule !== '0' && rawModule !== '3') {
+      throw new IpcValidationError(`远程日志文件 ${index + 1} 的模块无效`)
+    }
+    const module = rawModule as RemoteLogModule
+    return {
+      module,
+      bootIndex: requireInteger(
+        file.bootIndex,
+        `远程日志文件 ${index + 1} 的 Boot Index`,
+        0,
+        MAX_REMOTE_LOG_BOOT_INDEX,
+      ),
+    }
+  })
+
+  const rawObjectKeys = requireRecord(request.objectKeys, '远程日志对象 Key')
+  requireOnlyKeys(rawObjectKeys, ['0', '3'], '远程日志对象 Key')
+  const objectKeys: Partial<Record<RemoteLogModule, string>> = {}
+  for (const module of new Set<RemoteLogModule>(files.map((file) => file.module))) {
+    const label = module === '0' ? '飞行器对象 Key' : '机场对象 Key'
+    const rawObjectKey = requireString(rawObjectKeys[module], label, { maxBytes: 1_024 })
+    try {
+      objectKeys[module] = normalizeRemoteLogObjectKey(rawObjectKey)
+    } catch (error) {
+      throw new IpcValidationError(error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  return { profileId, gatewaySn, objectStorageProfileId, files, objectKeys }
+}
+
 const validateDevice = (value: unknown): DjiDevice => {
   const device = requireRecord(value, '设备')
-  requireString(device.id, '设备 ID', { maxBytes: MAX_PROFILE_ID_BYTES })
-  requireString(device.name, '设备名称')
-  requireString(device.sn, '设备 SN')
+  const id = requireString(device.id, '设备 ID', { maxBytes: MAX_PROFILE_ID_BYTES })
+  const name = requireString(device.name, '设备名称')
+  const sn = requireString(device.sn, '设备 SN')
   if (device.type !== 'dock' && device.type !== 'aircraft' && device.type !== 'pilot') {
     throw new IpcValidationError('设备类型无效')
   }
@@ -519,36 +619,46 @@ const validateDevice = (value: unknown): DjiDevice => {
     throw new IpcValidationError('DJI 厂商与机场型号不匹配')
   }
   requireOptionalBoolean(device.enabled, '设备启用状态')
-  if (device.parentSn !== undefined) requireString(device.parentSn, '父设备 SN')
-  return device as unknown as DjiDevice
+  const parentSn = device.parentSn === undefined ? undefined : requireString(device.parentSn, '父设备 SN')
+  return {
+    id,
+    name,
+    sn,
+    type: device.type,
+    provider: device.provider as DjiDevice['provider'],
+    enabled: device.enabled as boolean | undefined,
+    dockModel: device.dockModel as DjiDevice['dockModel'],
+    parentSn,
+  }
 }
 
 const validateSubscription = (value: unknown): TopicSubscription => {
   const subscription = requireRecord(value, '订阅')
-  requireString(subscription.id, '订阅 ID', { maxBytes: MAX_PROFILE_ID_BYTES })
-  validateTopic(subscription.topic, '订阅 Topic')
-  validateQos(subscription.qos)
-  requireBoolean(subscription.enabled, '订阅启用状态')
+  const id = requireString(subscription.id, '订阅 ID', { maxBytes: MAX_PROFILE_ID_BYTES })
+  const topic = validateTopic(subscription.topic, '订阅 Topic')
+  const qos = validateQos(subscription.qos)
+  const enabled = requireBoolean(subscription.enabled, '订阅启用状态')
   if (subscription.source !== 'dji' && subscription.source !== 'superdock' && subscription.source !== 'custom') {
     throw new IpcValidationError('订阅来源无效')
   }
-  return subscription as unknown as TopicSubscription
+  return { id, topic, qos, enabled, source: subscription.source }
 }
 
 export const validateConnectionProfile = (value: unknown): ConnectionProfile => {
   requireSerializedSize(value, '连接配置', MAX_PROFILE_DOCUMENT_BYTES)
   const profile = requireRecord(value, '连接配置')
   const profileId = validateProfileId(profile.id)
-  requireString(profile.name, '连接名称')
+  const name = requireString(profile.name, '连接名称')
   if (profile.protocol !== 'mqtt' && profile.protocol !== 'mqtts' && profile.protocol !== 'ws' && profile.protocol !== 'wss') {
     throw new IpcValidationError('MQTT 协议无效')
   }
-  requireString(profile.host, 'Broker 地址')
-  requireInteger(profile.port, 'Broker 端口', 1, 65_535)
-  requireString(profile.path, 'WebSocket Path', { allowEmpty: true })
-  requireString(profile.clientId, 'Client ID', { maxBytes: MAX_CLIENT_ID_BYTES })
-  requireString(profile.username, '用户名', { allowEmpty: true })
-  requireString(profile.password, '密码', {
+  const protocol = profile.protocol
+  const host = requireString(profile.host, 'Broker 地址')
+  const port = requireInteger(profile.port, 'Broker 端口', 1, 65_535)
+  const path = requireString(profile.path, 'WebSocket Path', { allowEmpty: true })
+  const clientId = requireString(profile.clientId, 'Client ID', { maxBytes: MAX_CLIENT_ID_BYTES })
+  const username = requireString(profile.username, '用户名', { allowEmpty: true })
+  const password = requireString(profile.password, '密码', {
     allowEmpty: true,
     allowNullCharacter: true,
     maxBytes: MAX_TOPIC_BYTES,
@@ -558,19 +668,45 @@ export const validateConnectionProfile = (value: unknown): ConnectionProfile => 
   if (profile.mqttVersion !== '3.1.1' && profile.mqttVersion !== '5.0') {
     throw new IpcValidationError('MQTT 版本无效')
   }
-  requireBoolean(profile.clean, 'Clean Session')
-  requireInteger(profile.keepalive, 'Keep Alive', 0, 65_535)
-  requireInteger(profile.connectTimeout, '连接超时', 1, 3_600)
-  requireInteger(profile.reconnectPeriod, '重连间隔', 0, 3_600)
-  requireBoolean(profile.rejectUnauthorized, '服务器证书校验')
-  requireString(profile.caPath, 'CA 证书路径', { allowEmpty: true })
-  requireString(profile.certPath, '客户端证书路径', { allowEmpty: true })
-  requireString(profile.keyPath, '客户端私钥路径', { allowEmpty: true })
-  requireArray(profile.devices, '设备', MAX_DEVICES).forEach(validateDevice)
-  requireArray(profile.subscriptions, '订阅', MAX_SUBSCRIPTIONS).forEach(validateSubscription)
-  requireFiniteNumber(profile.createdAt, '创建时间')
-  requireFiniteNumber(profile.updatedAt, '更新时间')
-  return { ...profile, id: profileId } as unknown as ConnectionProfile
+  const mqttVersion = profile.mqttVersion
+  const clean = requireBoolean(profile.clean, 'Clean Session')
+  const keepalive = requireInteger(profile.keepalive, 'Keep Alive', 0, 65_535)
+  const connectTimeout = requireInteger(profile.connectTimeout, '连接超时', 1, 3_600)
+  const reconnectPeriod = requireInteger(profile.reconnectPeriod, '重连间隔', 0, 3_600)
+  const rejectUnauthorized = requireBoolean(profile.rejectUnauthorized, '服务器证书校验')
+  const caPath = requireString(profile.caPath, 'CA 证书路径', { allowEmpty: true })
+  const certPath = requireString(profile.certPath, '客户端证书路径', { allowEmpty: true })
+  const keyPath = requireString(profile.keyPath, '客户端私钥路径', { allowEmpty: true })
+  const devices = requireArray(profile.devices, '设备', MAX_DEVICES).map(validateDevice)
+  const subscriptions = requireArray(profile.subscriptions, '订阅', MAX_SUBSCRIPTIONS).map(validateSubscription)
+  const createdAt = requireFiniteNumber(profile.createdAt, '创建时间')
+  const updatedAt = requireFiniteNumber(profile.updatedAt, '更新时间')
+  return {
+    id: profileId,
+    name,
+    protocol,
+    host,
+    port,
+    path,
+    clientId,
+    username,
+    password,
+    hasStoredPassword: profile.hasStoredPassword as boolean | undefined,
+    clearStoredPassword: profile.clearStoredPassword as boolean | undefined,
+    mqttVersion,
+    clean,
+    keepalive,
+    connectTimeout,
+    reconnectPeriod,
+    rejectUnauthorized,
+    caPath,
+    certPath,
+    keyPath,
+    devices,
+    subscriptions,
+    createdAt,
+    updatedAt,
+  }
 }
 
 export const validatePublishRequest = (value: unknown): PublishRequest => {
@@ -589,24 +725,37 @@ export const validatePublishRequest = (value: unknown): PublishRequest => {
 
 const validateMessageRecord = (value: unknown): MqttMessageRecord => {
   const record = requireRecord(value, '导出消息')
-  requireString(record.id, '消息 ID', { maxBytes: MAX_PROFILE_ID_BYTES })
-  validateProfileId(record.profileId)
+  const id = requireString(record.id, '消息 ID', { maxBytes: MAX_PROFILE_ID_BYTES })
+  const profileId = validateProfileId(record.profileId)
   if (record.direction !== 'in' && record.direction !== 'out') throw new IpcValidationError('消息方向无效')
-  validateTopic(record.topic, '消息 Topic')
-  requireString(record.payload, '消息 Payload', {
+  const direction = record.direction
+  const topic = validateTopic(record.topic, '消息 Topic')
+  const payload = requireString(record.payload, '消息 Payload', {
     allowEmpty: true,
     allowNullCharacter: true,
     maxBytes: MAX_MQTT_PAYLOAD_BYTES,
   })
-  validateQos(record.qos)
-  requireBoolean(record.retain, '消息 Retain')
-  requireFiniteNumber(record.timestamp, '消息时间')
-  requireFiniteNumber(record.size, '消息大小')
+  const qos = validateQos(record.qos)
+  const retain = requireBoolean(record.retain, '消息 Retain')
+  const timestamp = requireFiniteNumber(record.timestamp, '消息时间')
+  const size = requireFiniteNumber(record.size, '消息大小')
   requireOptionalBoolean(record.duplicate, '消息 Duplicate')
   if (record.properties !== undefined && !isRecord(record.properties)) {
     throw new IpcValidationError('MQTT Properties 格式无效')
   }
-  return record as unknown as MqttMessageRecord
+  return redactMqttMessageRecord({
+    id,
+    profileId,
+    direction,
+    topic,
+    payload,
+    qos,
+    retain,
+    timestamp,
+    size,
+    duplicate: record.duplicate as boolean | undefined,
+    properties: record.properties,
+  })
 }
 
 export const validateExportMessageOptions = (value: unknown): ValidatedExport => {

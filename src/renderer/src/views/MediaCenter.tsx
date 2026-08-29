@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   CircleAlert,
@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react'
 import type { MediaServerKind, MediaServerProfile, MediaServerRuntime } from '../../../shared/contracts'
+import { SecretInput } from '../components/SecretInput'
 import { Tooltip } from '../components/Tooltip'
 import { buildMediaEndpoints } from '../lib/media'
 
@@ -92,15 +93,22 @@ export function MediaCenter({
 }: MediaCenterProps) {
   const [selectedId, setSelectedId] = useState('')
   const [editor, setEditor] = useState<MediaServerProfile | null>(null)
+  const editorLoadGeneration = useRef(0)
   const [busyId, setBusyId] = useState('')
   const [streamApp, setStreamApp] = useState('live')
   const [streamName, setStreamName] = useState('dji')
 
   useEffect(() => {
-    setSelectedId((current) => servers.some((server) => server.id === current)
-      ? current
-      : servers.find((server) => server.isDefault)?.id ?? servers[0]?.id ?? '')
+    setSelectedId((current) => {
+      const next = servers.some((server) => server.id === current)
+        ? current
+        : servers.find((server) => server.isDefault)?.id ?? servers[0]?.id ?? ''
+      if (next !== current) editorLoadGeneration.current += 1
+      return next
+    })
   }, [servers])
+
+  useEffect(() => () => { editorLoadGeneration.current += 1 }, [])
 
   const selectedServer = servers.find((server) => server.id === selectedId)
     ?? servers.find((server) => server.isDefault)
@@ -110,6 +118,31 @@ export function MediaCenter({
     () => selectedServer ? buildMediaEndpoints(selectedServer, streamApp, streamName) : null,
     [selectedServer, streamApp, streamName],
   )
+
+  const openServerEditor = async (server: MediaServerProfile): Promise<void> => {
+    const generation = editorLoadGeneration.current + 1
+    editorLoadGeneration.current = generation
+    try {
+      const resolved = await window.djiApi.media.resolveServer(server.id)
+      if (editorLoadGeneration.current !== generation) return
+      if (!resolved) throw new Error('媒体服务配置已不存在')
+      setEditor(resolved)
+    } catch (error) {
+      if (editorLoadGeneration.current !== generation) return
+      setEditor({ ...server })
+      onNotify(`解密 API Secret 失败：${error instanceof Error ? error.message : String(error)}，可重新输入后保存`, 'error')
+    }
+  }
+
+  const selectServer = (profileId: string): void => {
+    editorLoadGeneration.current += 1
+    setSelectedId(profileId)
+  }
+
+  const closeServerEditor = (): void => {
+    editorLoadGeneration.current += 1
+    setEditor(null)
+  }
 
   const checkServer = async (server: MediaServerProfile): Promise<void> => {
     setBusyId(server.id)
@@ -155,8 +188,8 @@ export function MediaCenter({
           if (result.runtime) onRuntimeChange(result.runtime)
         })
       }
-      setSelectedId(saved.id)
-      setEditor(null)
+      selectServer(saved.id)
+      closeServerEditor()
       if (wasLocalRunning) {
         const result = await window.djiApi.media.startLocal()
         if (result.runtime) onRuntimeChange(result.runtime)
@@ -178,7 +211,7 @@ export function MediaCenter({
       onServersChange(servers.map((item) => item.id === saved.id
         ? saved
         : { ...item, isDefault: false }))
-      setSelectedId(saved.id)
+      selectServer(saved.id)
       onNotify(`已将${server.name}设为默认媒体服务`, 'success')
     } catch (error) {
       onNotify(error instanceof Error ? error.message : String(error), 'error')
@@ -195,8 +228,8 @@ export function MediaCenter({
       if (!result.ok) throw new Error(result.error ?? '删除失败')
       const remaining = await window.djiApi.media.listServers()
       onServersChange(remaining)
-      setSelectedId(remaining.find((server) => server.isDefault)?.id ?? remaining[0]?.id ?? '')
-      setEditor(null)
+      selectServer(remaining.find((server) => server.isDefault)?.id ?? remaining[0]?.id ?? '')
+      closeServerEditor()
       onNotify('远程媒体服务已删除', 'success')
     } catch (error) {
       onNotify(error instanceof Error ? error.message : String(error), 'error')
@@ -216,7 +249,10 @@ export function MediaCenter({
     <div className="media-center">
       <aside className="media-server-panel">
         <div className="media-server-actions">
-          <button className="button primary compact" onClick={() => setEditor(createRemoteProfile())}><Plus size={14} />添加远程服务</button>
+          <button className="button primary compact" onClick={() => {
+            editorLoadGeneration.current += 1
+            setEditor(createRemoteProfile())
+          }}><Plus size={14} />添加远程服务</button>
           {selectedServer && <Tooltip label="刷新状态"><button className="icon-button" disabled={Boolean(busyId)} onClick={() => void checkServer(selectedServer)}><RefreshCw className={busyId === selectedServer.id ? 'spin' : ''} size={15} /></button></Tooltip>}
         </div>
         <div className="media-server-list">
@@ -225,7 +261,7 @@ export function MediaCenter({
             const Icon = server.kind === 'local-zlm' ? HardDrive : server.kind === 'remote-srs' || server.kind === 'remote-easymedia' ? Cloud : Server
             return (
               <div key={server.id} className={`media-server-row ${selectedServer?.id === server.id ? 'selected' : ''}`}>
-                <button className="media-server-select" onClick={() => setSelectedId(server.id)}>
+                <button className="media-server-select" onClick={() => selectServer(server.id)}>
                   <span className={`media-server-icon ${server.kind}`}><Icon size={15} /></span>
                   <span className="media-server-copy"><strong>{server.name}</strong><small>{server.host}:{displayedServerPort(server)}</small></span>
                   <span className={`server-state-dot ${runtime?.state ?? 'stopped'}`} title={displayedRuntimeLabel(server, runtime)} />
@@ -259,7 +295,7 @@ export function MediaCenter({
                       {selectedRuntime?.state === 'running' ? '停止服务' : '启动服务'}
                     </button>
                   )}
-                  <Tooltip label="服务设置"><button className="icon-button" onClick={() => setEditor({ ...selectedServer })}><Settings2 size={16} /></button></Tooltip>
+                  <Tooltip label="服务设置"><button className="icon-button" onClick={() => void openServerEditor(selectedServer)}><Settings2 size={16} /></button></Tooltip>
                 </div>
               </header>
               {selectedRuntime?.detail && <div className="media-service-alert"><CircleAlert size={14} /><span>{selectedRuntime.detail}</span></div>}
@@ -284,7 +320,7 @@ export function MediaCenter({
       {editor && (
         <div className="modal-backdrop">
           <div className="modal media-server-modal" role="dialog" aria-modal="true" aria-label="媒体服务设置">
-            <header className="modal-header"><div><span className="eyebrow">MEDIA SERVER</span><h2>{editor.kind === 'local-zlm' ? '本地 ZLMediaKit 设置' : servers.some((server) => server.id === editor.id) ? '编辑远程服务' : '添加远程服务'}</h2></div><Tooltip label="关闭"><button className="icon-button" onClick={() => setEditor(null)}><X size={17} /></button></Tooltip></header>
+            <header className="modal-header"><div><span className="eyebrow">MEDIA SERVER</span><h2>{editor.kind === 'local-zlm' ? '本地 ZLMediaKit 设置' : servers.some((server) => server.id === editor.id) ? '编辑远程服务' : '添加远程服务'}</h2></div><Tooltip label="关闭"><button className="icon-button" onClick={closeServerEditor}><X size={17} /></button></Tooltip></header>
             <div className="modal-body settings-form">
               {editor.kind !== 'local-zlm' && (
                 <label className="field"><span>服务类型</span><select value={editor.kind} onChange={(event) => {
@@ -323,10 +359,20 @@ export function MediaCenter({
                   {editor.kind !== 'remote-srs' && <label className="field"><span>WebRTC 端口{editor.kind === 'local-zlm' ? '' : '（0 禁用）'}</span><input type="number" min={editor.kind === 'local-zlm' ? 1 : 0} max={65535} value={editor.webrtcPort} onChange={(event) => setEditor({ ...editor, webrtcPort: Number(event.target.value) })} /></label>}
                 </div>
                 {editor.kind !== 'local-zlm' && <div className="field-grid two-columns"><label className="field"><span>API 协议</span><select value={editor.apiProtocol} onChange={(event) => setEditor({ ...editor, apiProtocol: event.target.value as 'http' | 'https' })}><option value="http">HTTP</option><option value="https">HTTPS</option></select></label><label className="field"><span>播放协议</span><select value={editor.httpProtocol} onChange={(event) => setEditor({ ...editor, httpProtocol: event.target.value as 'http' | 'https' })}><option value="http">HTTP</option><option value="https">HTTPS</option></select></label></div>}
-                <label className="field"><span>API Secret{editor.hasStoredSecret && !editor.secret ? '（已保存，留空保持不变）' : ''}</span><input type="password" value={editor.secret} onChange={(event) => setEditor({ ...editor, secret: event.target.value, clearStoredSecret: false })} /></label>
+                <SecretInput
+                  key={editor.id}
+                  label="API Secret"
+                  value={editor.secret}
+                  onChange={(secret) => setEditor({
+                    ...editor,
+                    secret,
+                    clearStoredSecret: secret ? false : Boolean(editor.hasStoredSecret),
+                  })}
+                  placeholder={editor.clearStoredSecret ? '保存后清除' : editor.hasStoredSecret ? '已加密保存' : '可选'}
+                />
               </>}
             </div>
-            <footer className="modal-footer">{editor.kind === 'local-zlm' || !servers.some((server) => server.id === editor.id) ? <span /> : <button className="button danger-ghost" onClick={() => void removeServer()}><Trash2 size={14} />删除</button>}<div className="footer-actions"><button className="button secondary" onClick={() => setEditor(null)}>取消</button><button className="button primary" disabled={busyId === editor.id} onClick={() => void saveServer()}>保存服务</button></div></footer>
+            <footer className="modal-footer">{editor.kind === 'local-zlm' || !servers.some((server) => server.id === editor.id) ? <span /> : <button className="button danger-ghost" onClick={() => void removeServer()}><Trash2 size={14} />删除</button>}<div className="footer-actions"><button className="button secondary" onClick={closeServerEditor}>取消</button><button className="button primary" disabled={busyId === editor.id} onClick={() => void saveServer()}>保存服务</button></div></footer>
           </div>
         </div>
       )}

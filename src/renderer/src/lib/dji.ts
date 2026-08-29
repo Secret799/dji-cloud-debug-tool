@@ -98,6 +98,45 @@ export const djiProductName = (identity: DjiDeviceIdentity | undefined): string 
 export const productName = (identity: DjiDeviceIdentity | undefined): string | undefined =>
   superDockProductName(identity) ?? djiProductName(identity)
 
+export const knownProviderFromIdentity = (identity: DjiDeviceIdentity | undefined): DeviceProvider | undefined => {
+  if (!identity) return undefined
+  const productKey = djiProductKey(identity)
+  if (DJI_PRODUCT_NAMES[productKey]) return 'dji'
+  if (SUPERDOCK_PRODUCT_NAMES[productKey]) return 'superdock'
+  return undefined
+}
+
+export const resolveGatewayProvider = (
+  configured: Pick<DjiDevice, 'type' | 'provider' | 'dockModel'> | undefined,
+  runtime: Pick<DeviceTelemetry, 'provider' | 'identity'> | undefined,
+): DeviceProvider | undefined => {
+  if (runtime?.identity) return knownProviderFromIdentity(runtime.identity)
+  if (configured) return deviceProvider(configured)
+  return runtime?.provider
+}
+
+export interface GatewayCapabilities {
+  deviceControl: boolean
+  payload: boolean
+  remoteLogs: boolean
+  firmwareUpgrade: boolean
+}
+
+const GATEWAY_CAPABILITIES: Readonly<Record<DeviceProvider, GatewayCapabilities>> = Object.freeze({
+  dji: Object.freeze({ deviceControl: true, payload: true, remoteLogs: true, firmwareUpgrade: true }),
+  superdock: Object.freeze({ deviceControl: true, payload: true, remoteLogs: false, firmwareUpgrade: false }),
+})
+
+const UNKNOWN_GATEWAY_CAPABILITIES: GatewayCapabilities = Object.freeze({
+  deviceControl: false,
+  payload: false,
+  remoteLogs: false,
+  firmwareUpgrade: false,
+})
+
+export const gatewayCapabilitiesForProvider = (provider: DeviceProvider | undefined): GatewayCapabilities =>
+  provider ? GATEWAY_CAPABILITIES[provider] : UNKNOWN_GATEWAY_CAPABILITIES
+
 export interface CommandTransaction {
   tid: string
   bid?: string
