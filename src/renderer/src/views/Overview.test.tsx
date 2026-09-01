@@ -11,6 +11,8 @@ import {
   HmsPayloadDetails,
   JsonPayloadView,
   Overview,
+  PayloadMessageList,
+  PsdkChannelTabs,
   telemetryFieldMatchesSearch,
 } from './Overview'
 
@@ -131,6 +133,64 @@ describe('JSON payload tree', () => {
     expect(markup).toContain('command-payload-raw')
     expect(markup).toContain('not-json')
     expect(markup).not.toContain('role="tree"')
+  })
+})
+
+describe('payload message list', () => {
+  it('renders all integrated PSDK methods newest first and collapsed by default', () => {
+    const activities = [
+      {
+        id: 'older', timestamp: 100, method: 'custom_data_transmission_from_psdk',
+        label: 'PSDK 自定义数据', value: 'OLDER',
+      },
+      {
+        id: 'latest', timestamp: 300, method: 'psdk_ui_resource_upload_result',
+        label: 'PSDK UI 资源上传结果', value: 'LATEST',
+      },
+      {
+        id: 'middle', timestamp: 200, method: 'psdk_floating_window_text',
+        label: 'PSDK 浮窗文本', value: 'MIDDLE',
+      },
+    ].map(({ id, timestamp, method, label, value }) => ({
+      record: {
+        id,
+        profileId: 'profile',
+        direction: 'in' as const,
+        topic: 'thing/product/DOCK-1/events',
+        payload: JSON.stringify({ method, data: { psdk_index: 4, value } }),
+        qos: 1 as const,
+        retain: false,
+        timestamp,
+        size: 80,
+      },
+      method,
+      kind: 'event' as const,
+      label,
+      knownMethod: true,
+      psdkIndex: 4,
+    })) satisfies DeviceActivity[]
+
+    const markup = renderToStaticMarkup(<PayloadMessageList activities={activities} />)
+    const tabsMarkup = renderToStaticMarkup(
+      <PsdkChannelTabs
+        activities={activities}
+        activeMethod="psdk_floating_window_text"
+        onSelect={() => undefined}
+      />,
+    )
+
+    expect(markup.match(/class="payload-message-item"/g)).toHaveLength(3)
+    expect(markup).not.toContain('class="payload-message-item" open=""')
+    expect(markup).toContain('custom_data_transmission_from_psdk')
+    expect(markup).toContain('psdk_floating_window_text')
+    expect(markup).toContain('psdk_ui_resource_upload_result')
+    expect(markup.indexOf('LATEST')).toBeLessThan(markup.indexOf('MIDDLE'))
+    expect(markup.indexOf('MIDDLE')).toBeLessThan(markup.indexOf('OLDER'))
+    expect(tabsMarkup).toContain('aria-label="PSDK 数据通道"')
+    expect(tabsMarkup.match(/role="tab"/g)).toHaveLength(3)
+    expect(tabsMarkup).toContain('aria-label="浮窗文本通道" aria-selected="true"')
+    expect(tabsMarkup).toContain('aria-label="UI 资源通道" aria-selected="false"')
+    expect(tabsMarkup).toContain('aria-label="自定义数据通道" aria-selected="false"')
   })
 })
 
@@ -295,6 +355,45 @@ describe('Overview DJI field presentation', () => {
     expect(markup).toContain('自定义飞行页签')
     expect(markup).toContain('自定义水平速度')
     expect(markup).toContain('aria-label="自定义水平速度字段详情"')
+  })
+
+  it('shows a formatted telemetry value together with its raw value', () => {
+    const profile = {
+      id: 'profile',
+      name: 'Aircraft',
+      devices: [{ id: 'aircraft', name: '飞机', sn: 'AIR-1', type: 'aircraft' }],
+    } as ConnectionProfile
+    const telemetryLayout = createDefaultTelemetryLayout()
+    const field = {
+      key: 'custom_timestamp',
+      label: '采集时间',
+      description: '',
+      visible: true,
+      formatter: 'datetime' as const,
+    }
+    telemetryLayout.devices.aircraft.fields.push(field)
+    telemetryLayout.devices.aircraft.tabs[0].sections[0].fieldKeys.push(field.key)
+    const timestamp = 1_700_000_000_000
+
+    const markup = renderToStaticMarkup(
+      <Overview
+        profile={profile}
+        telemetry={[{
+          profileId: 'profile', sn: 'AIR-1', type: 'aircraft', name: '飞机', online: true,
+          lastSeenAt: Date.now(), lastTopic: 'thing/product/AIR-1/osd', status: {}, state: {},
+          osd: { custom_timestamp: timestamp },
+        }]}
+        selectedDeviceSn="AIR-1"
+        records={[]}
+        transactions={[]}
+        telemetryLayout={telemetryLayout}
+      />,
+    )
+
+    expect(markup).toContain('采集时间')
+    expect(markup).toContain('telemetry-formatted-raw')
+    expect(markup).toContain(`<span>原始值</span><code>${timestamp}</code>`)
+    expect(markup).not.toContain(`<strong>${timestamp}</strong>`)
   })
 
   it('shows an unknown vendor when the product enum is not registered', () => {

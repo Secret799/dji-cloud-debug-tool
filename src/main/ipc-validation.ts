@@ -15,6 +15,7 @@ import type {
   RtmpRelayStartRequest,
   SeiMessageDetailRequest,
   SeiParserStartRequest,
+  SpeakerAudioRecordingRequest,
   TopicSubscription,
   WebDavConfig,
   WebDavSyncRequest,
@@ -42,6 +43,7 @@ const MAX_WHEP_SDP_BYTES = 256 * 1024
 const MAX_WEBDAV_BACKUP_BYTES = 16 * 1024 * 1024
 const MAX_REMOTE_LOG_FILES = 1_000
 const MAX_REMOTE_LOG_BOOT_INDEX = 4_294_967_295
+const MAX_SPEAKER_RECORDING_BYTES = 16 * 1024 * 1024
 const ALLOWED_RENDERER_STORAGE_KEYS = new Set([
   'dji-cloud-studio.sidebar-width',
   'dji-cloud-studio.telemetry-cache.v1',
@@ -492,7 +494,6 @@ export const validateObjectStorageProfile = (value: unknown): ObjectStorageProfi
   requireOptionalBoolean(profile.hasStoredSecurityToken, '已保存 Security Token 标记')
   requireOptionalBoolean(profile.clearStoredAccessKeySecret, '清除 Access Key Secret 标记')
   requireOptionalBoolean(profile.clearStoredSecurityToken, '清除 Security Token 标记')
-  const expire = requireInteger(profile.expire, '凭证过期时间戳', 1, Number.MAX_SAFE_INTEGER)
   const createdAt = requireFiniteNumber(profile.createdAt, '创建时间')
   const updatedAt = requireFiniteNumber(profile.updatedAt, '更新时间')
   return {
@@ -505,7 +506,6 @@ export const validateObjectStorageProfile = (value: unknown): ObjectStorageProfi
     accessKeyId,
     accessKeySecret,
     securityToken,
-    expire,
     hasStoredAccessKeySecret: profile.hasStoredAccessKeySecret as boolean | undefined,
     hasStoredSecurityToken: profile.hasStoredSecurityToken as boolean | undefined,
     clearStoredAccessKeySecret: profile.clearStoredAccessKeySecret as boolean | undefined,
@@ -521,6 +521,23 @@ export const validateFirmwareUploadRequest = (value: unknown): FirmwareUploadReq
   const objectStorageProfileId = validateProfileId(request.objectStorageProfileId)
   const objectKey = requireString(request.objectKey, '对象 Key', { maxBytes: 2_048 }).trim()
   return { selectionToken, objectStorageProfileId, objectKey }
+}
+
+export const validateSpeakerAudioRecordingRequest = (value: unknown): SpeakerAudioRecordingRequest => {
+  const request = requireRecord(value, '语音录音请求')
+  requireOnlyKeys(request, ['fileName', 'data'], '语音录音请求')
+  const fileName = requireString(request.fileName, '录音文件名', { maxBytes: 128 }).trim()
+  if (!/^[A-Za-z0-9._-]+\.wav$/i.test(fileName)) throw new IpcValidationError('录音文件名必须是 WAV 文件')
+  if (!(request.data instanceof Uint8Array)) throw new IpcValidationError('录音数据格式无效')
+  if (!request.data.byteLength) throw new IpcValidationError('录音数据为空')
+  if (request.data.byteLength > MAX_SPEAKER_RECORDING_BYTES) throw new IpcValidationError('录音数据不能超过 16 MiB')
+  const header = request.data.subarray(0, 12)
+  if (
+    header.byteLength < 12
+    || Buffer.from(header.subarray(0, 4)).toString('ascii') !== 'RIFF'
+    || Buffer.from(header.subarray(8, 12)).toString('ascii') !== 'WAVE'
+  ) throw new IpcValidationError('录音数据不是有效的 WAV 文件')
+  return { fileName, data: request.data }
 }
 
 export const validateRemoteLogUploadRequest = (value: unknown): RemoteLogUploadRequest => {

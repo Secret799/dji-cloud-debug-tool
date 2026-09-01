@@ -19,6 +19,8 @@ import type {
   SeiMessageDetailRequest,
   SeiParserEvent,
   SeiParserStartRequest,
+  SpeakerAudioRecordingRequest,
+  SpeakerAudioUploadRequest,
   TelemetryLayoutConfig,
   WebDavConfig,
   WebDavSyncEvent,
@@ -99,6 +101,17 @@ const api: DjiDesktopApi = {
       const handler = (_event: Electron.IpcRendererEvent, progress: FirmwareUploadProgress): void => listener(progress)
       ipcRenderer.on(IPC_CHANNELS.firmwareUploadProgress, handler)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.firmwareUploadProgress, handler)
+    },
+  },
+  speakerAudio: {
+    pick: () => ipcRenderer.invoke(IPC_CHANNELS.speakerAudioPick),
+    registerRecording: (request: SpeakerAudioRecordingRequest) =>
+      ipcRenderer.invoke(IPC_CHANNELS.speakerAudioRegisterRecording, request),
+    upload: (request: SpeakerAudioUploadRequest) => ipcRenderer.invoke(IPC_CHANNELS.speakerAudioUpload, request),
+    onUploadProgress: (listener: (progress: FirmwareUploadProgress) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, progress: FirmwareUploadProgress): void => listener(progress)
+      ipcRenderer.on(IPC_CHANNELS.speakerAudioUploadProgress, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.speakerAudioUploadProgress, handler)
     },
   },
   updates: {

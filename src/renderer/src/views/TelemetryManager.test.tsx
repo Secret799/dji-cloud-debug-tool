@@ -1,7 +1,11 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { createDefaultTelemetryLayout } from '../lib/telemetry-layout'
-import { TelemetryManager, telemetryMetadataSourceLabel } from './TelemetryManager'
+import {
+  buildTelemetryAutoFormatSuggestions,
+  TelemetryManager,
+  telemetryMetadataSourceLabel,
+} from './TelemetryManager'
 
 const renderManager = (
   config: ReturnType<typeof createDefaultTelemetryLayout>,
@@ -62,6 +66,48 @@ describe('TelemetryManager property metadata', () => {
     expect(markup).toContain('监测项管理 · 自定义属性设置')
     expect(markup).not.toContain('添加字段')
     expect(markup).not.toContain('删除字段')
+  })
+
+  it('offers built-in data formatters and marks configured fields', () => {
+    const config = createDefaultTelemetryLayout()
+    const field = config.devices.dock.fields.find((item) => item.key === 'activation_time')
+    if (!field) throw new Error('Missing activation time field')
+    field.formatter = 'datetime'
+    config.devices.dock.tabs[0].sections[0].fieldKeys = [field.key]
+
+    const markup = renderManager(config)
+
+    expect(markup).toContain('数据格式化')
+    expect(markup).toContain('时间戳 -&gt; 日期时间')
+    expect(markup).toContain('秒 -&gt; x 时 x 分 x 秒')
+    expect(markup).toContain('米 -&gt; 千米')
+    expect(markup).toContain('KB -&gt; MB')
+    expect(markup).toContain('KB -&gt; GB')
+    expect(markup).toContain('<option value="datetime" selected="">')
+    expect(markup).toContain('已格式化')
+    expect(markup).toContain('自动识别')
+  })
+
+  it('builds unit-aware suggestions across all DJI monitoring items', () => {
+    const config = createDefaultTelemetryLayout()
+    const activationTime = config.devices.dock.fields.find((field) => field.key === 'activation_time')
+    if (!activationTime) throw new Error('Missing activation time field')
+    activationTime.formatter = 'date'
+
+    const suggestions = buildTelemetryAutoFormatSuggestions(config, 'dji')
+    const suggestion = (device: 'dock' | 'aircraft', key: string) =>
+      suggestions.find((item) => item.deviceType === device && item.fieldKey === key)
+
+    expect(suggestion('dock', 'activation_time')).toMatchObject({
+      formatter: 'datetime', currentFormatter: 'date', selected: false,
+    })
+    expect(suggestion('dock', 'acc_time')?.formatter).toBe('seconds_to_duration')
+    expect(suggestion('dock', 'storage.total')).toMatchObject({
+      formatter: 'kilobytes_to_megabytes',
+      options: ['kilobytes_to_megabytes', 'kilobytes_to_gigabytes'],
+    })
+    expect(suggestion('aircraft', 'total_flight_distance')?.formatter).toBe('meters_to_kilometers')
+    expect(suggestions.some((item) => item.fieldKey === 'network_state.rate')).toBe(false)
   })
 
   it('defaults to the dock and uses SuperDock metadata for the strawberry brand', () => {

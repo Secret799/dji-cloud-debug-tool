@@ -8,7 +8,7 @@ import { FirmwareUploadManager, normalizeFirmwareObjectKey } from './firmware-up
 const profile: ObjectStorageProfile = {
   id: 'oss-1', name: '升级存储', provider: 'minio', bucket: 'firmware', region: '',
   endpoint: 'https://minio.example.com', accessKeyId: 'id', accessKeySecret: 'secret', securityToken: '',
-  expire: Date.now() + 60 * 60 * 1_000, createdAt: 1, updatedAt: 1,
+  createdAt: 1, updatedAt: 1,
 }
 
 describe('FirmwareUploadManager', () => {
@@ -56,6 +56,7 @@ describe('FirmwareUploadManager', () => {
     })
     expect(progress).toHaveBeenCalledWith(expect.objectContaining({ percent: 50 }))
     expect(progress).toHaveBeenLastCalledWith(expect.objectContaining({ percent: 100 }))
+    expect(uploader).toHaveBeenCalledWith(expect.objectContaining({ expiresIn: 24 * 60 * 60 }))
   })
 
   it('rejects a local file changed after selection', async () => {
@@ -67,6 +68,20 @@ describe('FirmwareUploadManager', () => {
       selectionToken: selected.token, objectStorageProfileId: profile.id, objectKey: 'firmware/file.zip',
     })).resolves.toMatchObject({ ok: false, error: expect.stringContaining('发生变化') })
     expect(uploader).not.toHaveBeenCalled()
+  })
+
+  it('registers in-memory recordings as temporary upload selections', async () => {
+    const uploader = vi.fn(async () => 'https://example.com/voice.wav')
+    const manager = new FirmwareUploadManager({ resolve: async () => profile } as never, vi.fn(), uploader, '音频文件')
+    const selected = await manager.selectBytes('voice-1.wav', new TextEncoder().encode('recorded-audio'))
+    const result = await manager.upload({
+      selectionToken: selected.token,
+      objectStorageProfileId: profile.id,
+      objectKey: 'speaker/voice-1.wav',
+    })
+    expect(selected).toMatchObject({ fileName: 'voice-1.wav', fileSize: 14 })
+    expect(result).toMatchObject({ ok: true, artifact: { fileName: 'voice-1.wav' } })
+    await manager.dispose()
   })
 })
 

@@ -15,6 +15,7 @@ import {
   validateSeiMessageDetailRequest,
   validateSeiParserId,
   validateSeiParserStartRequest,
+  validateSpeakerAudioRecordingRequest,
   validateSessionPassword,
   validateWhepOfferRequest,
 } from './ipc-validation'
@@ -89,6 +90,7 @@ describe('IPC validation', () => {
     })
     expect(objectStorage).not.toHaveProperty('storedAccessKeySecret')
     expect(objectStorage).not.toHaveProperty('encryptedAccessKeySecret')
+    expect(objectStorage).not.toHaveProperty('expire')
   })
 
   it('accepts a valid WHEP offer and rejects unsafe URLs or invalid SDP', () => {
@@ -354,7 +356,7 @@ describe('IPC validation', () => {
     const profile = {
       id: 'storage-1', name: 'Primary OSS', provider: 'ali', bucket: 'bucket', region: 'cn-hangzhou',
       endpoint: 'https://oss-cn-hangzhou.aliyuncs.com', accessKeyId: 'key', accessKeySecret: 'secret',
-      securityToken: '', expire: 1_900_000_000_000, createdAt: 1, updatedAt: 1,
+      securityToken: '', createdAt: 1, updatedAt: 1,
     }
     expect(validateObjectStorageProfile(profile).provider).toBe('ali')
     expect(() => validateObjectStorageProfile({ ...profile, provider: 'unknown' })).toThrow('厂商无效')
@@ -373,6 +375,16 @@ describe('IPC validation', () => {
     expect(() => validateFirmwareUploadRequest({ ...request, selectionToken: 'x'.repeat(257) })).toThrow('过长')
     expect(() => validateFirmwareUploadRequest({ ...request, objectKey: '' })).toThrow('不能为空')
     expect(() => validateFirmwareUploadRequest({ ...request, objectKey: { path: 'firmware.zip' } })).toThrow('字符串')
+  })
+
+  it('validates recorded speaker WAV data', () => {
+    const data = new Uint8Array(44)
+    data.set(new TextEncoder().encode('RIFF'), 0)
+    data.set(new TextEncoder().encode('WAVE'), 8)
+    expect(validateSpeakerAudioRecordingRequest({ fileName: 'voice-1.wav', data })).toEqual({ fileName: 'voice-1.wav', data })
+    expect(() => validateSpeakerAudioRecordingRequest({ fileName: '../voice.wav', data })).toThrow('WAV')
+    expect(() => validateSpeakerAudioRecordingRequest({ fileName: 'voice.wav', data: new Uint8Array() })).toThrow('为空')
+    expect(() => validateSpeakerAudioRecordingRequest({ fileName: 'voice.wav', data: new Uint8Array(44) })).toThrow('有效的 WAV')
   })
 
   it('validates remote log uploads and strips unselected object keys', () => {

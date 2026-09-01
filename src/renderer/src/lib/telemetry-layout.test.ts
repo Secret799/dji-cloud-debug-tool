@@ -171,6 +171,19 @@ describe('telemetry layout configuration', () => {
     expect(parsed.devices.pilot.fields[0].propertySetting).toEqual(field.propertySetting)
   })
 
+  it('preserves a supported formatter and rejects unknown formatter names', () => {
+    const config = createDefaultTelemetryLayout()
+    config.devices.pilot.fields[0].formatter = 'datetime'
+
+    expect(parseTelemetryLayoutConfig(config).devices.pilot.fields[0].formatter).toBe('datetime')
+
+    const invalid = structuredClone(config) as unknown as {
+      devices: { pilot: { fields: Array<{ formatter?: string }> } }
+    }
+    invalid.devices.pilot.fields[0].formatter = 'javascript'
+    expect(() => parseTelemetryLayoutConfig(invalid)).toThrow('数据格式化函数无效')
+  })
+
   it('rejects unsafe array indexes in custom property paths', () => {
     const config = createDefaultTelemetryLayout()
     config.devices.pilot.fields[0].propertySetting = {

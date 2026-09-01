@@ -12,6 +12,7 @@ const packagedExecutable = process.env.DJI_STUDIO_EXECUTABLE
   ? resolve(projectRoot, process.env.DJI_STUDIO_EXECUTABLE)
   : undefined
 const skipLocalMediaServerStart = process.env.DJI_STUDIO_SKIP_LOCAL_ZLM_START === 'true'
+const focusPayload = process.env.DJI_STUDIO_FOCUS_PAYLOAD === 'true'
 const errors = []
 const layouts = []
 
@@ -44,9 +45,17 @@ try {
 
   const assertTooltip = async (name) => {
     const control = window.getByRole('button', { name, exact: true }).first()
-    await control.hover()
     const tooltip = window.getByRole('tooltip')
-    await tooltip.waitFor({ state: 'visible' })
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await control.hover({ force: attempt > 0 })
+      try {
+        await tooltip.waitFor({ state: 'visible', timeout: 2_000 })
+        break
+      } catch (error) {
+        if (attempt === 1) throw error
+        await window.mouse.move(500, 350)
+      }
+    }
     const text = await tooltip.textContent()
     if (text !== name) errors.push(`Tooltip for ${name} displayed ${JSON.stringify(text)}`)
     await window.mouse.move(500, 350)
@@ -54,14 +63,14 @@ try {
   }
 
   await assertTooltip('设备工作台')
-  await assertTooltip('添加设备')
+  await assertTooltip('添加网关')
   await assertTooltip('云同步')
 
   const railOrder = await window.locator('.app-rail').evaluate((rail) => ({
     top: [...rail.querySelectorAll('.rail-top button')].map((button) => button.getAttribute('aria-label')),
     bottom: [...rail.querySelectorAll('.rail-bottom button')].map((button) => button.getAttribute('aria-label')),
   }))
-  if (railOrder.top.join('|') !== '设备工作台|媒体中心|OSS 管理|大疆配置') {
+  if (railOrder.top.join('|') !== '设备工作台|媒体中心|OSS 管理|监测项配置') {
     errors.push(`navigation: unexpected top rail order (${railOrder.top.join(', ')})`)
   }
   if (railOrder.bottom.join('|') !== '云同步|设置|关于') {
@@ -186,13 +195,13 @@ try {
     layouts.push(layout)
   }
 
-  await window.getByRole('button', { name: '添加设备' }).click()
+  await window.getByRole('button', { name: '添加网关' }).click()
   if (await window.locator('.device-modal select').first().inputValue() !== 'dock2') {
     errors.push('overview: new dock does not default to the Dock 2 field model')
   }
   await window.locator('.device-modal input').nth(0).fill('测试机场')
   await window.locator('.device-modal input').nth(1).fill('DOCK-SMOKE-001')
-  await window.getByRole('button', { name: '保存设备' }).click()
+  await window.getByRole('button', { name: '保存网关' }).click()
   await window.locator('.telemetry-workspace').waitFor({ state: 'visible' })
   await window.locator('.toast').waitFor({ state: 'hidden', timeout: 6_000 })
   await window.waitForFunction(
@@ -601,79 +610,85 @@ try {
     await window.getByRole('button', { name: '遥测', exact: true }).click()
     await window.locator('.telemetry-workspace').waitFor({ state: 'visible' })
 
+    if (!focusPayload) {
     const silentModeRow = window.locator('.telemetry-row').filter({ hasText: 'silent_mode' }).first()
-    const silentModeValue = await silentModeRow.locator('.telemetry-field-value > strong').innerText()
-    if (silentModeValue !== '静音模式 (1)') {
-      errors.push(`overview: unexpected silent_mode value ${JSON.stringify(silentModeValue)}`)
-    }
-
-    const propertySetButton = silentModeRow.locator('.telemetry-property-set-button')
-    if (await propertySetButton.count() !== 1) {
-      errors.push('overview: writable telemetry field is missing its setting control')
-    } else {
-      await propertySetButton.evaluate((button) => {
-        const propsKey = Object.keys(button).find((key) => key.startsWith('__reactProps$'))
-        button[propsKey]?.onClick?.()
-      })
-      const propertyDialog = window.getByRole('dialog', { name: '设置机场静音模式' })
-      await propertyDialog.waitFor({ state: 'visible' })
-      if (await propertyDialog.locator('select').inputValue() !== '1') {
-        errors.push('property set: current enum value was not selected')
-      }
-      const propertyDialogText = await propertyDialog.innerText()
-      if (!propertyDialogText.includes('thing/product/DOCK-SMOKE-001/property/set')
-        || !propertyDialogText.includes('DJI Dock 2 设备属性')) {
-        errors.push(`property set: missing topic or metadata source (${JSON.stringify(propertyDialogText)})`)
-      }
-      await inspectLayout('property-set', [
-        'body',
-        '.modal-backdrop',
-        '.property-set-modal',
-        '.property-set-meta',
-        '.property-set-field',
-        '.property-set-footer',
-      ])
-      await window.screenshot({ path: `${screenshotBase}-property-set.png` })
-      await propertyDialog.getByRole('button', { name: '关闭', exact: true }).last().click()
-      await propertyDialog.waitFor({ state: 'hidden' })
-    }
-
-    await silentModeRow.locator('.field-help-button').hover()
+    const silentModeValueLocator = silentModeRow.locator('.telemetry-field-value strong')
     const tooltip = window.locator('.field-tooltip')
-    await tooltip.waitFor({ state: 'visible', timeout: 3_000 })
-    await window.waitForTimeout(180)
-    const tooltipText = await tooltip.innerText()
-    if (!tooltipText.includes('风扇转速降低') || !tooltipText.includes('可读写')) {
-      errors.push('overview: Dock 2 field tooltip is missing official details')
+    if (await silentModeValueLocator.count() === 0) {
+      errors.push('overview: silent_mode telemetry value is missing; skipped its property and tooltip checks')
+    } else {
+      const silentModeValue = await silentModeValueLocator.innerText()
+      if (silentModeValue !== '静音模式 (1)') {
+        errors.push(`overview: unexpected silent_mode value ${JSON.stringify(silentModeValue)}`)
+      }
+
+      const propertySetButton = silentModeRow.locator('.telemetry-property-set-button')
+      if (await propertySetButton.count() !== 1) {
+        errors.push('overview: writable telemetry field is missing its setting control')
+      } else {
+        await propertySetButton.evaluate((button) => {
+          const propsKey = Object.keys(button).find((key) => key.startsWith('__reactProps$'))
+          button[propsKey]?.onClick?.()
+        })
+        const propertyDialog = window.getByRole('dialog', { name: '设置机场静音模式' })
+        await propertyDialog.waitFor({ state: 'visible' })
+        if (await propertyDialog.locator('select').inputValue() !== '1') {
+          errors.push('property set: current enum value was not selected')
+        }
+        const propertyDialogText = await propertyDialog.innerText()
+        if (!propertyDialogText.includes('thing/product/DOCK-SMOKE-001/property/set')
+          || !propertyDialogText.includes('DJI Dock 2 设备属性')) {
+          errors.push(`property set: missing topic or metadata source (${JSON.stringify(propertyDialogText)})`)
+        }
+        await inspectLayout('property-set', [
+          'body',
+          '.modal-backdrop',
+          '.property-set-modal',
+          '.property-set-meta',
+          '.property-set-field',
+          '.property-set-footer',
+        ])
+        await window.screenshot({ path: `${screenshotBase}-property-set.png` })
+        await propertyDialog.getByRole('button', { name: '关闭', exact: true }).last().click()
+        await propertyDialog.waitFor({ state: 'hidden' })
+      }
+
+      await silentModeRow.locator('.field-help-button').hover()
+      await tooltip.waitFor({ state: 'visible', timeout: 3_000 })
+      await window.waitForTimeout(180)
+      const tooltipText = await tooltip.innerText()
+      if (!tooltipText.includes('风扇转速降低') || !tooltipText.includes('可读写')) {
+        errors.push('overview: Dock 2 field tooltip is missing official details')
+      }
+      const tooltipBox = await tooltip.boundingBox()
+      if (
+        !tooltipBox
+        || tooltipBox.x < -1
+        || tooltipBox.y < -1
+        || tooltipBox.x + tooltipBox.width > 1025
+        || tooltipBox.y + tooltipBox.height > 681
+      ) {
+        errors.push(`overview: field tooltip is outside the viewport (${JSON.stringify(tooltipBox)})`)
+      }
+      await window.screenshot({ path: `${screenshotBase}-field-tooltip.png` })
+
+      await window.keyboard.press('Escape')
+      await tooltip.waitFor({ state: 'hidden', timeout: 1_000 })
+
+      await window.mouse.move(1010, 10)
+      await silentModeRow.locator('.field-help-button').focus()
+      await tooltip.waitFor({ state: 'visible', timeout: 1_000 })
+      await window.mouse.move(1010, 10)
+      await window.keyboard.press('Escape')
+      await tooltip.waitFor({ state: 'hidden', timeout: 1_000 })
+
+      const silentModeButton = silentModeRow.locator('.field-help-button')
+      await silentModeButton.evaluate((button) => button.blur())
+      await silentModeButton.focus()
+      await tooltip.waitFor({ state: 'visible', timeout: 1_000 })
     }
-    const tooltipBox = await tooltip.boundingBox()
-    if (
-      !tooltipBox
-      || tooltipBox.x < -1
-      || tooltipBox.y < -1
-      || tooltipBox.x + tooltipBox.width > 1025
-      || tooltipBox.y + tooltipBox.height > 681
-    ) {
-      errors.push(`overview: field tooltip is outside the viewport (${JSON.stringify(tooltipBox)})`)
-    }
-    await window.screenshot({ path: `${screenshotBase}-field-tooltip.png` })
-
-    await window.keyboard.press('Escape')
-    await tooltip.waitFor({ state: 'hidden', timeout: 1_000 })
-
-    await window.mouse.move(1010, 10)
-    await silentModeRow.locator('.field-help-button').focus()
-    await tooltip.waitFor({ state: 'visible', timeout: 1_000 })
-    await window.mouse.move(1010, 10)
-    await window.keyboard.press('Escape')
-    await tooltip.waitFor({ state: 'hidden', timeout: 1_000 })
-
-    const silentModeButton = silentModeRow.locator('.field-help-button')
-    await silentModeButton.evaluate((button) => button.blur())
-    await silentModeButton.focus()
-    await tooltip.waitFor({ state: 'visible', timeout: 1_000 })
     await window.getByRole('tab', { name: /其他信息/ }).click()
-    await tooltip.waitFor({ state: 'hidden', timeout: 1_000 })
+    if (await tooltip.isVisible()) await tooltip.waitFor({ state: 'hidden', timeout: 1_000 })
     const telemetryCategoryTabs = window.locator('.telemetry-category-tabs')
     const telemetrySectionTabs = window.locator('#telemetry-panel-other .telemetry-section-tabs')
     const telemetrySectionPanels = window.locator('#telemetry-panel-other .telemetry-section-panels')
@@ -706,7 +721,7 @@ try {
     await window.getByRole('tab', { name: /设备信息/ }).click()
     await window.getByRole('tab', { name: /机场设备/ }).click()
     const airConditionerRow = window.locator('.telemetry-row').filter({ hasText: 'air_conditioner.air_conditioner_state' }).first()
-    const airConditionerValue = await airConditionerRow.locator('.telemetry-field-value > strong').innerText()
+    const airConditionerValue = await airConditionerRow.locator('.telemetry-field-value strong').innerText()
     if (airConditionerValue !== '风冷准备中 (10)') {
       errors.push(`overview: malformed-source enum was not repaired (${JSON.stringify(airConditionerValue)})`)
     }
@@ -760,16 +775,24 @@ try {
     }
     await maintenanceArrayItems.nth(1).locator('summary').click()
     await window.screenshot({ path: `${screenshotBase}-maintenance.png` })
+    }
 
     const payloadEvents = [
-      { id: 'smoke-payload-event-1', psdkIndex: 1, value: 'PSDK-ONE' },
-      { id: 'smoke-payload-event-1b', psdkIndex: 1, value: 'PSDK-ONE-SECOND' },
-      { id: 'smoke-payload-event-2', psdkIndex: 2, value: 'ENC:AAECA/8=' },
+      { id: 'smoke-payload-floating', method: 'psdk_floating_window_text', psdkIndex: 2, value: 'FLOATING-WINDOW' },
+      { id: 'smoke-payload-ui', method: 'psdk_ui_resource_upload_result', psdkIndex: 2, result: 0 },
+      { id: 'smoke-payload-event-1', method: 'custom_data_transmission_from_psdk', psdkIndex: 1, value: 'PSDK-ONE' },
+      { id: 'smoke-payload-event-1b', method: 'custom_data_transmission_from_psdk', psdkIndex: 1, value: 'PSDK-ONE-SECOND' },
+      { id: 'smoke-payload-event-2', method: 'custom_data_transmission_from_psdk', psdkIndex: 2, value: 'ENC:AAECA/8=', payloadType: 'parachute' },
     ]
     for (const payloadEvent of payloadEvents) {
       const payloadEventBody = JSON.stringify({
-        method: 'custom_data_transmission_from_psdk',
-        data: { psdk_index: payloadEvent.psdkIndex, value: payloadEvent.value },
+        method: payloadEvent.method,
+        data: {
+          psdk_index: payloadEvent.psdkIndex,
+          ...(payloadEvent.value ? { value: payloadEvent.value } : {}),
+          ...(payloadEvent.result !== undefined ? { result: payloadEvent.result } : {}),
+          ...(payloadEvent.payloadType ? { payload_type: payloadEvent.payloadType } : {}),
+        },
       })
       await electronApp.evaluate(({ BrowserWindow }, event) => {
         for (const instance of BrowserWindow.getAllWindows()) {
@@ -804,13 +827,41 @@ try {
     }
     await payloadWorkbenchTab.click()
     await window.locator('.payload-workspace').waitFor({ state: 'visible' })
-    const rawPayloadText = await window.locator('.psdk-report-value pre').innerText()
-    if (rawPayloadText !== 'ENC:AAECA/8=') errors.push(`payload: raw encrypted value changed (${JSON.stringify(rawPayloadText)})`)
+    const parsedPayloadText = await window.locator('.payload-data-value pre').innerText()
+    if (parsedPayloadText !== 'ENC:AAECA/8=') errors.push(`payload: parsed encrypted value changed (${JSON.stringify(parsedPayloadText)})`)
+    const latestRawPayloadText = await window.locator('.payload-message-item').first().locator('.payload-message-body pre').textContent()
+    if (!latestRawPayloadText?.includes('"psdk_index": 2')) {
+      errors.push(`payload: raw message data changed (${JSON.stringify(latestRawPayloadText)})`)
+    }
     const payloadWorkspaceText = await window.locator('.payload-workspace').innerText()
-    for (const expected of ['负载信息', 'PSDK 数据消息', 'PSDK 2', 'custom_data_transmission_from_psdk', 'ENC:AAECA/8=', '"psdk_index": 2']) {
+    for (const expected of ['负载信息', '负载类型', '自动识别', '手动识别', '降落伞', '识别依据：字段 payload_type=parachute', '暂无控制能力', '负载数据', '原始数据', 'PSDK 2', 'custom_data_transmission_from_psdk', 'ENC:AAECA/8=']) {
       if (!payloadWorkspaceText.includes(expected)) errors.push(`payload: missing ${expected}`)
     }
-    for (const unexpected of ['PSDK 负载控制', '发送自定义数据', 'custom_data_transmission_to_psdk', '喊话器', 'gimbal_yaw', 'camera_photo_take_progress', '获取负载控制权', '拍照', '云台回中']) {
+    if (await window.locator('.payload-message-item').count() !== 1 || await window.locator('.payload-message-item[open]').count() !== 0) {
+      errors.push('payload: raw messages should be collapsed by default')
+    }
+    const psdkChannelTabs = window.getByRole('tablist', { name: 'PSDK 数据通道' })
+    if (await psdkChannelTabs.getByRole('tab').count() !== 3) {
+      errors.push('payload: PSDK data channel tabs are incomplete')
+    }
+    if (await window.getByRole('tab', { name: '自定义数据通道' }).getAttribute('aria-selected') !== 'true') {
+      errors.push('payload: latest PSDK data channel was not selected')
+    }
+    await window.getByRole('tab', { name: '浮窗文本通道' }).click()
+    if (
+      await window.locator('.payload-data-value pre').innerText() !== 'FLOATING-WINDOW'
+      || await window.locator('.payload-message-item').count() !== 1
+    ) {
+      errors.push('payload: floating-window channel did not filter parsed and raw data')
+    }
+    await window.getByRole('tab', { name: 'UI 资源通道' }).click()
+    const uiResourceText = await window.locator('.payload-data-value pre').innerText()
+    if (!uiResourceText.includes('"result": 0') || await window.locator('.payload-message-item').count() !== 1) {
+      errors.push(`payload: UI-resource channel did not filter parsed and raw data (${JSON.stringify(uiResourceText)})`)
+    }
+    await window.getByRole('tab', { name: '自定义数据通道' }).click()
+    await window.screenshot({ path: `${screenshotBase}-payload-no-control.png` })
+    for (const unexpected of ['PSDK 负载控制', '发送自定义数据', 'custom_data_transmission_to_psdk', 'gimbal_yaw', 'camera_photo_take_progress', '获取负载控制权', '拍照', '云台回中']) {
       if (payloadWorkspaceText.includes(unexpected)) errors.push(`payload: should not contain ${unexpected}`)
     }
     const psdkTabs = window.getByRole('tab', { name: /^PSDK / })
@@ -818,7 +869,38 @@ try {
       errors.push('payload: psdk_index tabs did not select the current payload')
     }
     await window.getByRole('tab', { name: 'PSDK 1' }).click()
+    if (await window.locator('.payload-message-item').count() !== 2 || await window.locator('.payload-message-item[open]').count() !== 0) {
+      errors.push('payload: all PSDK raw messages should remain collapsed')
+    }
+    await window.getByRole('button', { name: '手动识别' }).click()
+    await window.getByRole('combobox', { name: '手动负载类型' }).selectOption('speaker')
     const selectedPayloadText = await window.locator('.payload-workspace').innerText()
+    if (!selectedPayloadText.includes('喊话器') || !selectedPayloadText.includes('PSDK 1 已手动指定')) {
+      errors.push('payload: manual payload type selection was not applied')
+    }
+    for (const speakerControlText of ['PSDK 控制通道', 'TTS 喊话', '设置音量', '停止播放', 'thing/product/DOCK-SMOKE-001/services · PSDK 1']) {
+      if (!selectedPayloadText.includes(speakerControlText)) errors.push(`payload: speaker control is missing ${speakerControlText}`)
+    }
+    await window.getByRole('button', { name: '语音方式' }).click()
+    const speakerRecordingText = await window.locator('.speaker-control').innerText()
+    for (const recordingText of ['麦克风', '本地文件', '麦克风就绪', '00:00 / 01:00', '开始录音', '对象存储']) {
+      if (!speakerRecordingText.includes(recordingText)) errors.push(`payload: speaker recording mode is missing ${recordingText}`)
+    }
+    const recordingRegistration = await window.evaluate(async () => {
+      const data = new Uint8Array(44)
+      data.set(new TextEncoder().encode('RIFF'), 0)
+      data.set(new TextEncoder().encode('WAVE'), 8)
+      return window.djiApi.speakerAudio.registerRecording({ fileName: 'smoke-recording.wav', data })
+    })
+    if (recordingRegistration.error || !recordingRegistration.package?.token) {
+      errors.push(`payload: speaker recording IPC registration failed (${recordingRegistration.error ?? 'missing selection token'})`)
+    }
+    await window.screenshot({ path: `${screenshotBase}-payload-speaker-recording.png` })
+    await window.getByRole('button', { name: '本地文件' }).click()
+    const speakerAudioText = await window.locator('.speaker-control').innerText()
+    for (const audioText of ['选择 MP3 / WAV 音频', '对象存储', '上传并喊话']) {
+      if (!speakerAudioText.includes(audioText)) errors.push(`payload: speaker audio mode is missing ${audioText}`)
+    }
     if (!selectedPayloadText.includes('PSDK-ONE') || selectedPayloadText.includes('ENC:AAECA/8=')) {
       errors.push('payload: psdk_index tab did not filter payload details and messages')
     }
@@ -830,6 +912,10 @@ try {
       '.payload-dashboard',
       '.payload-info-panel',
       '.payload-event-panel',
+      '.payload-data-section',
+      '.payload-latest-data',
+      '.payload-raw-section',
+      '.payload-message-list',
       '.psdk-index-tabs',
     ])
     const payloadPanelBoxes = await Promise.all([
@@ -843,6 +929,51 @@ try {
       || payloadPanelBoxes[1].x <= payloadPanelBoxes[0].x + payloadPanelBoxes[0].width
     ) {
       errors.push(`payload: desktop panels are not arranged left and right (${JSON.stringify(payloadPanelBoxes)})`)
+    }
+    const payloadFixedLayout = await window.evaluate(() => {
+      const metrics = (selector) => {
+        const element = document.querySelector(selector)
+        if (!(element instanceof HTMLElement)) return undefined
+        const rect = element.getBoundingClientRect()
+        return {
+          height: Math.round(rect.height),
+          clientHeight: element.clientHeight,
+          scrollHeight: element.scrollHeight,
+          overflowY: window.getComputedStyle(element).overflowY,
+        }
+      }
+      return {
+        dashboard: metrics('.payload-dashboard'),
+        info: metrics('.payload-info-panel'),
+        event: metrics('.payload-event-panel'),
+        parsedSection: metrics('.payload-data-section'),
+        parsedContent: metrics('.payload-latest-data'),
+        rawSection: metrics('.payload-raw-section'),
+        rawContent: metrics('.payload-message-list'),
+      }
+    })
+    if (
+      !payloadFixedLayout.dashboard
+      || !payloadFixedLayout.info
+      || !payloadFixedLayout.event
+      || Math.abs(payloadFixedLayout.info.height - payloadFixedLayout.event.height) > 1
+      || payloadFixedLayout.event.height > payloadFixedLayout.dashboard.height + 1
+    ) {
+      errors.push(`payload: panels do not keep a fixed shared height (${JSON.stringify(payloadFixedLayout)})`)
+    }
+    if (
+      !payloadFixedLayout.parsedSection
+      || !payloadFixedLayout.rawSection
+      || Math.abs(payloadFixedLayout.parsedSection.height - payloadFixedLayout.rawSection.height) > 1
+    ) {
+      errors.push(`payload: parsed and raw data regions are not fixed to equal heights (${JSON.stringify(payloadFixedLayout)})`)
+    }
+    if (
+      payloadFixedLayout.info?.overflowY !== 'auto'
+      || payloadFixedLayout.parsedContent?.overflowY !== 'auto'
+      || payloadFixedLayout.rawContent?.overflowY !== 'auto'
+    ) {
+      errors.push(`payload: fixed data regions are missing vertical scrolling (${JSON.stringify(payloadFixedLayout)})`)
     }
     await window.screenshot({ path: `${screenshotBase}-payload.png` })
     await browserWindow.evaluate((instance) => instance.setContentSize(1024, 680))
@@ -1273,7 +1404,7 @@ try {
     { timeout: 5_000 },
   )
 
-  await window.getByRole('button', { name: '大疆配置', exact: true }).click()
+  await window.getByRole('button', { name: '监测项配置', exact: true }).click()
   await window.locator('.dji-config-center').waitFor({ state: 'visible' })
   await window.getByRole('button', { name: /错误码管理/ }).click()
   await window.locator('.error-code-manager').waitFor({ state: 'visible' })
@@ -1306,7 +1437,7 @@ try {
   ])
   await window.screenshot({ path: `${screenshotBase}-error-codes.png` })
 
-  await window.getByRole('button', { name: /遥测项管理/ }).click()
+  await window.getByRole('button', { name: /监测项管理/ }).click()
   await window.locator('.telemetry-manager').waitFor({ state: 'visible' })
   await window.locator('.telemetry-field-editor-form').waitFor({ state: 'visible' })
   await inspectLayout('telemetry-manager', [

@@ -46,6 +46,7 @@ import { DeviceModal } from './components/DeviceModal'
 import { Sidebar } from './components/Sidebar'
 import { Tooltip } from './components/Tooltip'
 import {
+  buildDrcStatusEventReply,
   buildServicePayload,
   commandTransactions,
   createDevice,
@@ -658,6 +659,18 @@ export default function App() {
       }
 
       if (event.type === 'message') {
+        const drcStatusEventReply = buildDrcStatusEventReply(event.message)
+        if (drcStatusEventReply) {
+          void window.djiApi.mqtt.publish({
+            profileId: event.profileId,
+            topic: drcStatusEventReply.topic,
+            payload: drcStatusEventReply.payload,
+            qos: 1,
+            retain: false,
+          }).then((result) => {
+            if (!result.ok) showToast(`DRC 状态确认失败：${result.error ?? '未知错误'}`, 'error')
+          }).catch((error) => showToast(`DRC 状态确认失败：${errorMessage(error)}`, 'error'))
+        }
         const firmwareEventReply = buildFirmwareEventReply(event.message)
         if (firmwareEventReply) {
           void window.djiApi.mqtt.publish({

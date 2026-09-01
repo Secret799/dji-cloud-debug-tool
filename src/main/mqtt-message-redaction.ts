@@ -92,11 +92,49 @@ const containsSensitiveMarker = (value: string): boolean => {
   return SENSITIVE_ASSIGNMENT_PATTERN.test(value) || SENSITIVE_XML_PATTERN.test(value)
 }
 
+const redactSignedUrl = (value: string): string | undefined => {
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    return undefined
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return undefined
+
+  let changed = false
+  if (url.username) {
+    url.username = 'REDACTED'
+    changed = true
+  }
+  if (url.password) {
+    url.password = 'REDACTED'
+    changed = true
+  }
+  for (const [key, item] of url.searchParams) {
+    const normalizedKey = normalizeKey(key)
+    if (
+      isSensitiveKey(key)
+      || normalizedKey === 'signature'
+      || normalizedKey.endsWith('signature')
+      || containsSensitiveMarker(item)
+    ) {
+      url.searchParams.set(key, 'REDACTED')
+      changed = true
+    }
+  }
+  return changed ? url.toString() : undefined
+}
+
 const cloneAndRedact = (value: unknown, state: RedactionState, depth: number): unknown => {
   state.nodes += 1
   if (depth > MAX_REDACTION_DEPTH || state.nodes > MAX_REDACTION_NODES) throw new RedactionLimitError()
 
   if (typeof value === 'string') {
+    const redactedUrl = redactSignedUrl(value)
+    if (redactedUrl) {
+      state.changed = true
+      return redactedUrl
+    }
     if (!containsSensitiveMarker(value)) return value
     state.changed = true
     return REDACTED_MQTT_VALUE

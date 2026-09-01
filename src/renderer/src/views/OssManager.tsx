@@ -32,7 +32,6 @@ export function OssManager({ profiles, selectedId, onSelect, onSave, onRemove, o
   const selected = profiles.find((profile) => profile.id === selectedId)
   const [editorOpen, setEditorOpen] = useState(false)
   const [draft, setDraft] = useState<ObjectStorageProfile>(() => selected ? cloneProfile(selected) : createObjectStorageProfile())
-  const [expire, setExpire] = useState(selected?.expire ? String(selected.expire) : String(draft.expire))
   const [isNew, setIsNew] = useState(!selected)
   const [saving, setSaving] = useState(false)
   const resolveGeneration = useRef(0)
@@ -67,7 +66,6 @@ export function OssManager({ profiles, selectedId, onSelect, onSave, onRemove, o
     const generation = resolveGeneration.current + 1
     resolveGeneration.current = generation
     setDraft(cloneProfile(current))
-    setExpire(String(current.expire))
     setIsNew(false)
     void resolveProfile(current, generation)
   }, [profiles, selectedId])
@@ -79,7 +77,6 @@ export function OssManager({ profiles, selectedId, onSelect, onSave, onRemove, o
     resolveGeneration.current = generation
     onSelect(profile.id)
     setDraft(cloneProfile(profile))
-    setExpire(String(profile.expire))
     setIsNew(false)
     setEditorOpen(true)
     void resolveProfile(profile, generation)
@@ -89,7 +86,6 @@ export function OssManager({ profiles, selectedId, onSelect, onSave, onRemove, o
     resolveGeneration.current += 1
     const next = createObjectStorageProfile()
     setDraft(next)
-    setExpire(String(next.expire))
     setIsNew(true)
     setEditorOpen(true)
   }
@@ -101,18 +97,16 @@ export function OssManager({ profiles, selectedId, onSelect, onSave, onRemove, o
   }
 
   const handleSave = async (): Promise<void> => {
-    const next = { ...draft, expire: Number(expire) }
-    const issues = objectStorageProfileIssues(next)
+    const issues = objectStorageProfileIssues(draft)
     if (issues.length) {
       onNotify(`请填写：${issues.join('、')}`, 'error')
       return
     }
     setSaving(true)
     try {
-      const saved = await onSave(next)
+      const saved = await onSave(draft)
       resolveGeneration.current += 1
       setDraft(cloneProfile(saved))
-      setExpire(String(saved.expire))
       setIsNew(false)
       onSelect(saved.id)
       setEditorOpen(false)
@@ -175,7 +169,6 @@ export function OssManager({ profiles, selectedId, onSelect, onSave, onRemove, o
                 <div className="wide"><dt>Endpoint</dt><dd>{selected.endpoint || '未设置'}</dd></div>
                 <div><dt>Access Key ID</dt><dd>{selected.accessKeyId || '未设置'}</dd></div>
                 <div><dt>Security Token</dt><dd>{selected.hasStoredSecurityToken ? '已加密保存' : '未设置'}</dd></div>
-                <div><dt>凭证过期时间</dt><dd>{selected.expire > 0 ? selected.expire : '不限制'}</dd></div>
               </dl>
             </div>
           </section>
@@ -245,7 +238,6 @@ export function OssManager({ profiles, selectedId, onSelect, onSave, onRemove, o
                     }))}
                     placeholder={draft.clearStoredSecurityToken ? '保存后清除' : draft.hasStoredSecurityToken ? '已加密保存' : '可选'}
                   />
-                  <label className="field"><span>凭证过期时间戳</span><input inputMode="numeric" value={expire} onChange={(event) => setExpire(event.target.value)} placeholder="毫秒或秒时间戳" /></label>
                 </div>
               </section>
               <div className="oss-modal-security"><ShieldCheck size={14} /><span>密钥由应用内 AES-256-GCM 加密保存</span></div>

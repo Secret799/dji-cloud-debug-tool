@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowDown,
   ArrowUp,
+  Braces,
   Download,
   Eye,
   EyeOff,
@@ -10,8 +11,10 @@ import {
   RotateCcw,
   Search,
   Settings2,
+  Sparkles,
   Trash2,
   Upload,
+  X,
 } from 'lucide-react'
 import type {
   DeviceProvider,
@@ -21,6 +24,7 @@ import type {
   TelemetryLayoutField,
   TelemetryLayoutSection,
   TelemetryLayoutTab,
+  TelemetryValueFormatter,
 } from '../../../shared/contracts'
 import { parseTelemetryLayoutConfig } from '../../../shared/telemetry-layout'
 import { Tooltip } from '../components/Tooltip'
@@ -39,6 +43,7 @@ import {
   type TelemetryMetadataSource,
   updateTelemetryLayoutTimestamp,
 } from '../lib/telemetry-layout'
+import { TELEMETRY_FORMATTER_OPTIONS, telemetryFormatterRecommendations } from '../lib/telemetry-format'
 
 interface TelemetryManagerProps {
   provider?: DeviceProvider
@@ -51,6 +56,22 @@ const deviceLabels: Record<DeviceType, string> = {
   dock: '机场',
   aircraft: '飞机',
   pilot: '遥控器',
+}
+
+const availableDeviceTypesForProvider = (provider: DeviceProvider): DeviceType[] =>
+  provider === 'superdock' ? ['dock'] : ['dock', 'aircraft', 'pilot']
+
+const formatterLabels = new Map(TELEMETRY_FORMATTER_OPTIONS.map((option) => [option.value, option.label]))
+
+export interface TelemetryAutoFormatSuggestion {
+  deviceType: DeviceType
+  fieldKey: string
+  label: string
+  unit: string
+  formatter: TelemetryValueFormatter
+  options: TelemetryValueFormatter[]
+  selected: boolean
+  currentFormatter?: TelemetryValueFormatter
 }
 
 const cloneLayout = (layout: TelemetryDeviceLayout): TelemetryDeviceLayout => ({
@@ -88,13 +109,36 @@ export const telemetryMetadataSourceLabel = (source: TelemetryMetadataSource): s
   return '未关联官方物模型元数据'
 }
 
+export const buildTelemetryAutoFormatSuggestions = (
+  config: TelemetryLayoutConfig,
+  provider: DeviceProvider,
+): TelemetryAutoFormatSuggestion[] => availableDeviceTypesForProvider(provider).flatMap((type) =>
+  config.devices[type].fields.flatMap((field) => {
+    if (!telemetryFieldSupportsProvider(type, field.key, provider)) return []
+    const { metadata } = resolveTelemetryFieldMetadata(type, field.key, field, provider)
+    const options = telemetryFormatterRecommendations(metadata?.unit, field.key, metadata?.type)
+    if (!metadata?.unit || !options.length) return []
+    return [{
+      deviceType: type,
+      fieldKey: field.key,
+      label: metadata.label || field.label || field.key,
+      unit: metadata.unit,
+      formatter: options[0],
+      options,
+      selected: field.formatter === undefined,
+      currentFormatter: field.formatter,
+    }]
+  }),
+)
+
 export function TelemetryManager({ provider = 'dji', config, onChange, onNotify }: TelemetryManagerProps) {
-  const availableDeviceTypes: DeviceType[] = provider === 'superdock' ? ['dock'] : ['dock', 'aircraft', 'pilot']
+  const availableDeviceTypes = availableDeviceTypesForProvider(provider)
   const [deviceType, setDeviceType] = useState<DeviceType>('dock')
   const [selectedTabId, setSelectedTabId] = useState('')
   const [selectedSectionId, setSelectedSectionId] = useState('')
   const [selectedFieldKey, setSelectedFieldKey] = useState('')
   const [search, setSearch] = useState('')
+  const [autoFormatSuggestions, setAutoFormatSuggestions] = useState<TelemetryAutoFormatSuggestion[] | null>(null)
   const layout = config.devices[deviceType]
   const selectedTab = layout.tabs.find((tab) => tab.id === selectedTabId) ?? layout.tabs[0]
   const selectedSection = selectedTab?.sections.find((section) => section.id === selectedSectionId)
@@ -118,7 +162,8 @@ export function TelemetryManager({ provider = 'dji', config, onChange, onNotify 
   const filteredFields = sectionFields.filter((field) => {
     if (!query) return true
     const { metadata } = resolveTelemetryFieldMetadata(deviceType, field.key, field, provider)
-    return `${field.label} ${field.key} ${field.description} ${djiAccessModeLabel(metadata?.accessMode) ?? ''} ${metadata?.type ?? ''}`
+    const formatterLabel = TELEMETRY_FORMATTER_OPTIONS.find((option) => option.value === field.formatter)?.label ?? ''
+    return `${field.label} ${field.key} ${field.description} ${formatterLabel} ${djiAccessModeLabel(metadata?.accessMode) ?? ''} ${metadata?.type ?? ''}`
       .toLocaleLowerCase()
       .includes(query)
   })
@@ -175,6 +220,15 @@ export function TelemetryManager({ provider = 'dji', config, onChange, onNotify 
       setSelectedFieldKey(selectedSection.fieldKeys[0] ?? '')
     }
   }, [selectedSection, selectedFieldKey])
+
+  useEffect(() => {
+    if (!autoFormatSuggestions) return undefined
+    const dismiss = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setAutoFormatSuggestions(null)
+    }
+    window.addEventListener('keydown', dismiss)
+    return () => window.removeEventListener('keydown', dismiss)
+  }, [autoFormatSuggestions])
 
   const commit = (nextLayout: TelemetryDeviceLayout): void => {
     onChange(updateTelemetryLayoutTimestamp({
@@ -319,6 +373,48 @@ export function TelemetryManager({ provider = 'dji', config, onChange, onNotify 
     onNotify('已恢复默认监测项配置', 'success')
   }
 
+  const openAutoFormat = (): void => {
+    const suggestions = buildTelemetryAutoFormatSuggestions(config, provider)
+    if (!suggestions.length) {
+      onNotify('没有识别到可自动格式化的监测项', 'info')
+      return
+    }
+    setAutoFormatSuggestions(suggestions)
+  }
+
+  const updateAutoFormatSuggestion = (
+    device: DeviceType,
+    fieldKey: string,
+    updater: (suggestion: TelemetryAutoFormatSuggestion) => TelemetryAutoFormatSuggestion,
+  ): void => setAutoFormatSuggestions((current) => current?.map((suggestion) =>
+    suggestion.deviceType === device && suggestion.fieldKey === fieldKey ? updater(suggestion) : suggestion,
+  ) ?? null)
+
+  const applyAutoFormat = (): void => {
+    const selected = autoFormatSuggestions?.filter((suggestion) => suggestion.selected) ?? []
+    if (!selected.length) return
+    const devices = { ...config.devices }
+    availableDeviceTypes.forEach((type) => {
+      const formatterByField = new Map(selected
+        .filter((suggestion) => suggestion.deviceType === type)
+        .map((suggestion) => [suggestion.fieldKey, suggestion.formatter]))
+      if (!formatterByField.size) return
+      const nextLayout = cloneLayout(config.devices[type])
+      nextLayout.fields = nextLayout.fields.map((field) => ({
+        ...field,
+        formatter: formatterByField.get(field.key) ?? field.formatter,
+      }))
+      devices[type] = nextLayout
+    })
+    onChange(updateTelemetryLayoutTimestamp({ ...config, devices }))
+    setAutoFormatSuggestions(null)
+    onNotify(`已自动配置 ${selected.length} 个监测项`, 'success')
+  }
+
+  const selectedAutoFormatCount = autoFormatSuggestions?.filter((suggestion) => suggestion.selected).length ?? 0
+  const allAutoFormatsSelected = Boolean(autoFormatSuggestions?.length)
+    && selectedAutoFormatCount === autoFormatSuggestions?.length
+
   return (
     <div className="telemetry-manager">
       <header className="telemetry-manager-toolbar">
@@ -333,6 +429,9 @@ export function TelemetryManager({ provider = 'dji', config, onChange, onNotify 
           {layout.tabs.length} 个一级页签 · {layout.tabs.reduce((count, tab) => count + tab.sections.length, 0)} 个二级页签 · {supportedFieldKeys.size} 个字段
         </span>
         <span className="toolbar-spacer" />
+        <button type="button" className="button secondary compact telemetry-auto-format-button" onClick={openAutoFormat}>
+          <Sparkles size={15} />自动识别
+        </button>
         <Tooltip label="导入配置">
           <button className="icon-button" onClick={() => void handleImport()}><Upload size={16} /></button>
         </Tooltip>
@@ -409,6 +508,7 @@ export function TelemetryManager({ provider = 'dji', config, onChange, onNotify 
                             {djiAccessModeLabel(metadata.accessMode)}
                           </small>
                         )}
+                        {field.formatter && <small className="telemetry-formatter-badge">已格式化</small>}
                       </span>
                       <code>{field.key}</code>
                     </span>
@@ -439,6 +539,27 @@ export function TelemetryManager({ provider = 'dji', config, onChange, onNotify 
                   const [tabId, sectionId] = JSON.parse(event.target.value) as [string, string]
                   moveFieldTo(selectedField.key, tabId, sectionId)
                 }}>{layout.tabs.flatMap((tab) => tab.sections.map((section) => <option value={JSON.stringify([tab.id, section.id])} key={`${tab.id}:${section.id}`}>{tab.name || '未命名页签'} / {section.name || '未命名页签'}</option>))}</select></label>
+
+                <section className="telemetry-formatter-editor">
+                  <header><span><Braces size={15} />数据格式化</span></header>
+                  <label>
+                    <span>内置函数</span>
+                    <select
+                      value={selectedField.formatter ?? ''}
+                      onChange={(event) => updateField(selectedField.key, (field) => ({
+                        ...field,
+                        formatter: event.target.value
+                          ? event.target.value as TelemetryLayoutField['formatter']
+                          : undefined,
+                      }))}
+                    >
+                      <option value="">不格式化</option>
+                      {TELEMETRY_FORMATTER_OPTIONS.map((option) => (
+                        <option value={option.value} key={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                </section>
 
                 <section className="telemetry-property-editor">
                   <header>
@@ -522,6 +643,73 @@ export function TelemetryManager({ provider = 'dji', config, onChange, onNotify 
           ) : <div className="panel-empty"><ListTree size={24} /><span>选择一个指标项进行编辑</span></div>}
         </section>
       </div>
+      {autoFormatSuggestions && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setAutoFormatSuggestions(null)
+        }}>
+          <section className="modal telemetry-auto-format-modal" role="dialog" aria-modal="true" aria-labelledby="telemetry-auto-format-title">
+            <header className="modal-header">
+              <div><span className="eyebrow">AUTO FORMAT</span><h2 id="telemetry-auto-format-title">确认自动格式化</h2></div>
+              <Tooltip label="关闭"><button type="button" className="icon-button" onClick={() => setAutoFormatSuggestions(null)}><X size={18} /></button></Tooltip>
+            </header>
+            <div className="modal-body telemetry-auto-format-body">
+              <label className="check-field telemetry-auto-format-select-all">
+                <input
+                  type="checkbox"
+                  checked={allAutoFormatsSelected}
+                  onChange={(event) => setAutoFormatSuggestions((current) => current?.map((suggestion) => ({
+                    ...suggestion,
+                    selected: event.target.checked,
+                  })) ?? null)}
+                />
+                <span>选择全部识别结果</span>
+                <small>{autoFormatSuggestions.length} 项</small>
+              </label>
+              <div className="telemetry-auto-format-list">
+                {autoFormatSuggestions.map((suggestion) => (
+                  <div className={`telemetry-auto-format-row${suggestion.selected ? ' selected' : ''}`} key={`${suggestion.deviceType}:${suggestion.fieldKey}`}>
+                    <input
+                      type="checkbox"
+                      aria-label={`选择${suggestion.label}`}
+                      checked={suggestion.selected}
+                      onChange={(event) => updateAutoFormatSuggestion(suggestion.deviceType, suggestion.fieldKey, (current) => ({
+                        ...current,
+                        selected: event.target.checked,
+                      }))}
+                    />
+                    <span className="telemetry-auto-format-field">
+                      <span><small>{deviceLabels[suggestion.deviceType]}</small><strong>{suggestion.label}</strong><code>{suggestion.unit}</code></span>
+                      <code>{suggestion.fieldKey}</code>
+                      {suggestion.currentFormatter && <small>当前：{formatterLabels.get(suggestion.currentFormatter)}</small>}
+                    </span>
+                    <select
+                      aria-label={`${suggestion.label}格式化函数`}
+                      value={suggestion.formatter}
+                      onChange={(event) => updateAutoFormatSuggestion(suggestion.deviceType, suggestion.fieldKey, (current) => ({
+                        ...current,
+                        formatter: event.target.value as TelemetryValueFormatter,
+                      }))}
+                    >
+                      {suggestion.options.map((formatter) => (
+                        <option value={formatter} key={formatter}>{formatterLabels.get(formatter)}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <footer className="modal-footer">
+              <small>已选择 {selectedAutoFormatCount} / {autoFormatSuggestions.length} 项</small>
+              <div className="footer-actions">
+                <button type="button" className="button secondary" onClick={() => setAutoFormatSuggestions(null)}>取消</button>
+                <button type="button" className="button primary" disabled={!selectedAutoFormatCount} onClick={applyAutoFormat}>
+                  应用 {selectedAutoFormatCount} 项
+                </button>
+              </div>
+            </footer>
+          </section>
+        </div>
+      )}
     </div>
   )
 }

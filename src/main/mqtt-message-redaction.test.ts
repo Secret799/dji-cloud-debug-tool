@@ -83,7 +83,7 @@ describe('MQTT message redaction', () => {
       wrapper: REDACTED_MQTT_VALUE,
       values: [
         REDACTED_MQTT_VALUE,
-        REDACTED_MQTT_VALUE,
+        'https://example.com/log?X-Amz-Credential=REDACTED&X-Amz-Signature=REDACTED',
         REDACTED_MQTT_VALUE,
         REDACTED_MQTT_VALUE,
         REDACTED_MQTT_VALUE,
@@ -110,6 +110,27 @@ describe('MQTT message redaction', () => {
     expect(JSON.stringify(redacted)).not.toContain('direct-amz-signature')
     expect(JSON.stringify(redacted)).not.toContain('direct-oss-credential')
     expect(JSON.stringify(redacted)).not.toContain('direct-oss-signature')
+  })
+
+  it('keeps signed audio URLs inspectable while masking bearer query values', () => {
+    const payload = JSON.stringify({
+      method: 'speaker_audio_play_start',
+      data: {
+        audio: {
+          name: 'voice.wav',
+          url: 'https://minio.example.com/speaker/voice.wav?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=access%2Fscope&X-Amz-Signature=secret-signature',
+          md5: '5d41402abc4b2a76b9719d911017c592',
+        },
+      },
+    })
+
+    const redacted = JSON.parse(redactMqttPayload(payload))
+    expect(redacted.data.audio.url).toBe(
+      'https://minio.example.com/speaker/voice.wav?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=REDACTED&X-Amz-Signature=REDACTED',
+    )
+    expect(redacted.data.audio.md5).toBe('5d41402abc4b2a76b9719d911017c592')
+    expect(JSON.stringify(redacted)).not.toContain('access%2Fscope')
+    expect(JSON.stringify(redacted)).not.toContain('secret-signature')
   })
 
   it('redacts credentials in MQTT properties and strips unknown record fields', () => {

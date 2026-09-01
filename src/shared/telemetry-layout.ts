@@ -9,6 +9,7 @@ import type {
   TelemetryPropertyValueType,
   TelemetrySectionKind,
   TelemetryTabKind,
+  TelemetryValueFormatter,
 } from './contracts'
 
 const DEVICE_TYPES: DeviceType[] = ['dock', 'aircraft', 'pilot']
@@ -19,6 +20,12 @@ const SECTION_KINDS = new Set<TelemetrySectionKind>([
 ])
 const PROPERTY_VALUE_TYPES = new Set<TelemetryPropertyValueType>([
   'bool', 'enum_int', 'int', 'float', 'double', 'text', 'enum_string', 'date', 'struct', 'array',
+])
+const VALUE_FORMATTERS = new Set<TelemetryValueFormatter>([
+  'datetime', 'date', 'time', 'number', 'fixed_2', 'percent',
+  'seconds_to_minutes', 'seconds_to_hours', 'seconds_to_duration', 'meters_to_kilometers',
+  'kilobytes_to_megabytes', 'kilobytes_to_gigabytes',
+  'json', 'uppercase', 'lowercase',
 ])
 const MAX_TABS = 50
 const MAX_SECTIONS_PER_TAB = 50
@@ -75,11 +82,15 @@ const parsePropertySetting = (value: unknown, label: string): TelemetryPropertyS
 const parseField = (value: unknown, index: number): TelemetryLayoutField => {
   const field = record(value, `字段 ${index + 1}`)
   if (typeof field.visible !== 'boolean') throw new Error(`字段 ${index + 1} 的显示状态无效`)
+  if (field.formatter !== undefined && !VALUE_FORMATTERS.has(field.formatter as TelemetryValueFormatter)) {
+    throw new Error(`字段 ${index + 1} 的数据格式化函数无效`)
+  }
   return {
     key: text(field.key, `字段 ${index + 1} 的原始字段名`, MAX_KEY_LENGTH),
     label: text(field.label, `字段 ${index + 1} 的显示名称`, MAX_NAME_LENGTH, true),
     description: text(field.description, `字段 ${index + 1} 的描述`, MAX_DESCRIPTION_LENGTH, true),
     visible: field.visible,
+    formatter: field.formatter as TelemetryValueFormatter | undefined,
     propertySetting: parsePropertySetting(field.propertySetting, `字段 ${index + 1} 的属性设置`),
   }
 }

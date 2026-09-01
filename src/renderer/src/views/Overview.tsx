@@ -21,6 +21,7 @@ import {
   FileArchive,
   Gamepad2,
   MapPin,
+  Megaphone,
   MessagesSquare,
   Package,
   Plane,
@@ -30,6 +31,7 @@ import {
   Search,
   SearchCheck,
   ShieldCheck,
+  Umbrella,
   Wifi,
   Wrench,
   X,
@@ -68,10 +70,12 @@ import {
   FIELD_LABELS,
   DJI_PRODUCT_NAMES,
   PRODUCT_NAMES,
+  PSDK_DATA_METHODS,
   SUPERDOCK_PRODUCT_NAMES,
   type CommandTransaction,
   type DeviceActivity,
   type DeviceTelemetry,
+  type PsdkDataMethod,
   type ServiceCaller,
   djiProductKey,
   gatewayCapabilitiesForProvider,
@@ -104,6 +108,7 @@ import { MqttConsole } from './MqttConsole'
 import { RemoteLogCenter } from './RemoteLogCenter'
 import { FirmwareUpgradeCenter } from './FirmwareUpgradeCenter'
 import { PropertySetModal, type PropertySetTarget } from '../components/PropertySetModal'
+import { SpeakerControl } from '../components/SpeakerControl'
 import { Tooltip } from '../components/Tooltip'
 import {
   createDefaultTelemetryLayout,
@@ -111,6 +116,17 @@ import {
   telemetryCustomPropertyMetadata,
   telemetrySectionKindForPath,
 } from '../lib/telemetry-layout'
+import { formatTelemetryValue, rawTelemetryValue } from '../lib/telemetry-format'
+import {
+  PAYLOAD_TYPE_OPTIONS,
+  loadPayloadTypeAssignments,
+  payloadTypeAssignmentKey,
+  payloadTypeLabel,
+  recognizePayloadType,
+  savePayloadTypeAssignments,
+  type PayloadKind,
+  type PayloadRecognitionMode,
+} from '../lib/payload-type'
 
 interface OverviewProps {
   profile: ConnectionProfile
@@ -558,6 +574,12 @@ type TelemetrySectionId = string
 type TelemetryTabId = string
 
 const DEFAULT_TELEMETRY_LAYOUT = createDefaultTelemetryLayout()
+
+const psdkDataChannelLabels: Record<PsdkDataMethod, string> = {
+  psdk_floating_window_text: '浮窗文本',
+  psdk_ui_resource_upload_result: 'UI 资源',
+  custom_data_transmission_from_psdk: '自定义数据',
+}
 
 const telemetrySections: { id: TelemetrySectionId; icon: typeof Activity }[] = [
   { id: 'system', icon: Activity },
@@ -1264,6 +1286,76 @@ export function DeviceEventWorkspace({
   )
 }
 
+export function PayloadMessageList({ activities }: { activities: DeviceActivity[] }) {
+  const newestFirst = activities.slice().sort((left, right) => right.record.timestamp - left.record.timestamp)
+
+  if (!newestFirst.length) {
+    return <div className="panel-empty small"><Radio size={22} /><span>暂无 PSDK 数据消息</span></div>
+  }
+
+  return (
+    <div className="payload-message-list">
+      {newestFirst.map((activity) => {
+        const { record } = activity
+        return (
+          <details className="payload-message-item" key={record.id}>
+            <summary>
+              <span className="payload-message-heading">
+                <span className={`event-kind ${activity.kind}`}>{activity.kind === 'event' ? '事件' : '请求'}</span>
+                <strong>{activity.label}</strong>
+                <code>{activity.method}</code>
+                <time>{new Date(record.timestamp).toLocaleTimeString()}</time>
+              </span>
+              <span className="payload-message-topic">
+                <code>{record.topic}</code>
+                <ChevronDown size={14} />
+              </span>
+            </summary>
+            <div className="payload-message-body">
+              <pre>{prettyPayload(record.payload)}</pre>
+            </div>
+          </details>
+        )
+      })}
+    </div>
+  )
+}
+
+export function PsdkChannelTabs({
+  activities,
+  activeMethod,
+  onSelect,
+}: {
+  activities: DeviceActivity[]
+  activeMethod?: PsdkDataMethod
+  onSelect: (method: PsdkDataMethod) => void
+}) {
+  return (
+    <nav className="psdk-channel-tabs" aria-label="PSDK 数据通道" role="tablist">
+      {PSDK_DATA_METHODS.map((method) => {
+        const active = activeMethod === method
+        const count = activities.filter((activity) => activity.method === method).length
+        const label = psdkDataChannelLabels[method]
+        return (
+          <button
+            key={method}
+            type="button"
+            className={active ? 'active' : ''}
+            role="tab"
+            aria-label={`${label}通道`}
+            aria-selected={active}
+            title={method}
+            onClick={() => onSelect(method)}
+          >
+            <span>{label}</span>
+            <small>{count}</small>
+          </button>
+        )
+      })}
+    </nav>
+  )
+}
+
 export function Overview({
   profile,
   telemetry,
@@ -1290,6 +1382,8 @@ export function Overview({
   const [activeTelemetrySection, setActiveTelemetrySection] = useState<TelemetrySectionId>()
   const [telemetrySearch, setTelemetrySearch] = useState('')
   const [selectedPsdkIndex, setSelectedPsdkIndex] = useState<number>()
+  const [selectedPsdkMethod, setSelectedPsdkMethod] = useState<PsdkDataMethod>()
+  const [payloadTypeAssignments, setPayloadTypeAssignments] = useState(loadPayloadTypeAssignments)
   const [propertySetTarget, setPropertySetTarget] = useState<PropertySetTarget>()
   const telemetryPanelsRef = useRef<HTMLDivElement>(null)
   const requestedConfigured = profile.devices.find((device) => device.sn === selectedDeviceSn)
@@ -1434,7 +1528,11 @@ export function Overview({
   const selectedPayloadActivities = activePsdkIndex === undefined
     ? payloadActivities
     : payloadActivities.filter((activity) => activity.psdkIndex === activePsdkIndex)
-  const latestPayloadActivity = selectedPayloadActivities.at(-1)
+  const activePsdkMethod = selectedPsdkMethod ?? selectedPayloadActivities.at(-1)?.method
+  const channelPayloadActivities = activePsdkMethod === undefined
+    ? selectedPayloadActivities
+    : selectedPayloadActivities.filter((activity) => activity.method === activePsdkMethod)
+  const latestPayloadActivity = channelPayloadActivities.at(-1)
   const latestPayloadEnvelope = latestPayloadActivity ? parseServicePayload(latestPayloadActivity.record.payload) : undefined
   const latestPayloadData = latestPayloadEnvelope?.data
   const latestPayloadValue = latestPayloadData && typeof latestPayloadData === 'object' && !Array.isArray(latestPayloadData)
@@ -1447,6 +1545,38 @@ export function Overview({
         ? ''
         : JSON.stringify(latestPayloadData, null, 2)
       : JSON.stringify(latestPayloadValue, null, 2)
+  const payloadAssignmentKey = activePsdkIndex === undefined || !payloadGatewaySn
+    ? undefined
+    : payloadTypeAssignmentKey(profile.id, payloadGatewaySn, activePsdkIndex)
+  const payloadTypeAssignment = payloadAssignmentKey ? payloadTypeAssignments[payloadAssignmentKey] : undefined
+  const payloadRecognitionMode: PayloadRecognitionMode = payloadTypeAssignment?.mode ?? 'auto'
+  const recognizedPayloadType = activePsdkIndex === undefined
+    ? undefined
+    : recognizePayloadType(payloadRecords, activePsdkIndex)
+  const effectivePayloadType = payloadRecognitionMode === 'manual'
+    ? payloadTypeAssignment?.manualType
+    : recognizedPayloadType?.type
+  const updatePayloadTypeAssignment = (mode: PayloadRecognitionMode, manualType?: PayloadKind): void => {
+    if (!payloadAssignmentKey) return
+    setPayloadTypeAssignments((current) => {
+      const next = {
+        ...current,
+        [payloadAssignmentKey]: {
+          mode,
+          ...(manualType ? { manualType } : {}),
+        },
+      }
+      savePayloadTypeAssignments(next)
+      return next
+    })
+  }
+  const payloadTypeForIndex = (index: number): PayloadKind | undefined => {
+    if (!payloadGatewaySn) return recognizePayloadType(payloadRecords, index)?.type
+    const assignment = payloadTypeAssignments[payloadTypeAssignmentKey(profile.id, payloadGatewaySn, index)]
+    return assignment?.mode === 'manual'
+      ? assignment.manualType
+      : recognizePayloadType(payloadRecords, index)?.type
+  }
   const aircraftModelKey = deviceType === 'aircraft' ? telemetryValue(source, 'device_model_key') : undefined
   const legacyProductKey = typeof aircraftModelKey === 'string' ? aircraftModelKey : undefined
   const productKey = topologyProductKey ?? legacyProductKey
@@ -1604,6 +1734,17 @@ export function Overview({
         const { label, description, unit, officialMetadata, metadataSourceLabel, propertyPath } = presentation
         const arrayItemIndex = context?.primitiveItem ? Number(leaf) : undefined
         const hasValue = field.value !== undefined && field.value !== null && field.value !== ''
+        const formatter = layoutField?.formatter
+        const displayValue = formatter
+          ? formatTelemetryValue(field.value, formatter)
+          : Array.isArray(field.value)
+            ? '空数组'
+            : field.value && typeof field.value === 'object' && !Object.keys(field.value).length
+              ? '空对象'
+              : officialMetadata ? formatDjiFieldValue(field.value, officialMetadata) : formatValue(field.value)
+        const showUnit = hasValue && unit && (
+          !officialMetadata || formatter === 'number' || formatter === 'fixed_2'
+        )
         return (
           <div className="telemetry-row" key={`${field.source}:${field.path}`}>
             <div className="telemetry-field-label">
@@ -1619,14 +1760,14 @@ export function Overview({
               )}
             </div>
             <div className="telemetry-field-value">
-              <strong>
-                {Array.isArray(field.value)
-                  ? '空数组'
-                  : field.value && typeof field.value === 'object' && !Object.keys(field.value).length
-                    ? '空对象'
-                    : officialMetadata ? formatDjiFieldValue(field.value, officialMetadata) : formatValue(field.value)}
-                {!officialMetadata && unit && hasValue ? ` ${unit}` : ''}
-              </strong>
+              <span className={`telemetry-field-value-copy${formatter === 'json' ? ' json' : ''}`}>
+                <strong>{displayValue}{showUnit ? ` ${unit}` : ''}</strong>
+                {formatter && (
+                  <small className="telemetry-formatted-raw">
+                    <span>原始值</span><code>{rawTelemetryValue(field.value)}</code>
+                  </small>
+                )}
+              </span>
               {officialMetadata?.accessMode === 'rw' && onPublish && (
                 <Tooltip label={status === 'connected' && propertyGatewaySn ? `设置${label}` : '连接 MQTT 后可设置'}>
                   <button
@@ -2008,35 +2149,135 @@ export function Overview({
                             key={index}
                             className={active ? 'active' : ''}
                             role="tab"
+                            aria-label={`PSDK ${index}`}
                             aria-selected={active}
                             onClick={() => setSelectedPsdkIndex(index)}
                           >
-                            PSDK {index}
+                            <span>PSDK {index}</span>
+                            <small>{payloadTypeLabel(payloadTypeForIndex(index))}</small>
                           </button>
                         )
                       })}
                     </nav>
                   )}
-                  {latestPayloadActivity ? (
-                    <div className="psdk-latest-report">
-                      <div className="psdk-report-meta">
-                        <span><small>上报方法</small><code>{latestPayloadActivity.method}</code></span>
-                        <span><small>PSDK 索引</small><strong>{latestPayloadActivity.psdkIndex}</strong></span>
-                        <span><small>数据长度</small><strong>{typeof latestPayloadValue === 'string' ? latestPayloadValue.length : 0} 字符</strong></span>
+                  {activePsdkIndex !== undefined && (
+                    <section className="payload-type-panel" aria-label={`PSDK ${activePsdkIndex} 负载类型`}>
+                      <header>
+                        <div>
+                          {effectivePayloadType === 'speaker'
+                            ? <Megaphone size={16} />
+                            : effectivePayloadType === 'parachute'
+                              ? <Umbrella size={16} />
+                              : <Box size={16} />}
+                          <span>负载类型</span>
+                        </div>
+                        <strong className={effectivePayloadType ? `identified ${effectivePayloadType}` : ''}>
+                          {payloadTypeLabel(effectivePayloadType)}
+                        </strong>
+                      </header>
+                      <div className="payload-type-controls">
+                        <div className="segmented" role="group" aria-label="负载类型识别方式">
+                          <button
+                            type="button"
+                            className={payloadRecognitionMode === 'auto' ? 'active' : ''}
+                            aria-pressed={payloadRecognitionMode === 'auto'}
+                            onClick={() => updatePayloadTypeAssignment('auto', payloadTypeAssignment?.manualType)}
+                          >
+                            自动识别
+                          </button>
+                          <button
+                            type="button"
+                            className={payloadRecognitionMode === 'manual' ? 'active' : ''}
+                            aria-pressed={payloadRecognitionMode === 'manual'}
+                            onClick={() => updatePayloadTypeAssignment(
+                              'manual',
+                              payloadTypeAssignment?.manualType ?? recognizedPayloadType?.type ?? 'speaker',
+                            )}
+                          >
+                            手动识别
+                          </button>
+                        </div>
+                        <label className="payload-type-select">
+                          <span>类型</span>
+                          <select
+                            aria-label="手动负载类型"
+                            value={payloadTypeAssignment?.manualType ?? recognizedPayloadType?.type ?? 'speaker'}
+                            disabled={payloadRecognitionMode !== 'manual'}
+                            onChange={(event) => updatePayloadTypeAssignment('manual', event.target.value as PayloadKind)}
+                          >
+                            {PAYLOAD_TYPE_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
+                          <ChevronDown size={13} />
+                        </label>
                       </div>
-                      <div className="psdk-report-value">
-                        <span>{latestPayloadValue === undefined ? 'data（原始字段）' : 'data.value（原始数据）'}</span>
-                        <pre>{latestPayloadText || '（空数据）'}</pre>
-                      </div>
-                    </div>
-                  ) : <div className="panel-empty small"><Box size={22} /><span>暂无 PSDK 负载上报</span></div>}
+                      <p>
+                        {payloadRecognitionMode === 'auto'
+                          ? recognizedPayloadType
+                            ? `识别依据：${recognizedPayloadType.evidence}`
+                            : '未发现明确的类型上报'
+                          : `PSDK ${activePsdkIndex} 已手动指定`}
+                      </p>
+                    </section>
+                  )}
+                  {effectivePayloadType === 'speaker' && activePsdkIndex !== undefined && payloadGatewaySn && (
+                    <SpeakerControl
+                      key={`${payloadGatewaySn}:${activePsdkIndex}`}
+                      gatewaySn={payloadGatewaySn}
+                      psdkIndex={activePsdkIndex}
+                      status={status}
+                      busy={busy}
+                      onService={onService}
+                      onNotify={onNotify}
+                      objectStorageProfiles={objectStorageProfiles}
+                      activeObjectStorageId={activeObjectStorageId}
+                      onSelectObjectStorage={onSelectObjectStorage}
+                      onOpenOssManager={onOpenOssManager}
+                    />
+                  )}
+                  {effectivePayloadType !== 'speaker' && activePsdkIndex !== undefined && (
+                    <section className="payload-control-empty" aria-label={`PSDK ${activePsdkIndex} 负载控制`}>
+                      <header><div><RadioTower size={16} /><h4>PSDK 控制通道</h4></div></header>
+                      <div><Wrench size={22} /><strong>暂无控制能力</strong></div>
+                    </section>
+                  )}
+                  {activePsdkIndex === undefined && (
+                    <div className="panel-empty small"><Box size={22} /><span>暂无 PSDK 负载上报</span></div>
+                  )}
                 </section>
                 <section className="payload-event-panel">
-                  <header className="event-workspace-header">
-                    <div><Bell size={17} /><h3>PSDK 数据消息</h3></div>
-                    <span>{selectedPayloadActivities.length} 条</span>
-                  </header>
-                  {renderEventList(selectedPayloadActivities, '暂无 PSDK 数据消息')}
+                  <PsdkChannelTabs
+                    activities={selectedPayloadActivities}
+                    activeMethod={activePsdkMethod}
+                    onSelect={setSelectedPsdkMethod}
+                  />
+                  <section className="payload-data-section">
+                    <header className="event-workspace-header">
+                      <div><Activity size={17} /><h3>负载数据</h3></div>
+                      <span>{latestPayloadActivity ? new Date(latestPayloadActivity.record.timestamp).toLocaleTimeString() : '尚未上报'}</span>
+                    </header>
+                    {latestPayloadActivity ? (
+                      <div className="payload-latest-data">
+                        <div className="payload-data-meta">
+                          <span><small>上报方法</small><code>{latestPayloadActivity.method}</code></span>
+                          <span><small>PSDK 索引</small><strong>{latestPayloadActivity.psdkIndex}</strong></span>
+                          <span><small>数据长度</small><strong>{latestPayloadText.length} 字符</strong></span>
+                        </div>
+                        <div className="payload-data-value">
+                          <span>{latestPayloadValue === undefined ? 'data（解析数据）' : 'data.value（解析数据）'}</span>
+                          <pre>{latestPayloadText || '（空数据）'}</pre>
+                        </div>
+                      </div>
+                    ) : <div className="panel-empty small"><Activity size={22} /><span>暂无负载数据</span></div>}
+                  </section>
+                  <section className="payload-raw-section">
+                    <header className="event-workspace-header">
+                      <div><Braces size={17} /><h3>原始数据</h3></div>
+                      <span>{channelPayloadActivities.length} 条</span>
+                    </header>
+                    <PayloadMessageList activities={channelPayloadActivities} />
+                  </section>
                 </section>
               </div>
             </section>

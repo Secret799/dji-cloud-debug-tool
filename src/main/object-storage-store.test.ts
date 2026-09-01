@@ -29,7 +29,6 @@ const createProfile = (id: string, name = id): ObjectStorageProfile => ({
   accessKeyId: `${id}-key`,
   accessKeySecret: `${id}-secret`,
   securityToken: `${id}-token`,
-  expire: 1_900_000_000_000,
   createdAt: 1,
   updatedAt: 1,
 })
@@ -124,6 +123,7 @@ describe('ObjectStorageStore', () => {
       version: 1,
       profiles: [{
         ...plain,
+        expire: 1_900_000_000_000,
         storedAccessKeySecret: accessKeySecret,
         storedSecurityToken: securityToken,
       }],
@@ -136,6 +136,7 @@ describe('ObjectStorageStore', () => {
     const migrated = await readFile(filePath, 'utf8')
     expect(migrated).not.toContain('storedAccessKeySecret')
     expect(migrated).not.toContain('storedSecurityToken')
+    expect(migrated).not.toContain('"expire"')
     expect(migrated).not.toContain('legacy-secret')
     expect(migrated).toContain('dcdt:v1:k1:')
   })

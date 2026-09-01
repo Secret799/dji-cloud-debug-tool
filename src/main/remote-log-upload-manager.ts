@@ -14,9 +14,6 @@ type MqttPublisher = Pick<MqttConnectionManager, 'publish'>
 type ObjectStorageResolver = Pick<ObjectStorageStore, 'resolve'>
 type ConnectionProfileReader = Pick<ProfileStore, 'get'>
 
-const credentialExpiresAt = (expire: number): number =>
-  expire < 1_000_000_000_000 ? expire * 1_000 : expire
-
 export const normalizeRemoteLogObjectKey = (value: string): string => {
   const normalized = value.trim()
   if (!normalized) throw new Error('对象 Key 不能为空')
@@ -59,7 +56,6 @@ const buildUploadPayload = (
       credentials: {
         access_key_id: profile.accessKeyId.trim(),
         access_key_secret: profile.accessKeySecret,
-        expire: profile.expire,
         security_token: profile.securityToken,
       },
       endpoint: profile.endpoint.trim(),
@@ -111,9 +107,6 @@ export class RemoteLogUploadManager {
     if (!profile) return { ok: false, error: '对象存储配置不存在' }
     if (!profile.accessKeyId.trim() || !profile.accessKeySecret) {
       return { ok: false, error: '对象存储配置缺少有效凭据' }
-    }
-    if (credentialExpiresAt(profile.expire) <= Date.now()) {
-      return { ok: false, error: '对象存储临时凭证已过期，请先更新配置' }
     }
 
     return this.mqttManager.publish({

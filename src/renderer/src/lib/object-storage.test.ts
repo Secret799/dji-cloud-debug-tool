@@ -37,7 +37,6 @@ describe('object storage configuration', () => {
     config.endpoint = 'https://minio.example.com'
     config.credentials.accessKeyId = 'key'
     config.credentials.accessKeySecret = 'secret'
-    config.credentials.expire = 1_900_000_000_000
     expect(objectStorageConfigIssues(config)).toEqual([])
   })
 

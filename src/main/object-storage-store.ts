@@ -117,6 +117,11 @@ export class ObjectStorageStore {
       const document = parsed as StoreDocument
       let migrated = false
       for (const profile of document.profiles) {
+        const legacyProfile = profile as StoredObjectStorageProfile & { expire?: unknown }
+        if ('expire' in legacyProfile) {
+          delete legacyProfile.expire
+          migrated = true
+        }
         const accessKeySecretMigration = migrateStoredCredential({
           encrypted: profile.encryptedAccessKeySecret,
           plaintext: profile.storedAccessKeySecret,
@@ -157,6 +162,7 @@ export class ObjectStorageStore {
       hasStoredSecurityToken: _hasStoredSecurityToken,
       clearStoredAccessKeySecret,
       clearStoredSecurityToken,
+      expire: _expire,
       storedAccessKeySecret: _storedAccessKeySecret,
       storedSecurityToken: _storedSecurityToken,
       encryptedAccessKeySecret: _inputEncryptedAccessKeySecret,
@@ -167,6 +173,7 @@ export class ObjectStorageStore {
       storedSecurityToken?: unknown
       encryptedAccessKeySecret?: unknown
       encryptedSecurityToken?: unknown
+      expire?: unknown
     }
     let encryptedAccessKeySecret = existing?.encryptedAccessKeySecret
     let encryptedSecurityToken = existing?.encryptedSecurityToken
@@ -205,10 +212,12 @@ export class ObjectStorageStore {
       encryptedSecurityToken,
       clearStoredAccessKeySecret: _clearStoredAccessKeySecret,
       clearStoredSecurityToken: _clearStoredSecurityToken,
+      expire: _expire,
       ...plain
     } = profile as StoredObjectStorageProfile & {
       clearStoredAccessKeySecret?: boolean
       clearStoredSecurityToken?: boolean
+      expire?: unknown
     }
     return {
       ...plain,

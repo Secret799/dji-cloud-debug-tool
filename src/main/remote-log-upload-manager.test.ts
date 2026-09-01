@@ -12,7 +12,6 @@ const storageProfile = (overrides: Partial<ObjectStorageProfile> = {}): ObjectSt
   accessKeyId: 'access-id',
   accessKeySecret: 'access-secret',
   securityToken: 'session-token',
-  expire: Date.now() + 60_000,
   createdAt: 1,
   updatedAt: 1,
   ...overrides,
@@ -98,6 +97,7 @@ describe('RemoteLogUploadManager', () => {
         ] },
       },
     })
+    expect(payload.data.credentials).not.toHaveProperty('expire')
   })
 
   it('does not publish when the storage profile is missing', async () => {
@@ -112,19 +112,15 @@ describe('RemoteLogUploadManager', () => {
     expect(publish).not.toHaveBeenCalled()
   })
 
-  it.each([
-    ['missing secret', storageProfile({ accessKeySecret: '' }), '缺少有效凭据'],
-    ['expired milliseconds', storageProfile({ expire: Date.now() - 1 }), '已过期'],
-    ['expired seconds', storageProfile({ expire: Math.floor(Date.now() / 1_000) - 1 }), '已过期'],
-  ])('rejects %s credentials', async (_label, profile, error) => {
+  it('rejects missing credentials', async () => {
     const publish = vi.fn()
     const manager = new RemoteLogUploadManager(
-      { resolve: vi.fn().mockResolvedValue(profile) },
+      { resolve: vi.fn().mockResolvedValue(storageProfile({ accessKeySecret: '' })) },
       { publish },
       profileReader(),
     )
 
-    await expect(manager.start(uploadRequest())).resolves.toEqual({ ok: false, error: expect.stringContaining(error) })
+    await expect(manager.start(uploadRequest())).resolves.toEqual({ ok: false, error: expect.stringContaining('缺少有效凭据') })
     expect(publish).not.toHaveBeenCalled()
   })
 

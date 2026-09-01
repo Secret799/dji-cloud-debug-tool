@@ -19,6 +19,7 @@ import {
   superDockSupportsCommand,
   superDockProductName,
 } from './superdock'
+import { SPEAKER_SERVICE_METHODS } from './speaker'
 
 export interface TopicTemplate {
   id: string
@@ -186,10 +187,21 @@ export interface DeviceActivity {
   psdkIndex?: number
 }
 
+export const PSDK_DATA_METHODS = [
+  'psdk_floating_window_text',
+  'psdk_ui_resource_upload_result',
+  'custom_data_transmission_from_psdk',
+] as const
+
+export type PsdkDataMethod = typeof PSDK_DATA_METHODS[number]
+export type PsdkDataActivity = DeviceActivity & { method: PsdkDataMethod; psdkIndex: number }
+
+const psdkDataMethodSet = new Set<string>(PSDK_DATA_METHODS)
+
 export const isPayloadActivity = (
   activity: DeviceActivity,
-): activity is DeviceActivity & { psdkIndex: number } =>
-  activity.psdkIndex !== undefined
+): activity is PsdkDataActivity =>
+  activity.psdkIndex !== undefined && psdkDataMethodSet.has(activity.method)
 
 export interface DeviceActivityGroup {
   id: string
@@ -262,8 +274,8 @@ const DEVICE_ACTIVITY_METHODS: Record<string, DeviceActivityMethod> = {
   return_home_info: { kind: 'event', label: '返航信息' },
   custom_data_transmission_from_esdk: { kind: 'event', label: 'ESDK 自定义数据' },
   custom_data_transmission_from_psdk: { kind: 'event', label: 'PSDK 自定义数据' },
-  psdk_floating_window_text: { kind: 'event', label: 'PSDK 监测数据' },
-  psdk_ui_resource_upload_result: { kind: 'event', label: 'PSDK UI 按钮' },
+  psdk_floating_window_text: { kind: 'event', label: 'PSDK 浮窗文本' },
+  psdk_ui_resource_upload_result: { kind: 'event', label: 'PSDK UI 资源上传结果' },
   airsense_warning: { kind: 'event', label: 'AirSense 告警' },
   flight_areas_sync_progress: { kind: 'event', label: '限飞区同步进度' },
   flight_areas_drone_location: { kind: 'event', label: '限飞区飞行器位置' },
@@ -685,15 +697,23 @@ export const DJI_COMMANDS: CommandTemplate[] = [
     id: 'speaker-tts',
     category: 'speaker',
     label: 'TTS 喊话',
-    method: 'speaker_tts_play_start',
+    method: SPEAKER_SERVICE_METHODS.tts,
     description: '通过 PSDK 喊话器播放文字',
     data: { psdk_index: 0, tts: { name: 'debug-message', text: '测试播报', md5: '' } },
+  },
+  {
+    id: 'speaker-audio',
+    category: 'speaker',
+    label: '音频喊话',
+    method: SPEAKER_SERVICE_METHODS.audio,
+    description: '通过 PSDK 喊话器播放设备可下载的音频文件',
+    data: { psdk_index: 0, audio: { name: '', url: '', md5: '' } },
   },
   {
     id: 'speaker-volume',
     category: 'speaker',
     label: '设置音量',
-    method: 'speaker_play_volume_set',
+    method: SPEAKER_SERVICE_METHODS.volume,
     description: '设置 PSDK 喊话器音量',
     data: { psdk_index: 0, play_volume: 70 },
   },
@@ -701,7 +721,7 @@ export const DJI_COMMANDS: CommandTemplate[] = [
     id: 'speaker-stop',
     category: 'speaker',
     label: '停止播放',
-    method: 'speaker_play_stop',
+    method: SPEAKER_SERVICE_METHODS.stop,
     description: '停止当前喊话任务',
     data: { psdk_index: 0 },
   },
@@ -1070,6 +1090,35 @@ export const parseServiceReply = (record: MqttMessageRecord): ParsedServiceReply
   }
 }
 
+export const buildDrcStatusEventReply = (
+  record: MqttMessageRecord,
+  timestamp = Date.now(),
+): { topic: string; payload: string } | undefined => {
+  if (record.direction !== 'in' || !record.topic.endsWith('/events')) return undefined
+  try {
+    const envelope = JSON.parse(record.payload) as unknown
+    if (!isRecord(envelope) || envelope.method !== 'drc_status_notify' || finiteInteger(envelope.need_reply) !== 1) {
+      return undefined
+    }
+    const gatewaySn = extractTopicSn(record.topic)
+    const tid = typeof envelope.tid === 'string' ? envelope.tid.trim() : ''
+    const bid = typeof envelope.bid === 'string' ? envelope.bid.trim() : ''
+    if (!gatewaySn || !tid) return undefined
+    return {
+      topic: `thing/product/${gatewaySn}/events_reply`,
+      payload: JSON.stringify({
+        tid,
+        ...(bid ? { bid } : {}),
+        timestamp,
+        method: 'drc_status_notify',
+        data: { result: 0 },
+      }),
+    }
+  } catch {
+    return undefined
+  }
+}
+
 export const isDeviceEffectivelyEnabled = (devices: DjiDevice[], sn: string): boolean => {
   const devicesBySn = new Map(devices.map((device) => [device.sn, device]))
   const visited = new Set<string>()
@@ -1146,6 +1195,7 @@ export const mergeTelemetry = (
   const rawData = parsed.data
   const data = rawData && typeof rawData === 'object' && !Array.isArray(rawData) ? (rawData as Record<string, unknown>) : {}
   const isTopologyUpdate = message.topic.endsWith('/status') && parsed.method === 'update_topo'
+  const isDrcStatusEvent = message.topic.endsWith('/events') && parsed.method === 'drc_status_notify'
   const gatewayIdentity = isTopologyUpdate ? deviceIdentityFromData(data) : undefined
   const payloadGatewaySn = typeof parsed.gateway === 'string' ? parsed.gateway : undefined
   const configured = profile.devices.find((device) => device.sn === sn)
@@ -1185,6 +1235,12 @@ export const mergeTelemetry = (
   if (message.topic.endsWith('/osd')) next.osd = mergeNestedRecords(next.osd, deviceData)
   if (message.topic.endsWith('/state')) next.state = mergeNestedRecords(next.state, deviceData)
   if (message.topic.endsWith('/status')) next.status = mergeNestedRecords(next.status, deviceData)
+  if (isDrcStatusEvent) {
+    const drcState = finiteInteger(data.drc_state)
+    if (drcState === 0 || drcState === 1 || drcState === 2) {
+      next.state = mergeNestedRecords(next.state, { drc_state: drcState })
+    }
+  }
 
   const subDevices = isTopologyUpdate ? data.sub_devices : undefined
   const discovered: Record<string, DeviceTelemetry> = {}
@@ -1291,7 +1347,7 @@ export const commandTransactions = (records: MqttMessageRecord[], now = Date.now
         tid?: string
         bid?: string
         method?: string
-        data?: { result?: number }
+        data?: { result?: unknown }
       }
       if (!payload.tid) continue
       const gatewaySn = extractTopicSn(record.topic) ?? ''
@@ -1310,12 +1366,12 @@ export const commandTransactions = (records: MqttMessageRecord[], now = Date.now
         const pending = transactions.get(transactionKey)
         if (!pending) continue
         if (pending.bid && payload.bid && pending.bid !== payload.bid) continue
-        const result = payload.data?.result
+        const result = finiteInteger(payload.data?.result)
         transactions.set(transactionKey, {
           ...pending,
           finishedAt: record.timestamp,
           result,
-          status: result === 0 ? 'success' : 'failed',
+          status: result === undefined || result === 0 ? 'success' : 'failed',
           response: record,
         })
       }

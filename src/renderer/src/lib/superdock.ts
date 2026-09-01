@@ -170,6 +170,7 @@ export const SUPERDOCK_SUPPORTED_COMMAND_METHODS = new Set([
   'gimbal_reset',
   'custom_data_transmission_to_psdk',
   'speaker_tts_play_start',
+  'speaker_audio_play_start',
   'speaker_play_volume_set',
   'speaker_play_stop',
   'live_start_push',

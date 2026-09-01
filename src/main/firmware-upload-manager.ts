@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
-import { stat } from 'node:fs/promises'
-import { basename } from 'node:path'
+import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { basename, join } from 'node:path'
 import OSS from 'ali-oss'
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
@@ -18,6 +19,7 @@ import type { ObjectStorageStore } from './object-storage-store'
 
 interface SelectedPackage extends FirmwarePackageSelection {
   filePath: string
+  temporaryDirectory?: string
   mtimeMs: number
   selectedAt: number
 }
@@ -37,10 +39,7 @@ type ProgressSink = (progress: FirmwareUploadProgress) => void
 
 const MAX_SELECTIONS = 20
 const URL_VALIDITY_MS = 24 * 60 * 60 * 1_000
-const URL_EXPIRY_SAFETY_MS = 60_000
 const MULTIPART_SIZE = 10 * 1024 * 1024
-
-const credentialExpiresAt = (expire: number): number => expire < 1_000_000_000_000 ? expire * 1_000 : expire
 
 const fileMd5 = async (filePath: string): Promise<string> => {
   const hash = createHash('md5')
@@ -126,16 +125,44 @@ export class FirmwareUploadManager {
     private readonly objectStorageStore: ObjectStorageStore,
     private readonly progressSink: ProgressSink,
     private readonly uploader: ObjectUploader = uploadFirmwareObject,
+    private readonly fileLabel = '固件包',
   ) {}
 
   async select(filePath: string): Promise<FirmwarePackageSelection> {
+    return this.selectPath(filePath)
+  }
+
+  async selectBytes(fileName: string, data: Uint8Array): Promise<FirmwarePackageSelection> {
+    const safeName = basename(fileName)
+    if (safeName !== fileName || !safeName) throw new Error(`${this.fileLabel}文件名无效`)
+    const temporaryDirectory = await mkdtemp(join(tmpdir(), 'dji-speaker-audio-'))
+    const filePath = join(temporaryDirectory, safeName)
+    try {
+      await writeFile(filePath, data)
+      return await this.selectPath(filePath, temporaryDirectory)
+    } catch (error) {
+      await rm(temporaryDirectory, { recursive: true, force: true })
+      throw error
+    }
+  }
+
+  async dispose(): Promise<void> {
+    const directories = new Set([...this.selections.values()]
+      .map((selection) => selection.temporaryDirectory)
+      .filter((directory): directory is string => Boolean(directory)))
+    this.selections.clear()
+    await Promise.all([...directories].map((directory) => rm(directory, { recursive: true, force: true })))
+  }
+
+  private async selectPath(filePath: string, temporaryDirectory?: string): Promise<FirmwarePackageSelection> {
     const file = await stat(filePath)
-    if (!file.isFile()) throw new Error('所选固件包不是普通文件')
-    if (!Number.isSafeInteger(file.size) || file.size <= 0) throw new Error('固件包为空或文件大小无效')
+    if (!file.isFile()) throw new Error(`所选${this.fileLabel}不是普通文件`)
+    if (!Number.isSafeInteger(file.size) || file.size <= 0) throw new Error(`${this.fileLabel}为空或文件大小无效`)
     const token = randomUUID()
     const selection: SelectedPackage = {
       token,
       filePath,
+      temporaryDirectory,
       fileName: basename(filePath),
       fileSize: file.size,
       md5: await fileMd5(filePath),
@@ -150,20 +177,17 @@ export class FirmwareUploadManager {
 
   async upload(request: FirmwareUploadRequest): Promise<FirmwareUploadResult> {
     const selection = this.selections.get(request.selectionToken)
-    if (!selection) return { ok: false, error: '本地固件包选择已失效，请重新选择' }
-    if (this.activeUploads.has(selection.token)) return { ok: false, error: '该固件包正在上传' }
+    if (!selection) return { ok: false, error: `本地${this.fileLabel}选择已失效，请重新选择` }
+    if (this.activeUploads.has(selection.token)) return { ok: false, error: `该${this.fileLabel}正在上传` }
     const profile = await this.objectStorageStore.resolve(request.objectStorageProfileId)
     if (!profile) return { ok: false, error: '对象存储配置不存在' }
-    const expiresAt = credentialExpiresAt(profile.expire)
-    const availableValidity = expiresAt - Date.now() - URL_EXPIRY_SAFETY_MS
-    if (availableValidity < 60_000) return { ok: false, error: '对象存储凭证已过期或即将过期' }
     const objectKey = normalizeFirmwareObjectKey(request.objectKey)
     const beforeUpload = await stat(selection.filePath)
     if (beforeUpload.size !== selection.fileSize || beforeUpload.mtimeMs !== selection.mtimeMs) {
-      return { ok: false, error: '本地固件包在选择后已发生变化，请重新选择' }
+      return { ok: false, error: `本地${this.fileLabel}在选择后已发生变化，请重新选择` }
     }
 
-    const expiresIn = Math.max(60, Math.floor(Math.min(URL_VALIDITY_MS, availableValidity) / 1_000))
+    const expiresIn = URL_VALIDITY_MS / 1_000
     this.activeUploads.add(selection.token)
     this.emitProgress(selection, 0)
     try {
@@ -178,7 +202,7 @@ export class FirmwareUploadManager {
       })
       const afterUpload = await stat(selection.filePath)
       if (afterUpload.size !== selection.fileSize || afterUpload.mtimeMs !== selection.mtimeMs) {
-        throw new Error('固件包在上传过程中发生变化，上传结果不可用于升级')
+        throw new Error(`${this.fileLabel}在上传过程中发生变化，上传结果不可用`)
       }
       this.emitProgress(selection, selection.fileSize)
       const uploadedAt = Date.now()
@@ -221,7 +245,11 @@ export class FirmwareUploadManager {
       .filter((selection) => !this.activeUploads.has(selection.token))
       .sort((left, right) => left.selectedAt - right.selectedAt)
     while (this.selections.size > MAX_SELECTIONS && removable.length) {
-      this.selections.delete(removable.shift()!.token)
+      const selection = removable.shift()!
+      this.selections.delete(selection.token)
+      if (selection.temporaryDirectory) {
+        void rm(selection.temporaryDirectory, { recursive: true, force: true }).catch(() => undefined)
+      }
     }
   }
 }

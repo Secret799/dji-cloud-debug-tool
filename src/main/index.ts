@@ -21,6 +21,7 @@ import {
   validateSeiMessageDetailRequest,
   validateSeiParserId,
   validateSeiParserStartRequest,
+  validateSpeakerAudioRecordingRequest,
   validateSessionPassword,
   validateTopic,
   validateWebDavConfig,
@@ -37,7 +38,7 @@ import { ObjectStorageStore } from './object-storage-store'
 import { RtmpRelayManager } from './rtmp-relay-manager'
 import { SeiParserManager } from './sei-parser-manager'
 import { DeviceArchiveStore } from './device-archive-store'
-import { FirmwareUploadManager } from './firmware-upload-manager'
+import { FirmwareUploadManager, uploadFirmwareObject } from './firmware-upload-manager'
 import { RemoteLogUploadManager } from './remote-log-upload-manager'
 import { AppUpdateManager } from './app-update-manager'
 import { WebDavConfigStore } from './webdav-config-store'
@@ -62,6 +63,7 @@ let seiParserManager: SeiParserManager
 let objectStorageStore: ObjectStorageStore
 let deviceArchiveStore: DeviceArchiveStore
 let firmwareUploadManager: FirmwareUploadManager
+let speakerAudioUploadManager: FirmwareUploadManager
 let remoteLogUploadManager: RemoteLogUploadManager
 let appUpdateManager: AppUpdateManager
 let webDavConfigStore: WebDavConfigStore
@@ -414,6 +416,35 @@ const registerIpc = (): void => {
   handleTrusted(IPC_CHANNELS.firmwareUploadPackage, (_event, rawRequest: unknown) =>
     firmwareUploadManager.upload(validateFirmwareUploadRequest(rawRequest)),
   )
+  handleTrusted(IPC_CHANNELS.speakerAudioPick, async () => {
+    try {
+      const result = await dialog.showOpenDialog({
+        title: '选择喊话器音频',
+        properties: ['openFile'],
+        filters: [
+          { name: '喊话器音频', extensions: ['mp3', 'wav'] },
+        ],
+      })
+      if (result.canceled || !result.filePaths[0]) return { canceled: true }
+      return { canceled: false, package: await speakerAudioUploadManager.select(result.filePaths[0]) }
+    } catch (error) {
+      return { canceled: false, error: errorMessage(error) }
+    }
+  })
+  handleTrusted(IPC_CHANNELS.speakerAudioRegisterRecording, async (_event, rawRequest: unknown) => {
+    try {
+      const request = validateSpeakerAudioRecordingRequest(rawRequest)
+      return {
+        canceled: false,
+        package: await speakerAudioUploadManager.selectBytes(request.fileName, request.data),
+      }
+    } catch (error) {
+      return { canceled: false, error: errorMessage(error) }
+    }
+  })
+  handleTrusted(IPC_CHANNELS.speakerAudioUpload, (_event, rawRequest: unknown) =>
+    speakerAudioUploadManager.upload(validateFirmwareUploadRequest(rawRequest)),
+  )
   handleTrusted(IPC_CHANNELS.appUpdateState, () => appUpdateManager.getState())
   handleTrusted(IPC_CHANNELS.appUpdateCheck, () => appUpdateManager.check())
   handleTrusted(IPC_CHANNELS.appUpdateDownload, () => appUpdateManager.download())
@@ -471,6 +502,11 @@ app.whenReady().then(() => {
       mainWindow.webContents.send(IPC_CHANNELS.firmwareUploadProgress, progress)
     }
   })
+  speakerAudioUploadManager = new FirmwareUploadManager(objectStorageStore, (progress) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(IPC_CHANNELS.speakerAudioUploadProgress, progress)
+    }
+  }, uploadFirmwareObject, '音频文件')
   deviceArchiveStore = new DeviceArchiveStore()
   webDavConfigStore = new WebDavConfigStore()
   webDavBackupManager = new WebDavBackupManager(
@@ -514,6 +550,7 @@ app.on('before-quit', (event) => {
     mqttManager ? mqttManager.disconnectAll() : Promise.resolve(),
     mediaServerManager ? mediaServerManager.stopLocal().then(() => undefined) : Promise.resolve(),
     rtmpRelayManager ? rtmpRelayManager.close() : Promise.resolve(),
+    speakerAudioUploadManager ? speakerAudioUploadManager.dispose() : Promise.resolve(),
     Promise.resolve(seiParserManager?.close()),
   ]).then(() => undefined)
   void cleanup

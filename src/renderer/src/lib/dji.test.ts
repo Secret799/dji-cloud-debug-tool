@@ -3,6 +3,7 @@ import type { ConnectionProfile, DjiDevice, MqttMessageRecord } from '../../../s
 import type { DeviceTelemetry } from './dji'
 import { deviceProvider, superDockSupportsCommand } from './superdock'
 import {
+  buildDrcStatusEventReply,
   buildServicePayload,
   commandTemplatesForProvider,
   commandTransactions,
@@ -57,6 +58,29 @@ describe('DJI protocol helpers', () => {
       result: 13003,
       output: 'old-stream',
     })
+  })
+
+  it('builds the required reply for a DRC status event', () => {
+    const record = {
+      id: 'drc-status', profileId: 'p', direction: 'in', topic: 'thing/product/DOCK-1/events',
+      payload: JSON.stringify({
+        tid: 'tid-1', bid: 'bid-1', method: 'drc_status_notify', need_reply: 1,
+        data: { result: 514304, drc_state: 0 }, gateway: 'DOCK-1',
+      }),
+      qos: 1, retain: false, timestamp: 1, size: 1,
+    } as MqttMessageRecord
+
+    const reply = buildDrcStatusEventReply(record, 1_700_000_000_100)
+
+    expect(reply?.topic).toBe('thing/product/DOCK-1/events_reply')
+    expect(JSON.parse(reply?.payload ?? '{}')).toEqual({
+      tid: 'tid-1', bid: 'bid-1', timestamp: 1_700_000_000_100,
+      method: 'drc_status_notify', data: { result: 0 },
+    })
+    expect(buildDrcStatusEventReply({
+      ...record,
+      payload: JSON.stringify({ tid: 'tid-1', method: 'drc_status_notify', need_reply: 0, data: { drc_state: 2 } }),
+    })).toBeUndefined()
   })
 
   it('creates default subscriptions for a dock', () => {
@@ -348,7 +372,7 @@ describe('DJI protocol helpers', () => {
     })).toMatchObject({ kind: 'event', label: '未识别设备事件', knownMethod: false })
   })
 
-  it('classifies payload activity by psdk_index without inspecting encrypted data', () => {
+  it('classifies only integrated PSDK data methods as payload activity', () => {
     const base = {
       id: 'payload-event', profileId: 'profile', direction: 'in', topic: 'thing/product/DOCK-1/events',
       qos: 1, retain: false, timestamp: 100, size: 1,
@@ -386,12 +410,12 @@ describe('DJI protocol helpers', () => {
     expect(psdk).toMatchObject({ psdkIndex: 2 })
     expect(psdk && isPayloadActivity(psdk)).toBe(true)
     expect(vendorPsdk).toMatchObject({ psdkIndex: 4 })
-    expect(vendorPsdk && isPayloadActivity(vendorPsdk)).toBe(true)
+    expect(vendorPsdk && isPayloadActivity(vendorPsdk)).toBe(false)
     expect(psdkWithoutIndex && isPayloadActivity(psdkWithoutIndex)).toBe(false)
     expect(hms && isPayloadActivity(hms)).toBe(false)
   })
 
-  it('recognizes PSDK monitoring data and UI button messages', () => {
+  it('recognizes all integrated PSDK data messages', () => {
     const base = {
       id: 'psdk-event', profileId: 'profile', direction: 'in', topic: 'thing/product/DOCK-1/events',
       qos: 1, retain: false, timestamp: 100, size: 1,
@@ -406,15 +430,27 @@ describe('DJI protocol helpers', () => {
       id: 'psdk-ui-event',
       payload: JSON.stringify({ method: 'psdk_ui_resource_upload_result', data: { psdk_index: 1 } }),
     })
+    const customData = parseDeviceActivity({
+      ...base,
+      id: 'psdk-custom-data-event',
+      payload: JSON.stringify({
+        method: 'custom_data_transmission_from_psdk',
+        data: { psdk_index: 1, value: 'opaque' },
+      }),
+    })
 
     expect(monitoring).toMatchObject({
-      kind: 'event', label: 'PSDK 监测数据', knownMethod: true, psdkIndex: 1,
+      kind: 'event', label: 'PSDK 浮窗文本', knownMethod: true, psdkIndex: 1,
     })
     expect(uiButton).toMatchObject({
-      kind: 'event', label: 'PSDK UI 按钮', knownMethod: true, psdkIndex: 1,
+      kind: 'event', label: 'PSDK UI 资源上传结果', knownMethod: true, psdkIndex: 1,
+    })
+    expect(customData).toMatchObject({
+      kind: 'event', label: 'PSDK 自定义数据', knownMethod: true, psdkIndex: 1,
     })
     expect(monitoring && isPayloadActivity(monitoring)).toBe(true)
     expect(uiButton && isPayloadActivity(uiButton)).toBe(true)
+    expect(customData && isPayloadActivity(customData)).toBe(true)
   })
 
   it('groups device activities by kind and method with newest groups first', () => {
@@ -516,6 +552,35 @@ describe('DJI protocol helpers', () => {
       battery: { capacity_percent: 90 },
     })
     expect(second['profile:AIR-1'].status).toEqual({})
+  })
+
+  it('uses DRC status events as the gateway flight-control state', () => {
+    const profile = {
+      id: 'profile',
+      devices: [{ id: 'dock', name: 'Dock', sn: 'DOCK-1', type: 'dock' }],
+    } as ConnectionProfile
+    const base = {
+      id: 'drc-connecting', profileId: 'profile', direction: 'in',
+      topic: 'thing/product/DOCK-1/events', qos: 1, retain: false, timestamp: 100, size: 1,
+    } as MqttMessageRecord
+
+    const connecting = mergeTelemetry({}, profile, {
+      ...base,
+      payload: JSON.stringify({ method: 'drc_status_notify', data: { result: 0, drc_state: 1 } }),
+    })
+    const connected = mergeTelemetry(connecting, profile, {
+      ...base,
+      id: 'drc-connected',
+      timestamp: 200,
+      payload: JSON.stringify({ method: 'drc_status_notify', data: { result: 0, drc_state: 2 } }),
+    })
+
+    expect(connecting['profile:DOCK-1'].state).toEqual({ drc_state: 1 })
+    expect(connected['profile:DOCK-1']).toMatchObject({
+      lastTopic: 'thing/product/DOCK-1/events',
+      state: { drc_state: 2 },
+    })
+    expect(connected['profile:DOCK-1'].state).not.toHaveProperty('result')
   })
 
   it('keeps discovered aircraft OSD, state and status data in separate sections', () => {
@@ -776,6 +841,33 @@ describe('DJI protocol helpers', () => {
       status: 'success',
       result: 0,
       request: { id: 'out' },
+      response: { id: 'in' },
+    })
+  })
+
+  it('treats a data-bearing service reply without a result code as successful', () => {
+    const records = [
+      {
+        id: 'out', profileId: 'p', direction: 'out', topic: 'thing/product/D1/services',
+        payload: JSON.stringify({ tid: 'tid-1', bid: 'bid-1', method: 'fileupload_list', data: { module_list: ['0', '3'] } }),
+        qos: 1, retain: false, timestamp: 100, size: 1,
+      },
+      {
+        id: 'in', profileId: 'p', direction: 'in', topic: 'thing/product/D1/services_reply',
+        payload: JSON.stringify({
+          tid: 'tid-1',
+          bid: 'bid-1',
+          method: 'fileupload_list',
+          data: { files: [{ module: '0', name: 'dock.log' }, { module: '3', name: 'aircraft.log' }] },
+        }),
+        qos: 1, retain: false, timestamp: 150, size: 1,
+      },
+    ] as MqttMessageRecord[]
+
+    expect(commandTransactions(records, 200)[0]).toMatchObject({
+      method: 'fileupload_list',
+      status: 'success',
+      result: undefined,
       response: { id: 'in' },
     })
   })

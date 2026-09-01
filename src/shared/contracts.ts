@@ -45,6 +45,23 @@ export type TelemetryPropertyValueType =
   | 'struct'
   | 'array'
 
+export type TelemetryValueFormatter =
+  | 'datetime'
+  | 'date'
+  | 'time'
+  | 'number'
+  | 'fixed_2'
+  | 'percent'
+  | 'seconds_to_minutes'
+  | 'seconds_to_hours'
+  | 'seconds_to_duration'
+  | 'meters_to_kilometers'
+  | 'kilobytes_to_megabytes'
+  | 'kilobytes_to_gigabytes'
+  | 'json'
+  | 'uppercase'
+  | 'lowercase'
+
 export interface TelemetryPropertySetting {
   enabled: boolean
   path: string
@@ -57,6 +74,7 @@ export interface TelemetryLayoutField {
   label: string
   description: string
   visible: boolean
+  formatter?: TelemetryValueFormatter
   propertySetting?: TelemetryPropertySetting
 }
 
@@ -325,7 +343,6 @@ export interface ObjectStorageProfile {
   accessKeyId: string
   accessKeySecret: string
   securityToken: string
-  expire: number
   hasStoredAccessKeySecret?: boolean
   hasStoredSecurityToken?: boolean
   clearStoredAccessKeySecret?: boolean
@@ -386,6 +403,17 @@ export interface FirmwareArtifact {
 export interface FirmwareUploadResult extends OperationResult {
   artifact?: FirmwareArtifact
 }
+
+export type SpeakerAudioSelection = FirmwarePackageSelection
+export type SpeakerAudioPickResult = FirmwarePackagePickResult
+export interface SpeakerAudioRecordingRequest {
+  fileName: string
+  data: Uint8Array
+}
+export type SpeakerAudioRecordingResult = FirmwarePackagePickResult
+export type SpeakerAudioUploadRequest = FirmwareUploadRequest
+export type SpeakerAudioArtifact = FirmwareArtifact
+export type SpeakerAudioUploadResult = FirmwareUploadResult
 
 export interface FirmwareUploadProgress {
   selectionToken: string
@@ -562,6 +590,12 @@ export interface DjiDesktopApi {
   firmware: {
     pickPackage: () => Promise<FirmwarePackagePickResult>
     uploadPackage: (request: FirmwareUploadRequest) => Promise<FirmwareUploadResult>
+    onUploadProgress: (listener: (progress: FirmwareUploadProgress) => void) => () => void
+  }
+  speakerAudio: {
+    pick: () => Promise<SpeakerAudioPickResult>
+    registerRecording: (request: SpeakerAudioRecordingRequest) => Promise<SpeakerAudioRecordingResult>
+    upload: (request: SpeakerAudioUploadRequest) => Promise<SpeakerAudioUploadResult>
     onUploadProgress: (listener: (progress: FirmwareUploadProgress) => void) => () => void
   }
   updates: {

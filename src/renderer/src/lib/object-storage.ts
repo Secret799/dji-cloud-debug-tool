@@ -6,7 +6,6 @@ export interface ObjectStorageCredentials {
   accessKeyId: string
   accessKeySecret: string
   securityToken: string
-  expire: number
 }
 
 export interface ObjectStorageConfig {
@@ -32,7 +31,6 @@ export const createEmptyObjectStorageConfig = (): ObjectStorageConfig => ({
     accessKeyId: '',
     accessKeySecret: '',
     securityToken: '',
-    expire: 0,
   },
 })
 
@@ -48,7 +46,6 @@ export const createObjectStorageProfile = (): ObjectStorageProfile => {
     accessKeyId: '',
     accessKeySecret: '',
     securityToken: '',
-    expire: now + 60 * 60 * 1000,
     createdAt: now,
     updatedAt: now,
   }
@@ -71,9 +68,6 @@ export const parseObjectStorageConfig = (value: unknown): ObjectStorageConfig =>
       accessKeyId: typeof credentials.accessKeyId === 'string' ? credentials.accessKeyId : '',
       accessKeySecret: typeof credentials.accessKeySecret === 'string' ? credentials.accessKeySecret : '',
       securityToken: typeof credentials.securityToken === 'string' ? credentials.securityToken : '',
-      expire: typeof credentials.expire === 'number' && Number.isInteger(credentials.expire)
-        ? credentials.expire
-        : 0,
     },
   }
 }
@@ -85,7 +79,6 @@ export const objectStorageConfigIssues = (config: ObjectStorageConfig): string[]
   if (!config.endpoint.trim()) issues.push('Endpoint')
   if (!config.credentials.accessKeyId.trim()) issues.push('Access Key ID')
   if (!config.credentials.accessKeySecret) issues.push('Access Key Secret')
-  if (!Number.isInteger(config.credentials.expire) || config.credentials.expire <= 0) issues.push('凭证过期时间戳')
   return issues
 }
 
@@ -99,7 +92,6 @@ export const objectStorageProfileIssues = (profile: ObjectStorageProfile): strin
   if (!profile.accessKeySecret && (!profile.hasStoredAccessKeySecret || profile.clearStoredAccessKeySecret)) {
     issues.push('Access Key Secret')
   }
-  if (!Number.isInteger(profile.expire) || profile.expire <= 0) issues.push('凭证过期时间戳')
   return issues
 }
 
@@ -112,7 +104,6 @@ export const objectStorageProfileToConfig = (profile: ObjectStorageProfile): Obj
     accessKeyId: profile.accessKeyId,
     accessKeySecret: profile.accessKeySecret,
     securityToken: profile.securityToken,
-    expire: profile.expire,
   },
 })
 
@@ -131,7 +122,6 @@ export const objectStorageConfigToProfile = (
     accessKeyId: config.credentials.accessKeyId,
     accessKeySecret: config.credentials.accessKeySecret,
     securityToken: config.credentials.securityToken,
-    expire: config.credentials.expire,
     createdAt: now,
     updatedAt: now,
   }

@@ -27,6 +27,7 @@ describe('OssManager navigation', () => {
     expect(markup).toContain('添加 OSS 配置')
     expect(markup).toContain('主存储')
     expect(markup).toContain('<dt>Bucket</dt><dd>flight-data</dd>')
+    expect(markup).not.toContain('凭证过期')
     expect(markup).not.toContain('role="dialog"')
     expect(markup).not.toContain('访问凭证')
     expect(markup).not.toContain('保存配置')
