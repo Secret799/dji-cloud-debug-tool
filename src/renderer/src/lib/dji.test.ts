@@ -872,6 +872,21 @@ describe('DJI protocol helpers', () => {
     })
   })
 
+  it('correlates a reply recorded before the publish acknowledgement', () => {
+    const records: MqttMessageRecord[] = [
+      { id: 'in', profileId: 'p', direction: 'in', topic: 'thing/product/D1/services_reply',
+        payload: JSON.stringify({ tid: 'early', bid: 'bid', data: { result: 0 } }),
+        qos: 1, retain: false, timestamp: 110, size: 1 },
+      { id: 'out', profileId: 'p', direction: 'out', topic: 'thing/product/D1/services',
+        payload: JSON.stringify({ tid: 'early', bid: 'bid', method: 'cover_open', data: {} }),
+        qos: 1, retain: false, timestamp: 100, size: 1 },
+    ]
+    expect(commandTransactions(records, 20_000)[0]).toMatchObject({
+      status: 'success', result: 0, startedAt: 100, finishedAt: 110,
+      request: { id: 'out' }, response: { id: 'in' },
+    })
+  })
+
   it('does not associate a reply from another gateway or bid', () => {
     const records = [
       {

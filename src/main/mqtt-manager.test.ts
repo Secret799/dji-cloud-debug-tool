@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ConnectionProfile, MqttRuntimeEvent } from '../shared/contracts'
 import { MAX_MQTT_PAYLOAD_BYTES } from '../shared/limits'
 
@@ -24,11 +24,15 @@ import { MqttConnectionManager } from './mqtt-manager'
 
 class FakeMqttClient extends EventEmitter {
   connected = true
+  options = { reconnectPeriod: 3_000 }
+  outgoing = {}
+  removeOutgoingMessage = vi.fn()
   stream = { destroy: vi.fn() }
   end = vi.fn((_force: boolean, _options: object, callback: (error?: Error) => void) => callback())
   publish = vi.fn()
   subscribe = vi.fn()
   unsubscribe = vi.fn()
+  reconnect = vi.fn()
 }
 
 const createProfile = (): ConnectionProfile => ({
@@ -57,6 +61,7 @@ const createProfile = (): ConnectionProfile => ({
 })
 
 describe('MqttConnectionManager', () => {
+  afterEach(() => vi.useRealTimers())
   beforeEach(() => {
     mqttMocks.connect.mockReset()
     mqttMocks.readFile.mockReset()
@@ -207,6 +212,59 @@ describe('MqttConnectionManager', () => {
         objectKey: 'logs/device.zip',
       },
     })
+  })
+
+  it('fails unacknowledged publications on disconnect and clears retry storage before reconnecting', async () => {
+    vi.useFakeTimers()
+    const client = new FakeMqttClient()
+    let acknowledge!: () => void
+    client.publish.mockImplementation((_topic, _payload, _options, callback) => { acknowledge = callback })
+    mqttMocks.connect.mockReturnValue(client)
+    const events: MqttRuntimeEvent[] = []
+    const manager = new MqttConnectionManager((event) => events.push(event))
+    await manager.connect(createProfile(), '')
+    const publication = manager.publish({ profileId: 'profile-1', topic: 'thing/product/D/services', payload: '{}', qos: 1, retain: false })
+    const settled = vi.fn()
+    void publication.then(settled)
+
+    client.connected = false
+    client.emit('close')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(settled).toHaveBeenCalledWith({ ok: false, error: expect.any(String) })
+    expect(client.end).toHaveBeenCalledWith(true, {}, expect.any(Function))
+    acknowledge()
+    expect(events.filter((event) => event.type === 'message')).toHaveLength(0)
+    await vi.advanceTimersByTimeAsync(3_000)
+    expect(client.reconnect).toHaveBeenCalledTimes(1)
+  })
+
+  it('bounds publication acknowledgement waits even when the broker stays connected', async () => {
+    vi.useFakeTimers()
+    const client = new FakeMqttClient()
+    mqttMocks.connect.mockReturnValue(client)
+    const manager = new MqttConnectionManager(() => undefined)
+    await manager.connect({ ...createProfile(), reconnectPeriod: 0 }, '')
+    const settled = vi.fn()
+    void manager.publish({ profileId: 'profile-1', topic: 'test/topic', payload: '{}', qos: 1, retain: false }).then(settled)
+
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(settled).toHaveBeenCalledWith({ ok: false, error: expect.stringContaining('超时') })
+    expect(client.end).toHaveBeenCalledWith(true, {}, expect.any(Function))
+    expect(client.reconnect).not.toHaveBeenCalled()
+  })
+
+  it('cancels a pending automatic restart when the user disconnects', async () => {
+    vi.useFakeTimers()
+    const client = new FakeMqttClient()
+    mqttMocks.connect.mockReturnValue(client)
+    const manager = new MqttConnectionManager(() => undefined)
+    await manager.connect(createProfile(), '')
+    void manager.publish({ profileId: 'profile-1', topic: 'test/topic', payload: '{}', qos: 1, retain: false })
+    client.connected = false
+    client.emit('close')
+    await manager.disconnect('profile-1')
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(client.reconnect).not.toHaveBeenCalled()
   })
 
   it('redacts credentials from inbound payloads and MQTT properties', async () => {

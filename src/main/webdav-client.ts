@@ -5,6 +5,7 @@ import type { IncomingHttpHeaders } from 'node:http'
 import { basename } from 'node:path/posix'
 import { XMLParser } from 'fast-xml-parser'
 import type { WebDavConfig, WebDavVersion } from '../shared/contracts'
+import { MAX_BACKUP_ENVELOPE_BYTES } from './webdav-backup-limits'
 
 interface WebDavResponse {
   url: URL
@@ -22,7 +23,7 @@ interface DigestChallenge {
 }
 
 const VERSION_PATTERN = /^v(\d{6})-(\d{13})-([a-f0-9-]{36})\.djibak$/i
-const MAX_RESPONSE_BYTES = 32 * 1024 * 1024
+const REQUEST_TIMEOUT_MS = 20_000
 export const WEB_DAV_SYNC_LOCK_NAME = '.sync-lock.json'
 
 const parseDigestChallenge = (header: string): DigestChallenge => {
@@ -107,6 +108,7 @@ const normalizeEndpoint = (endpoint: string): URL => {
 
 export class WebDavClient {
   private readonly directoryUrl: URL
+  private conditionalDeleteVerified = false
 
   constructor(private readonly config: WebDavConfig) {
     this.directoryUrl = new URL('dji-cloud-studio-backups/', normalizeEndpoint(config.endpoint))
@@ -150,6 +152,7 @@ export class WebDavClient {
   }
 
   async upload(versionId: string, payload: Buffer): Promise<void> {
+    if (payload.byteLength > MAX_BACKUP_ENVELOPE_BYTES) throw new Error('备份文件超过加密大小限制')
     const response = await this.request('PUT', new URL(encodeURIComponent(versionId), this.directoryUrl), payload, {
       'Content-Type': 'application/octet-stream',
       'If-None-Match': '*',
@@ -159,6 +162,7 @@ export class WebDavClient {
 
   async tryAcquireSyncLock(payload: Buffer): Promise<boolean> {
     await this.ensureCollection()
+    await this.verifyConditionalDelete()
     const response = await this.request('PUT', new URL(WEB_DAV_SYNC_LOCK_NAME, this.directoryUrl), payload, {
       'Content-Type': 'application/json; charset=utf-8',
       'If-None-Match': '*',
@@ -170,39 +174,61 @@ export class WebDavClient {
     return false
   }
 
-  async readSyncLock(): Promise<Buffer | undefined> {
+  async readSyncLock(): Promise<{ body: Buffer; etag: string } | undefined> {
     await this.ensureCollection()
     const response = await this.request('GET', new URL(WEB_DAV_SYNC_LOCK_NAME, this.directoryUrl))
     if (response.status === 404) return undefined
     this.expectStatus(response, [200], '读取 WebDAV 同步锁')
-    return response.body
+    const etag = response.headers.etag
+    if (!etag || !/^"[^"\r\n]*"$/.test(etag)) throw new Error('WebDAV 同步锁缺少强 ETag，无法安全删除')
+    return { body: response.body, etag }
   }
 
   async releaseSyncLock(owner: string): Promise<void> {
     const current = await this.readSyncLock()
     if (!current) return
     try {
-      const document = JSON.parse(current.toString('utf8')) as { owner?: unknown }
+      const document = JSON.parse(current.body.toString('utf8')) as { owner?: unknown }
       if (document.owner !== owner) return
     } catch {
       return
     }
-    const response = await this.request('DELETE', new URL(WEB_DAV_SYNC_LOCK_NAME, this.directoryUrl))
-    if (response.status !== 404) this.expectStatus(response, [200, 204], '释放 WebDAV 同步锁')
+    await this.deleteObservedSyncLock(current.etag, '释放 WebDAV 同步锁')
   }
 
   async removeExpiredSyncLock(now = Date.now()): Promise<boolean> {
     const current = await this.readSyncLock()
     if (!current) return true
     try {
-      const document = JSON.parse(current.toString('utf8')) as { expiresAt?: unknown }
+      const document = JSON.parse(current.body.toString('utf8')) as { expiresAt?: unknown }
       if (typeof document.expiresAt !== 'number' || document.expiresAt > now) return false
     } catch {
       return false
     }
-    const response = await this.request('DELETE', new URL(WEB_DAV_SYNC_LOCK_NAME, this.directoryUrl))
-    if (response.status !== 404) this.expectStatus(response, [200, 204], '清理过期 WebDAV 同步锁')
+    return this.deleteObservedSyncLock(current.etag, '清理过期 WebDAV 同步锁')
+  }
+
+  private async deleteObservedSyncLock(etag: string, action: string): Promise<boolean> {
+    await this.verifyConditionalDelete()
+    const response = await this.request('DELETE', new URL(WEB_DAV_SYNC_LOCK_NAME, this.directoryUrl), undefined, { 'If-Match': etag })
+    if (response.status === 412) return false
+    if (response.status !== 404) this.expectStatus(response, [200, 204], action)
     return true
+  }
+
+  private async verifyConditionalDelete(): Promise<void> {
+    if (this.conditionalDeleteVerified) return
+    // Test a disposable resource: a server ignoring If-Match must never see a real lock DELETE.
+    const probeUrl = new URL(`.sync-lock-probe-${randomBytes(16).toString('hex')}`, this.directoryUrl)
+    const created = await this.request('PUT', probeUrl, randomBytes(32), { 'If-None-Match': '*' })
+    this.expectStatus(created, [201], '检查 WebDAV 条件删除支持')
+    try {
+      const rejected = await this.request('DELETE', probeUrl, undefined, { 'If-Match': `"missing-${randomBytes(16).toString('hex')}"` })
+      if (rejected.status !== 412) throw new Error('WebDAV 服务器未执行 If-Match 条件删除，无法安全同步')
+      this.conditionalDeleteVerified = true
+    } finally {
+      await this.request('DELETE', probeUrl).catch(() => undefined)
+    }
   }
 
   async download(versionId: string): Promise<Buffer> {
@@ -230,24 +256,25 @@ export class WebDavClient {
     body?: Buffer,
     extraHeaders: Record<string, string> = {},
   ): Promise<WebDavResponse> {
+    const deadline = Date.now() + REQUEST_TIMEOUT_MS
     const headers = { ...extraHeaders }
     if (body) headers['Content-Length'] = String(body.byteLength)
     if (this.config.authType === 'basic') {
       headers.Authorization = `Basic ${Buffer.from(`${this.config.username}:${this.config.secret}`, 'utf8').toString('base64')}`
-      return this.requestFollowingRedirects(method, url, body, headers)
+      return this.requestFollowingRedirects(method, url, body, headers, deadline)
     }
     if (this.config.authType === 'token') {
       headers.Authorization = `Bearer ${this.config.secret}`
-      return this.requestFollowingRedirects(method, url, body, headers)
+      return this.requestFollowingRedirects(method, url, body, headers, deadline)
     }
-    const challenge = await this.requestFollowingRedirects(method, url, body, headers)
+    const challenge = await this.requestFollowingRedirects(method, url, body, headers, deadline)
     if (challenge.status !== 401) return challenge
     const authenticate = asArray(challenge.headers['www-authenticate']).find((value) => /^\s*Digest\s+/i.test(value))
     if (!authenticate) throw new Error('WebDAV 服务器未提供 Digest 认证')
     return this.requestFollowingRedirects(method, url, body, {
       ...headers,
       Authorization: createDigestAuthorization(method, challenge.url, this.config.username, this.config.secret, authenticate),
-    })
+    }, deadline)
   }
 
   private async requestFollowingRedirects(
@@ -255,14 +282,15 @@ export class WebDavClient {
     url: URL,
     body: Buffer | undefined,
     headers: Record<string, string>,
+    deadline: number,
     redirects = 0,
   ): Promise<WebDavResponse> {
-    const response = await this.requestOnce(method, url, body, headers)
+    const response = await this.requestOnce(method, url, body, headers, deadline)
     if (![301, 302, 307, 308].includes(response.status) || !response.headers.location) return response
     if (redirects >= 3) throw new Error('WebDAV 端点重定向次数过多')
     const redirected = new URL(response.headers.location, url)
     if (redirected.origin !== url.origin) throw new Error('WebDAV 端点试图重定向到其他站点')
-    return this.requestFollowingRedirects(method, redirected, body, headers, redirects + 1)
+    return this.requestFollowingRedirects(method, redirected, body, headers, deadline, redirects + 1)
   }
 
   private requestOnce(
@@ -270,34 +298,57 @@ export class WebDavClient {
     url: URL,
     body: Buffer | undefined,
     headers: Record<string, string>,
+    deadline: number,
   ): Promise<WebDavResponse> {
+    const remaining = deadline - Date.now()
+    if (remaining <= 0) return Promise.reject(new Error('WebDAV 请求超过 20 秒总时限'))
     return new Promise((resolve, reject) => {
+      let settled = false
+      let deadlineTimer: ReturnType<typeof setTimeout> | undefined
+      const finish = (error?: Error, response?: WebDavResponse): void => {
+        if (settled) return
+        settled = true
+        clearTimeout(deadlineTimer)
+        if (error) reject(error)
+        else resolve(response!)
+      }
+      const fail = (error: Error): void => {
+        finish(error)
+        request.destroy(error)
+      }
       const transport = url.protocol === 'https:' ? httpsRequest : httpRequest
       const request = transport(url, {
         method,
         headers,
         rejectUnauthorized: this.config.rejectUnauthorized,
-        timeout: 20_000,
+        timeout: REQUEST_TIMEOUT_MS,
       }, (response) => {
         const chunks: Buffer[] = []
         let size = 0
+        response.on('aborted', () => fail(new Error('WebDAV 响应在完成前中断')))
+        response.on('error', fail)
+        response.on('close', () => {
+          if (!response.complete) fail(new Error('WebDAV 响应在完成前关闭'))
+        })
         response.on('data', (chunk: Buffer) => {
+          if (settled) return
           size += chunk.byteLength
-          if (size > MAX_RESPONSE_BYTES) {
-            request.destroy(new Error('WebDAV 响应超过 32 MiB 限制'))
+          if (size > MAX_BACKUP_ENVELOPE_BYTES) {
+            fail(new Error('WebDAV 响应超过加密备份大小限制'))
             return
           }
           chunks.push(chunk)
         })
-        response.on('end', () => resolve({
+        response.on('end', () => finish(undefined, {
           url,
           status: response.statusCode ?? 0,
           headers: response.headers,
           body: Buffer.concat(chunks),
         }))
       })
-      request.on('timeout', () => request.destroy(new Error('WebDAV 请求超时')))
-      request.on('error', reject)
+      deadlineTimer = setTimeout(() => fail(new Error('WebDAV 请求超过 20 秒总时限')), remaining)
+      request.on('timeout', () => fail(new Error('WebDAV 请求超时')))
+      request.on('error', (error) => finish(error))
       if (body) request.write(body)
       request.end()
     })

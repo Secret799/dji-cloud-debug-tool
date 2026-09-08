@@ -159,7 +159,17 @@ export function CommandCenter({
         : ''
   const [gatewaySn, setGatewaySn] = useState(contextualGatewaySn || gatewayDevices[0]?.sn || '')
   const contextualGateway = gatewayDevices.find((device) => device.sn === gatewaySn) ?? gatewayDevices[0]
-  const gatewayTelemetry = telemetry.find((device) => device.sn === gatewaySn)
+  const gatewayTelemetry = telemetry.find((device) => device.sn === gatewaySn && device.profileId === profile.id)
+  const [, setAuthorityClock] = useState(0)
+  useEffect(() => {
+    const timer = window.setInterval(() => setAuthorityClock((clock) => clock + 1), 1_000)
+    return () => window.clearInterval(timer)
+  }, [])
+  const hasCurrentGatewayTelemetry = (): boolean => {
+    const age = Date.now() - (gatewayTelemetry?.lastSeenAt ?? 0)
+    return status === 'connected' && gatewayTelemetry?.online === true && age >= 0 && age < 20_000
+  }
+  const gatewayTelemetryCurrent = hasCurrentGatewayTelemetry()
   const provider = resolveGatewayProvider(contextualGateway, gatewayTelemetry) ?? deviceProvider(contextualGateway)
   const isSuperDock = provider === 'superdock'
   const providerCommands = useMemo(() => commandTemplatesForProvider(provider), [provider])
@@ -224,7 +234,7 @@ export function CommandCenter({
     ),
     [relatedAircraftTelemetry],
   )
-  const modeCode = numericState(telemetryValue(gatewayTelemetrySource, 'mode_code'))
+  const modeCode = gatewayTelemetryCurrent ? numericState(telemetryValue(gatewayTelemetrySource, 'mode_code')) : undefined
   const coverState = numericState(telemetryValue(gatewayTelemetrySource, 'cover_state'))
   const putterState = numericState(telemetryValue(gatewayTelemetrySource, 'putter_state'))
   const chargeState = numericState(
@@ -245,7 +255,7 @@ export function CommandCenter({
   const dockLongitude = numericState(telemetryValue(gatewayTelemetrySource, 'longitude'))
   const dockLatitude = numericState(telemetryValue(gatewayTelemetrySource, 'latitude'))
   const dockHeight = numericState(telemetryValue(gatewayTelemetrySource, 'height'))
-  const drcState = numericState(telemetryValue(gatewayTelemetrySource, 'drc_state'))
+  const drcState = gatewayTelemetryCurrent ? numericState(telemetryValue(gatewayTelemetrySource, 'drc_state')) : undefined
   const rawControlSource = telemetryValue(aircraftTelemetrySource, 'control_source')
   const controlSource = typeof rawControlSource === 'string' && rawControlSource.trim() ? rawControlSource.trim() : ''
   const remoteDebugActive = modeCode === 2
@@ -460,17 +470,21 @@ export function CommandCenter({
       return
     }
     const actualCommand = providerCommands.find((command) => command.method === method)
-    if (actualCommand?.requiresDebug && !remoteDebugActive) {
+    if (actualCommand?.requiresDebug && (!remoteDebugActive || !hasCurrentGatewayTelemetry())) {
       onNotify?.('请先进入远程调试模式', 'error')
       return
     }
-    if (category === 'flight' && !flightAuthorityActive) {
+    if ((category === 'flight' || actualCommand?.requiresFlightAuthority) && (!flightAuthorityActive || !hasCurrentGatewayTelemetry())) {
       onNotify?.('请先获取飞行控制权', 'error')
       return
     }
     if (actualCommand?.danger) {
       if (!window.confirm(`确认执行“${actualCommand.label}”？请确保现场环境安全。`)) return
     } else if (!actualCommand && !window.confirm(`即将发送未识别的自定义指令“${method}”，确认继续？`)) {
+      return
+    }
+    if ((actualCommand?.requiresDebug || actualCommand?.requiresFlightAuthority || category === 'flight') && !hasCurrentGatewayTelemetry()) {
+      onNotify?.('设备已离线或遥测已过期，请等待设备重新上报状态', 'error')
       return
     }
 
@@ -503,15 +517,19 @@ export function CommandCenter({
       onNotify?.(`当前 ${isSuperDock ? 'SuperDock' : 'DJI'} 设备不支持指令 ${command.method}`, 'error')
       return false
     }
-    if (command.requiresDebug && !remoteDebugActive) {
+    if (command.requiresDebug && (!remoteDebugActive || !hasCurrentGatewayTelemetry())) {
       onNotify?.('请先进入远程调试模式', 'error')
       return false
     }
-    if (command.requiresFlightAuthority && !flightAuthorityActive) {
+    if (command.requiresFlightAuthority && (!flightAuthorityActive || !hasCurrentGatewayTelemetry())) {
       onNotify?.('请先获取飞行控制权', 'error')
       return false
     }
     if (command.danger && !window.confirm(`确认执行“${command.label}”？请确保现场环境安全。`)) return false
+    if ((command.requiresDebug || command.requiresFlightAuthority) && !hasCurrentGatewayTelemetry()) {
+      onNotify?.('设备已离线或遥测已过期，请等待设备重新上报状态', 'error')
+      return false
+    }
 
     setQuickSendingCommandId(command.id)
     try {

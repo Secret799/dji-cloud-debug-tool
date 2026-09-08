@@ -1,8 +1,9 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import type { ConnectionProfile, MediaServerProfile } from '../../../shared/contracts'
+import type { ConnectionProfile, ConnectionStatus, MediaServerProfile } from '../../../shared/contracts'
 import { DJI_COMMANDS, type DeviceTelemetry } from '../lib/dji'
 import { buildMediaEndpoints } from '../lib/media'
+import { parseTelemetryCache, serializeTelemetryCache } from '../lib/telemetry-cache'
 import {
   isValidSuperDockLtePhone,
   isValidSuperDockLteVerificationCode,
@@ -14,11 +15,12 @@ const renderCommandCenter = (
   profile: ConnectionProfile,
   selectedDeviceSn: string,
   telemetry: DeviceTelemetry[] = [],
+  status: ConnectionStatus = 'connected',
 ): string =>
   renderToStaticMarkup(
     <CommandCenter
       profile={profile}
-      status="connected"
+      status={status}
       busy={false}
       selectedDeviceSn={selectedDeviceSn}
       telemetry={telemetry}
@@ -29,11 +31,12 @@ const renderCommandCenter = (
 const renderFlightCenter = (
   profile: ConnectionProfile,
   telemetry: DeviceTelemetry[],
+  status: ConnectionStatus = 'connected',
 ): string =>
   renderToStaticMarkup(
     <CommandCenter
       profile={profile}
-      status="connected"
+      status={status}
       busy={false}
       selectedDeviceSn="DOCK-1"
       telemetry={telemetry}
@@ -463,6 +466,33 @@ describe('CommandCenter flight authority gate', () => {
       { id: 'aircraft', name: '库内飞机', sn: 'AIR-1', type: 'aircraft', parentSn: 'DOCK-1' },
     ],
   } as ConnectionProfile
+
+  it.each(['offline', 'expired', 'future', 'wrong-profile', 'cached', 'disconnected', 'reconnecting'] as const)('keeps flight and debug commands locked for %s authority', (scenario) => {
+    let device: DeviceTelemetry = {
+      profileId: 'profile', sn: 'DOCK-1', type: 'dock', name: 'Dock', online: true,
+      lastSeenAt: Date.now(), lastTopic: 'thing/product/DOCK-1/osd', status: {}, state: {},
+      osd: { drc_state: 2, mode_code: 2, cover_state: 0 },
+    }
+    if (scenario === 'offline') device.online = false
+    if (scenario === 'expired') device.lastSeenAt -= 20_001
+    if (scenario === 'future') device.lastSeenAt += 60_000
+    if (scenario === 'wrong-profile') device.profileId = 'other'
+    if (scenario === 'cached') {
+      device = Object.values(parseTelemetryCache(JSON.parse(serializeTelemetryCache({ device }))))[0]
+      // A fresh topology packet must not resurrect cached control authority.
+      device.online = true
+      device.lastSeenAt = Date.now()
+    }
+
+    const status = scenario === 'disconnected' || scenario === 'reconnecting' ? scenario : 'connected'
+    const flight = renderFlightCenter(profile, [device], status)
+    expect(flight.match(/class="command-tile[^\"]*locked[^\"]*" disabled=""/g)).toHaveLength(4)
+    expect(flight).not.toContain('已获取控制权')
+    const debug = renderCommandCenter(profile, 'DOCK-1', [device], status)
+    expect(debug).toContain('debug-operation-card locked')
+    if (scenario !== 'wrong-profile') expect(debug).toContain('<button class="button secondary" disabled="">打开舱盖</button>')
+    expect(debug).not.toContain('远程调试中')
+  })
 
   it('locks all flight operations until DRC reports that control authority is connected', () => {
     const telemetry = [{

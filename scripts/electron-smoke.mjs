@@ -1242,7 +1242,7 @@ try {
   }
   await window.locator('.remote-debug-console').waitFor({ state: 'visible' })
   const lockedDebugText = await window.locator('.remote-debug-console').innerText()
-  if (!lockedDebugText.includes('现场调试中') || !lockedDebugText.includes('请先进入远程调试模式')) {
+  if (!lockedDebugText.includes('状态未知') || !lockedDebugText.includes('请先进入远程调试模式')) {
     errors.push(`commands: remote operations were not locked outside remote debug mode (${JSON.stringify(lockedDebugText)})`)
   }
   if (await window.locator('.debug-operation-card button:not([disabled])').count()) {
@@ -1254,6 +1254,9 @@ try {
     const remoteDebugPayload = JSON.stringify({ data: { mode_code: 2 } })
     await electronApp.evaluate(({ BrowserWindow }, event) => {
       for (const instance of BrowserWindow.getAllWindows()) {
+        instance.webContents.send('runtime:event', {
+          type: 'status', profileId: event.profileId, status: 'connected', at: Date.now(),
+        })
         instance.webContents.send('runtime:event', event)
       }
     }, {
@@ -1294,6 +1297,27 @@ try {
       || activeQuickDebugText.includes('开启充电\n')
     ) {
       errors.push(`commands: remote debug controls showed both sides of a state toggle (${JSON.stringify(activeQuickDebugText)})`)
+    }
+    await electronApp.evaluate(({ BrowserWindow }, smokeProfileId) => {
+      for (const instance of BrowserWindow.getAllWindows()) {
+        for (const status of ['disconnected', 'connected']) {
+          instance.webContents.send('runtime:event', {
+            type: 'status', profileId: smokeProfileId, status, at: Date.now(),
+          })
+        }
+        instance.webContents.send('runtime:event', {
+          type: 'message', profileId: smokeProfileId,
+          message: {
+            id: 'smoke-reconnected-osd', profileId: smokeProfileId, direction: 'in',
+            topic: 'thing/product/DOCK-SMOKE-001/osd', payload: '{"data":{"temperature":25}}',
+            qos: 1, retain: false, timestamp: Date.now(), size: 27,
+          },
+        })
+      }
+    }, profileId)
+    await window.locator('.debug-mode-gate.active').waitFor({ state: 'hidden' })
+    if (await window.locator('.debug-operation-card button:not([disabled])').count()) {
+      errors.push('commands: reconnect restored stale remote debug authority')
     }
   }
   if (await window.locator('.debug-operation-result').count()) {
@@ -1345,7 +1369,7 @@ try {
   await window.getByRole('button', { name: '飞行控制', exact: true }).click()
   await window.locator('.flight-authority-console').waitFor({ state: 'visible' })
   const lockedFlightText = await window.locator('.flight-authority-console').innerText()
-  if (!lockedFlightText.includes('未获取控制权') || !lockedFlightText.includes('请先获取飞行控制权')) {
+  if (!lockedFlightText.includes('请先获取飞行控制权')) {
     errors.push(`commands: flight operations were not locked before DRC authority (${JSON.stringify(lockedFlightText)})`)
   }
   if (await window.locator('.command-tile:not([disabled])').count()) {

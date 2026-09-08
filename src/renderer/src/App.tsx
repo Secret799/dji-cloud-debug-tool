@@ -76,7 +76,7 @@ import {
   reconcileTelemetryLayout,
   saveTelemetryLayout,
 } from './lib/telemetry-layout'
-import { loadTelemetryCache, saveTelemetryCache } from './lib/telemetry-cache'
+import { loadTelemetryCache, saveTelemetryCache, withoutRuntimeOnlyState } from './lib/telemetry-cache'
 import {
   buildDeviceArchives,
   deviceArchivesEqual,
@@ -153,6 +153,14 @@ interface PendingServiceReply {
 
 const serviceReplyKey = (profileId: string, gatewaySn: string, tid: string): string =>
   `${profileId}:${gatewaySn}:${tid}`
+
+const invalidateTelemetryRuntime = (telemetry: DeviceTelemetry): DeviceTelemetry => ({
+  ...telemetry,
+  online: false,
+  osd: withoutRuntimeOnlyState(telemetry.osd),
+  state: withoutRuntimeOnlyState(telemetry.state),
+  status: withoutRuntimeOnlyState(telemetry.status),
+})
 
 const activeSubscriptionChanges = (
   current: ConnectionProfile,
@@ -643,7 +651,7 @@ export default function App() {
           updateTelemetrySnapshot((current) => Object.fromEntries(
             Object.entries(current).map(([key, telemetry]) => [
               key,
-              telemetry.profileId === event.profileId ? { ...telemetry, online: false } : telemetry,
+              telemetry.profileId === event.profileId ? invalidateTelemetryRuntime(telemetry) : telemetry,
             ]),
           ))
           pendingServiceRepliesRef.current.forEach((pending, key) => {
@@ -713,7 +721,12 @@ export default function App() {
         })
         const profile = profilesRef.current.find((item) => item.id === event.profileId)
         if (profile) {
-          const merged = updateTelemetrySnapshot((current) => mergeTelemetry(current, profile, event.message))
+          const merged = updateTelemetrySnapshot((current) => Object.fromEntries(
+            Object.entries(mergeTelemetry(current, profile, event.message)).map(([key, telemetry]) => [
+              key,
+              !telemetry.online && telemetry !== current[key] ? invalidateTelemetryRuntime(telemetry) : telemetry,
+            ]),
+          ))
           refreshDeviceArchives(
             profile,
             Object.values(merged).filter((telemetry) => telemetry.profileId === profile.id),
@@ -1336,7 +1349,11 @@ export default function App() {
     })
 
     try {
-      const published = await handlePublish(`thing/product/${gatewaySn}/services`, payload, 1, false)
+      const published = await Promise.race([
+        handlePublish(`thing/product/${gatewaySn}/services`, payload, 1, false),
+        replyPromise,
+      ])
+      if ('tid' in published) return published
       if (published.ok) return replyPromise
       const pending = pendingServiceRepliesRef.current.get(key)
       if (pending) window.clearTimeout(pending.timer)

@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path'
 import type { MediaServerProfile } from '../shared/contracts'
 import { encryptCredential, type CredentialContext } from './credential-crypto'
 import { hasStoredCredential, migrateStoredCredential, resolveStoredCredential } from './stored-credential'
+import { runConfigurationTransaction } from './configuration-transaction'
 
 interface StoredMediaServerProfile extends Omit<MediaServerProfile, 'secret' | 'hasStoredSecret' | 'clearStoredSecret' | 'webrtcPort'> {
   webrtcPort?: number
@@ -247,8 +248,10 @@ export class MediaServerStore {
   }
 
   private runExclusive<T>(operation: () => Promise<T>): Promise<T> {
-    const result = this.operationQueue.then(operation)
-    this.operationQueue = result.then(() => undefined, () => undefined)
-    return result
+    return runConfigurationTransaction(() => {
+      const result = this.operationQueue.then(operation)
+      this.operationQueue = result.then(() => undefined, () => undefined)
+      return result
+    })
   }
 }

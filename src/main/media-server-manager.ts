@@ -18,7 +18,9 @@ const errorMessage = (error: unknown): string => error instanceof Error ? error.
 
 export class MediaServerManager {
   private child: ChildProcessByStdio<null, Readable, Readable> | null = null
-  private stopRequested = false
+  private operation = 0
+  private stopping?: Promise<void>
+  private preparing?: Promise<unknown>
   private recentOutput = ''
   private runtime: MediaServerRuntime = {
     profileId: LOCAL_ZLM_ID,
@@ -37,19 +39,28 @@ export class MediaServerManager {
   }
 
   async check(profileId: string): Promise<MediaServerOperationResult> {
+    const operation = this.operation
     const profile = await this.store.getWithSecret(profileId)
     if (!profile) return { ok: false, error: '媒体服务配置不存在' }
     const runtime = await this.probe(profile)
-    if (profile.kind === 'local-zlm') this.setRuntime({ ...runtime, pid: this.child?.pid, binaryAvailable: await this.hasBinary() })
+    if (profile.kind === 'local-zlm') {
+      const binaryAvailable = await this.hasBinary()
+      if (operation === this.operation) this.setRuntime({ ...runtime, pid: this.child?.pid, binaryAvailable })
+    }
     return { ok: runtime.state === 'running', runtime, error: runtime.state === 'running' ? undefined : runtime.detail }
   }
 
   async startLocal(): Promise<MediaServerOperationResult> {
-    if (this.child && this.runtime.state === 'running') return { ok: true, runtime: await this.getLocalRuntime() }
+    if (this.child && !this.stopping && this.runtime.state === 'running') return { ok: true, runtime: await this.getLocalRuntime() }
+    const operation = ++this.operation
+    const cancelled = (): MediaServerOperationResult => ({ ok: false, runtime: { ...this.runtime }, error: '媒体服务启动已取消' })
     const profile = await this.store.getWithSecret(LOCAL_ZLM_ID)
+    if (operation !== this.operation) return cancelled()
     if (!profile) return { ok: false, error: '本地 ZLMediaKit 配置不存在' }
     const binaryPath = this.binaryPath()
-    if (!(await this.hasBinary())) {
+    const binaryAvailable = await this.hasBinary()
+    if (operation !== this.operation) return cancelled()
+    if (!binaryAvailable) {
       const runtime = this.setRuntime({
         profileId: LOCAL_ZLM_ID,
         state: 'error',
@@ -61,9 +72,17 @@ export class MediaServerManager {
     }
 
     try {
-      await this.stopLocal()
-      const paths = await this.prepareRuntime(profile)
-      this.stopRequested = false
+      await this.stopChild()
+      if (operation !== this.operation) return cancelled()
+      // Let an earlier file write settle before replacing the shared config.ini.
+      await this.preparing?.catch(() => {})
+      if (operation !== this.operation) return cancelled()
+      const preparation = this.prepareRuntime(profile)
+      this.preparing = preparation
+      const paths = await preparation.finally(() => {
+        if (this.preparing === preparation) this.preparing = undefined
+      })
+      if (operation !== this.operation) return cancelled()
       this.recentOutput = ''
       this.setRuntime({ profileId: LOCAL_ZLM_ID, state: 'starting', checkedAt: Date.now(), binaryAvailable: true })
       const child = spawn(binaryPath, ['-c', paths.config, '-l', '2', '--affinity', '0', '--log-dir', paths.logs], {
@@ -72,60 +91,81 @@ export class MediaServerManager {
       })
       this.child = child
       const capture = (chunk: Buffer): void => {
+        if (operation !== this.operation || this.child !== child) return
         this.recentOutput = `${this.recentOutput}${chunk.toString('utf8')}`.slice(-4_000)
       }
       child.stdout.on('data', capture)
       child.stderr.on('data', capture)
       child.once('error', (error) => {
+        if (operation !== this.operation || this.child !== child) return
         this.child = null
         this.setRuntime({ profileId: LOCAL_ZLM_ID, state: 'error', checkedAt: Date.now(), detail: error.message, binaryAvailable: true })
       })
       child.once('exit', (code, signal) => {
-        if (this.child === child) this.child = null
+        if (operation !== this.operation || this.child !== child) return
+        this.child = null
         this.setRuntime({
           profileId: LOCAL_ZLM_ID,
-          state: this.stopRequested ? 'stopped' : 'error',
+          state: 'error',
           checkedAt: Date.now(),
           binaryAvailable: true,
-          detail: this.stopRequested ? undefined : `MediaServer 已退出（code=${code ?? '-'}, signal=${signal ?? '-'}）${this.recentOutput ? `\n${this.recentOutput.slice(-600)}` : ''}`,
+          detail: `MediaServer 已退出（code=${code ?? '-'}, signal=${signal ?? '-'}）${this.recentOutput ? `\n${this.recentOutput.slice(-600)}` : ''}`,
         })
       })
 
       for (let attempt = 0; attempt < 40; attempt += 1) {
+        if (operation !== this.operation) return cancelled()
         if (this.child !== child) break
         const runtime = await this.probe(profile)
+        if (operation !== this.operation) return cancelled()
+        if (this.child !== child) break
         if (runtime.state === 'running') {
           const next = this.setRuntime({ ...runtime, pid: child.pid, binaryAvailable: true })
           return { ok: true, runtime: next }
         }
         await delay(250)
       }
+      if (operation !== this.operation) return cancelled()
       const detail = this.recentOutput.slice(-1_000) || 'ZLMediaKit 启动超时，请检查端口是否被占用'
-      await this.stopLocal()
+      await this.stopChild()
+      if (operation !== this.operation) return cancelled()
       const runtime = this.setRuntime({ profileId: LOCAL_ZLM_ID, state: 'error', checkedAt: Date.now(), detail, binaryAvailable: true })
       return { ok: false, runtime, error: detail }
     } catch (error) {
+      if (operation !== this.operation) return cancelled()
       const detail = errorMessage(error)
-      const runtime = this.setRuntime({ profileId: LOCAL_ZLM_ID, state: 'error', checkedAt: Date.now(), detail, binaryAvailable: await this.hasBinary() })
+      await this.stopChild()
+      if (operation !== this.operation) return cancelled()
+      const runtime = this.setRuntime({ profileId: LOCAL_ZLM_ID, state: 'error', checkedAt: Date.now(), detail, binaryAvailable })
       return { ok: false, runtime, error: detail }
     }
   }
 
   async stopLocal(): Promise<MediaServerOperationResult> {
-    const child = this.child
-    this.stopRequested = true
-    if (!child) {
-      const runtime = this.setRuntime({ profileId: LOCAL_ZLM_ID, state: 'stopped', checkedAt: Date.now(), binaryAvailable: await this.hasBinary() })
-      return { ok: true, runtime }
-    }
-    child.kill('SIGTERM')
-    await Promise.race([
-      new Promise<void>((resolve) => child.once('exit', () => resolve())),
-      delay(3_000).then(() => { if (!child.killed || this.child === child) child.kill('SIGKILL') }),
-    ])
-    if (this.child === child) this.child = null
-    const runtime = this.setRuntime({ profileId: LOCAL_ZLM_ID, state: 'stopped', checkedAt: Date.now(), binaryAvailable: await this.hasBinary() })
+    const operation = ++this.operation
+    await this.stopChild()
+    const binaryAvailable = await this.hasBinary()
+    if (operation !== this.operation) return { ok: false, runtime: { ...this.runtime }, error: '媒体服务停止操作已被取代' }
+    const runtime = this.setRuntime({ profileId: LOCAL_ZLM_ID, state: 'stopped', checkedAt: Date.now(), binaryAvailable })
     return { ok: true, runtime }
+  }
+
+  private async stopChild(): Promise<void> {
+    if (this.stopping) return this.stopping
+    const child = this.child
+    if (!child) return
+    this.stopping = new Promise<void>((resolve) => {
+      const finish = (): void => {
+        clearTimeout(timer)
+        child.removeListener('exit', finish)
+        if (this.child === child) this.child = null
+        resolve()
+      }
+      const timer = setTimeout(() => { child.kill('SIGKILL'); finish() }, 3_000)
+      child.once('exit', finish)
+      child.kill('SIGTERM')
+    }).finally(() => { this.stopping = undefined })
+    return this.stopping
   }
 
   private async probe(profile: MediaServerProfile): Promise<MediaServerRuntime> {

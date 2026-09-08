@@ -17,9 +17,10 @@ import {
 import { MediaServerStore } from './media-server-store'
 import { ObjectStorageStore } from './object-storage-store'
 import { ProfileStore } from './profile-store'
+import { runConfigurationTransaction } from './configuration-transaction'
 import { decryptWebDavBackup, encryptWebDavBackup } from './webdav-backup-crypto'
 import { WebDavClient } from './webdav-client'
-import { WebDavConfigStore } from './webdav-config-store'
+import { WebDavConfigStore, type SyncStateDocument } from './webdav-config-store'
 import {
   changedMqttRuntimeProfileIds,
   fingerprintWebDavData,
@@ -152,20 +153,6 @@ export class WebDavBackupManager {
         const client = new WebDavClient(config)
         const encrypted = await client.download(versionId)
         const document = this.parseBackupDocument(decryptWebDavBackup(encrypted, config.secret))
-        const previous = await this.captureSnapshot()
-        const affectedProfileIds = changedMqttRuntimeProfileIds(previous.profiles, document.data.profiles)
-        if (affectedProfileIds.length) await this.beforeRestore(affectedProfileIds)
-        try {
-          await this.applySnapshot(document.data)
-        } catch (restoreError) {
-          try {
-            await this.applySnapshot(previous)
-          } catch (rollbackError) {
-            throw new Error(`恢复失败且无法回滚：${operationError(restoreError)}；${operationError(rollbackError)}`)
-          }
-          throw restoreError
-        }
-        this.rendererStorage = { ...document.data.rendererStorage }
         const restored = versionFromDocument(versionId, encrypted.byteLength, document)
         const versions = await client.listVersions()
         const latest = versions[0]
@@ -174,18 +161,35 @@ export class WebDavBackupManager {
           const latestDocument = this.parseBackupDocument(decryptWebDavBackup(await client.download(latest.id), config.secret))
           baseFingerprint = fingerprintWebDavData(latestDocument.data)
         }
-        await this.configStore.updateSyncState((state) => ({
-          ...state,
-          localVersion: restored,
-          baseVersionId: latest?.id ?? versionId,
-          baseFingerprint,
-          activities: [this.activity('restore', restored), ...state.activities],
-        }))
-        return {
-          ok: true,
-          rendererStorage: document.data.rendererStorage,
-          overview: await this.buildOverview(versions, true),
-        }
+        const overview = await this.buildOverview(versions, true)
+        return await runConfigurationTransaction(async () => {
+          const previous = await this.captureSnapshot()
+          const affectedProfileIds = changedMqttRuntimeProfileIds(previous.profiles, document.data.profiles)
+          if (affectedProfileIds.length) await this.beforeRestore(affectedProfileIds)
+          try {
+            await this.applySnapshot(document.data)
+            const state = await this.configStore.updateSyncState((state) => ({
+              ...state,
+              localVersion: restored,
+              baseVersionId: latest?.id ?? versionId,
+              baseFingerprint,
+              activities: [this.activity('restore', restored), ...state.activities],
+            }))
+            this.rendererStorage = { ...document.data.rendererStorage }
+            return {
+              ok: true,
+              rendererStorage: document.data.rendererStorage,
+              overview: { ...overview, localVersion: state.localVersion, activities: state.activities },
+            }
+          } catch (restoreError) {
+            try {
+              await this.applySnapshot(previous)
+            } catch (rollbackError) {
+              throw new Error(`恢复失败且无法回滚：${operationError(restoreError)}；${operationError(rollbackError)}`)
+            }
+            throw restoreError
+          }
+        })
       } catch (error) {
         return { ok: false, error: operationError(error) }
       }
@@ -245,61 +249,72 @@ export class WebDavBackupManager {
     try {
       const versions = await client.listVersions()
       const latest = versions[0]
-      const local = await this.captureSnapshot()
-      let merged = local
       let remoteDocument: PortableBackupDocument | undefined
       if (latest) {
         const encrypted = await client.download(latest.id)
         remoteDocument = this.parseBackupDocument(decryptWebDavBackup(encrypted, config.secret))
-        merged = reconcileWebDavData(
-          local,
-          remoteDocument.data,
-          Boolean(state.baseVersionId),
-          state.baseFingerprint,
-          config.syncStrategy,
-        )
       }
+      return await runConfigurationTransaction(async () => {
+        const local = await this.captureSnapshot()
+        let merged = local
+        if (remoteDocument) {
+          merged = reconcileWebDavData(
+            local,
+            remoteDocument.data,
+            Boolean(state.baseVersionId),
+            state.baseFingerprint,
+            config.syncStrategy,
+          )
+        }
 
-      const remoteApplied = !webDavDataEqual(local, merged)
-      if (remoteApplied) {
-        const affectedProfileIds = changedMqttRuntimeProfileIds(local.profiles, merged.profiles)
-        if (affectedProfileIds.length) await this.beforeRestore(affectedProfileIds)
-        try {
-          await this.applySnapshot(merged)
-        } catch (mergeError) {
-          try {
-            await this.applySnapshot(local)
-          } catch (rollbackError) {
-            throw new Error(`同步合并失败且无法回滚：${operationError(mergeError)}；${operationError(rollbackError)}`)
+        const remoteApplied = !webDavDataEqual(local, merged)
+        let synchronizedVersion = latest
+        let synchronizedVersions = versions
+        let activityType: WebDavActivity['type'] | undefined = remoteApplied ? 'restore' : undefined
+        if (!latest || !remoteDocument || !webDavDataEqual(merged, remoteDocument.data)) {
+          const revision = Math.max(0, ...versions.map((version) => version.revision)) + 1
+          const createdAt = Date.now()
+          const id = `v${String(revision).padStart(6, '0')}-${createdAt}-${crypto.randomUUID()}.djibak`
+          const document: PortableBackupDocument = {
+            format: 'dji-cloud-studio-backup',
+            version: 2,
+            revision,
+            createdAt,
+            appVersion: app.getVersion(),
+            clientId: state.clientId,
+            parentVersionId: latest?.id,
+            data: merged,
           }
+          const encrypted = encryptWebDavBackup(document, config.secret)
+          await client.upload(id, encrypted)
+          synchronizedVersion = versionFromDocument(id, encrypted.byteLength, document)
+          synchronizedVersions = [synchronizedVersion, ...versions]
+          activityType = 'upload'
+        }
+
+        const overview = await this.buildOverview(synchronizedVersions, true)
+        if (remoteApplied) {
+          const affectedProfileIds = changedMqttRuntimeProfileIds(local.profiles, merged.profiles)
+          if (affectedProfileIds.length) await this.beforeRestore(affectedProfileIds)
+        }
+        let committedState: SyncStateDocument
+        try {
+          if (remoteApplied) await this.applySnapshot(merged)
+          committedState = await this.recordSyncBase(synchronizedVersion, merged, activityType)
+        } catch (mergeError) {
+          if (remoteApplied) {
+            try {
+              await this.applySnapshot(local)
+            } catch (rollbackError) {
+              throw new Error(`同步合并失败且无法回滚：${operationError(mergeError)}；${operationError(rollbackError)}`)
+            }
+          }
+          // An uploaded immutable version remains discoverable on the next sync; the local base stays unchanged.
           throw mergeError
         }
-        this.rendererStorage = { ...merged.rendererStorage }
-      }
-
-      if (latest && remoteDocument && webDavDataEqual(merged, remoteDocument.data)) {
-        await this.recordSyncBase(latest, merged, remoteApplied ? 'restore' : undefined)
-        return this.completeSync(await this.buildOverview(versions, true), remoteApplied)
-      }
-
-      const revision = Math.max(0, ...versions.map((version) => version.revision)) + 1
-      const createdAt = Date.now()
-      const id = `v${String(revision).padStart(6, '0')}-${createdAt}-${crypto.randomUUID()}.djibak`
-      const document: PortableBackupDocument = {
-        format: 'dji-cloud-studio-backup',
-        version: 2,
-        revision,
-        createdAt,
-        appVersion: app.getVersion(),
-        clientId: state.clientId,
-        parentVersionId: latest?.id,
-        data: merged,
-      }
-      const encrypted = encryptWebDavBackup(document, config.secret)
-      await client.upload(id, encrypted)
-      const uploaded = versionFromDocument(id, encrypted.byteLength, document)
-      await this.recordSyncBase(uploaded, merged, 'upload')
-      return this.completeSync(await this.buildOverview([uploaded, ...versions], true), remoteApplied)
+        if (remoteApplied) this.rendererStorage = { ...merged.rendererStorage }
+        return this.completeSync({ ...overview, localVersion: committedState.localVersion, activities: committedState.activities }, remoteApplied)
+      })
     } finally {
       await client.releaseSyncLock(lock.owner).catch((error) => {
         console.warn('Unable to release WebDAV synchronization lock:', error)
@@ -446,8 +461,8 @@ export class WebDavBackupManager {
     version: WebDavVersion,
     data: WebDavSyncData,
     activityType?: WebDavActivity['type'],
-  ): Promise<void> {
-    await this.configStore.updateSyncState((state) => ({
+  ): Promise<SyncStateDocument> {
+    return this.configStore.updateSyncState((state) => ({
       ...state,
       localVersion: version,
       baseVersionId: version.id,

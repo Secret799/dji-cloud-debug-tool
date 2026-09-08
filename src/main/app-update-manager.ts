@@ -3,7 +3,8 @@ import { createHash } from 'node:crypto'
 import { createWriteStream } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { basename, join } from 'node:path'
-import { finished } from 'node:stream/promises'
+import { Readable, Transform } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
 import type { AppUpdateState, OperationResult } from '../shared/contracts'
 import {
   compareAppVersions,
@@ -139,35 +140,28 @@ export class AppUpdateManager {
       if (!response.ok || !response.body) throw new Error(`下载安装包失败（HTTP ${response.status}）`)
 
       const total = Number(response.headers.get('content-length')) || this.installerAsset.size
-      const reader = response.body.getReader()
-      const output = createWriteStream(targetPath, { flags: 'wx' })
       const hash = createHash('sha256')
       let loaded = 0
-      try {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          const chunk = Buffer.from(value)
+      const progressStream = new Transform({
+        transform: (chunk: Buffer, _encoding, callback) => {
           hash.update(chunk)
           loaded += chunk.length
-          await new Promise<void>((resolve, reject) => {
-            output.write(chunk, (error) => error ? reject(error) : resolve())
-          })
           const progress = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : undefined
           if (progress !== this.state.progress) this.setState({ progress })
-        }
-        output.end()
-        await finished(output)
+          callback(null, chunk)
+        },
+      })
+      try {
+        // Attach pipeline error handlers in the same turn that opens the file.
+        await pipeline(
+          Readable.fromWeb(response.body as import('node:stream/web').ReadableStream<Uint8Array>),
+          progressStream,
+          createWriteStream(targetPath, { flags: 'wx' }),
+        )
+        if (hash.digest('hex') !== expectedHash) throw new Error('安装包 SHA-256 校验失败，文件可能不完整')
       } catch (error) {
-        void reader.cancel()
-        output.destroy()
-        await rm(targetPath, { force: true })
+        await rm(targetPath, { force: true }).catch(() => {})
         throw error
-      }
-
-      if (hash.digest('hex') !== expectedHash) {
-        await rm(targetPath, { force: true })
-        throw new Error('安装包 SHA-256 校验失败，文件可能不完整')
       }
       this.installerPath = targetPath
       this.setState({ status: 'downloaded', progress: 100 })

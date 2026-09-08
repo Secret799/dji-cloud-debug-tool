@@ -29,11 +29,11 @@ try {
   await browserWindow.evaluate((instance) => instance.setContentSize(1024, 680))
   await window.waitForFunction(() => window.innerWidth === 1024 && window.innerHeight === 680)
 
-  await window.getByRole('button', { name: '添加设备' }).click()
+  await window.getByRole('button', { name: '添加网关' }).click()
   await window.locator('.device-modal select').first().selectOption('dock3')
   await window.locator('.device-modal input').nth(0).fill('日志测试机场')
   await window.locator('.device-modal input').nth(1).fill('DOCK-LOG-SMOKE-001')
-  await window.getByRole('button', { name: '保存设备' }).click()
+  await window.getByRole('button', { name: '保存网关' }).click()
   await window.locator('.toast').waitFor({ state: 'hidden', timeout: 6_000 })
 
   const profileId = await window.evaluate(async () => (await window.djiApi.profiles.list())[0]?.id)
@@ -130,11 +130,11 @@ try {
   }
 
   await window.getByRole('button', { name: 'OSS 管理' }).click()
-  await window.locator('.oss-manager').waitFor({ state: 'visible' })
+  await window.locator('.oss-center').waitFor({ state: 'visible' })
   if (!(await window.getByText('Access Key ID', { exact: true }).isVisible())) errors.push('OSS credentials are missing from OSS management')
-  if (await window.locator('.oss-profile-row').count() !== 2) errors.push('Expected two managed object storage profiles')
-  if (!(await window.locator('.oss-profile-row').filter({ hasText: '主日志存储' }).isVisible())) errors.push('Primary storage profile is missing')
-  if (!(await window.locator('.oss-profile-row').filter({ hasText: '归档日志存储' }).isVisible())) errors.push('Archive storage profile is missing')
+  if (await window.locator('.oss-server-row').count() !== 2) errors.push('Expected two managed object storage profiles')
+  if (!(await window.locator('.oss-server-row').filter({ hasText: '主日志存储' }).isVisible())) errors.push('Primary storage profile is missing')
+  if (!(await window.locator('.oss-server-row').filter({ hasText: '归档日志存储' }).isVisible())) errors.push('Archive storage profile is missing')
   await window.screenshot({ path: ossScreenshotPath })
 
   await browserWindow.evaluate((instance) => instance.setContentSize(1480, 920))

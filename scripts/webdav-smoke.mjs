@@ -1,4 +1,5 @@
 import electronPath from 'electron'
+import { createHash } from 'node:crypto'
 import { mkdtemp, readFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
@@ -12,6 +13,7 @@ const screenshotPath = process.env.DJI_STUDIO_WEBDAV_SCREENSHOT || join(tmpdir()
 const screenshotBase = screenshotPath.replace(/\.png$/i, '')
 const errors = []
 const files = new Map()
+const etagFor = (body) => `"${createHash('sha256').update(body).digest('hex')}"`
 let collectionExists = false
 const expectedAuthorization = `Basic ${Buffer.from('admin:example-secret').toString('base64')}`
 const webDavServer = createServer((request, response) => {
@@ -53,10 +55,16 @@ const webDavServer = createServer((request, response) => {
     return
   }
   if (request.method === 'GET' && files.has(fileName)) {
-    response.writeHead(200).end(files.get(fileName))
+    const body = files.get(fileName)
+    response.writeHead(200, { ETag: etagFor(body) }).end(body)
     return
   }
-  if (request.method === 'DELETE' && files.delete(fileName)) {
+  if (request.method === 'DELETE' && files.has(fileName)) {
+    if (request.headers['if-match'] && request.headers['if-match'] !== etagFor(files.get(fileName))) {
+      response.writeHead(412).end()
+      return
+    }
+    files.delete(fileName)
     response.writeHead(204).end()
     return
   }
@@ -169,6 +177,8 @@ try {
   if (!(await dialog.getByLabel('Token', { exact: true }).isVisible())) errors.push('settings: Token secret field is not visible')
 
   await dialog.getByLabel('认证方式').selectOption('basic')
+  await dialog.getByLabel('用户名').fill('admin')
+  await dialog.getByLabel('密码', { exact: true }).fill('example-secret')
   await dialog.getByLabel('允许不安全的连接（忽略证书错误）').uncheck()
   await dialog.getByRole('button', { name: '测试连接', exact: true }).click()
   await dialog.getByText('连接成功，备份目录可以使用', { exact: true }).waitFor({ state: 'visible' })

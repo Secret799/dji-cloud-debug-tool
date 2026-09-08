@@ -16,12 +16,16 @@ interface ActiveConnection {
   profile: ConnectionProfile
   client: MqttClient
   generation: string
+  pendingPublications: Set<(result: OperationResult) => void>
+  resetting: boolean
+  restartTimer?: ReturnType<typeof setTimeout>
 }
 
 type EventSink = (event: MqttRuntimeEvent) => void
 
 const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error))
 const DISCONNECT_TIMEOUT_MS = 5_000
+const PUBLISH_TIMEOUT_MS = 10_000
 const reasonCodes = ReasonCodes as Record<number, string | undefined>
 
 const rejectionMessage = (operation: string, code: number): string => {
@@ -53,12 +57,21 @@ export class MqttConnectionManager {
       const url = this.buildUrl(profile)
       const client = mqtt.connect(url, options)
       const generation = crypto.randomUUID()
-      this.connections.set(profile.id, { profile, client, generation })
+      const active: ActiveConnection = { profile, client, generation, pendingPublications: new Set(), resetting: false }
+      this.connections.set(profile.id, active)
 
-      client.on('connect', () => this.isCurrent(profile.id, generation) && this.emitStatus(profile.id, 'connected'))
+      client.on('connect', () => this.isCurrent(profile.id, generation) && !active.resetting && this.emitStatus(profile.id, 'connected'))
       client.on('reconnect', () => this.isCurrent(profile.id, generation) && this.emitStatus(profile.id, 'reconnecting'))
-      client.on('offline', () => this.isCurrent(profile.id, generation) && this.emitStatus(profile.id, 'offline'))
-      client.on('close', () => this.isCurrent(profile.id, generation) && this.emitStatus(profile.id, 'disconnected'))
+      client.on('offline', () => {
+        if (!this.isCurrent(profile.id, generation)) return
+        this.emitStatus(profile.id, 'offline')
+        // mqtt.js is still scheduling reconnect here; cancel after its close handler finishes.
+      })
+      client.on('close', () => {
+        if (!this.isCurrent(profile.id, generation)) return
+        this.emitStatus(profile.id, 'disconnected')
+        this.cancelPublications(active, 'MQTT 连接已断开，未确认的发布已取消')
+      })
       client.on('error', (error) => this.isCurrent(profile.id, generation) && this.emitStatus(profile.id, 'error', error.message))
       client.on('message', (topic, payload, packet) => {
         if (!this.isCurrent(profile.id, generation)) return
@@ -104,6 +117,9 @@ export class MqttConnectionManager {
     const active = this.connections.get(profileId)
     if (!active) return { ok: true }
     this.connections.delete(profileId)
+    clearTimeout(active.restartTimer)
+    const force = active.resetting || active.pendingPublications.size > 0
+    for (const settle of active.pendingPublications) settle({ ok: false, error: 'MQTT 连接已断开，发布已取消' })
 
     return new Promise((resolve) => {
       let settled = false
@@ -124,7 +140,7 @@ export class MqttConnectionManager {
       }, DISCONNECT_TIMEOUT_MS)
 
       try {
-        active.client.end(false, {}, (error) => finish(error))
+        active.client.end(force, {}, (error) => finish(error))
       } catch (error) {
         finish(error instanceof Error ? error : new Error(String(error)))
       }
@@ -133,7 +149,7 @@ export class MqttConnectionManager {
 
   async publish(request: PublishRequest): Promise<OperationResult> {
     const active = this.connections.get(request.profileId)
-    if (!active?.client.connected) return { ok: false, error: '当前连接尚未就绪' }
+    if (!active?.client.connected || active.resetting) return { ok: false, error: '当前连接尚未就绪' }
     if (!request.topic.trim() || /[+#]/.test(request.topic)) {
       return { ok: false, error: '发布 Topic 不能为空，且不能包含 + 或 # 通配符' }
     }
@@ -141,36 +157,94 @@ export class MqttConnectionManager {
       return { ok: false, error: '发布 Payload 超过 1 MiB 限制' }
     }
 
+    const startedAt = Date.now()
     return new Promise((resolve) => {
-      active.client.publish(
-        request.topic.trim(),
-        request.payload,
-        { qos: request.qos, retain: request.retain },
-        (error) => {
-          if (error) {
-            resolve({ ok: false, error: error.message })
-            return
-          }
-          const payloadSize = Buffer.byteLength(request.payload)
-          this.eventSink({
-            type: 'message',
-            profileId: request.profileId,
-            message: redactMqttMessageRecord({
-              id: crypto.randomUUID(),
+      let settled = false
+      const finish = (result: OperationResult): void => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        active.pendingPublications.delete(finish)
+        resolve(result)
+      }
+      const timer = setTimeout(() => {
+        this.cancelPublications(active, '等待 MQTT 发布确认超时，未确认的发布已取消')
+      }, PUBLISH_TIMEOUT_MS)
+      active.pendingPublications.add(finish)
+      try {
+        active.client.publish(
+          request.topic.trim(),
+          request.payload,
+          { qos: request.qos, retain: request.retain },
+          (error) => {
+            if (settled) return
+            if (error) {
+              finish({ ok: false, error: error.message })
+              return
+            }
+            const payloadSize = Buffer.byteLength(request.payload)
+            this.eventSink({
+              type: 'message',
               profileId: request.profileId,
-              direction: 'out',
-              topic: request.topic.trim(),
-              payload: request.payload,
-              qos: request.qos,
-              retain: request.retain,
-              timestamp: Date.now(),
-              size: payloadSize,
-            }),
-          })
-          resolve({ ok: true })
-        },
-      )
+              message: redactMqttMessageRecord({
+                id: crypto.randomUUID(),
+                profileId: request.profileId,
+                direction: 'out',
+                topic: request.topic.trim(),
+                payload: request.payload,
+                qos: request.qos,
+                retain: request.retain,
+                timestamp: startedAt,
+                size: payloadSize,
+              }),
+            })
+            finish({ ok: true })
+          },
+        )
+      } catch (error) {
+        this.cancelPublications(active, errorMessage(error))
+      }
     })
+  }
+
+  private cancelPublications(active: ActiveConnection, error: string): void {
+    if (!active.pendingPublications.size) return
+    for (const settle of active.pendingPublications) settle({ ok: false, error })
+    if (active.resetting) return
+    active.resetting = true
+    this.emitStatus(active.profile.id, 'disconnected', error)
+    // Ending the client closes its stores and deferred publish queue before any reconnect.
+    // Resolving callbacks alone would leave QoS 1/2 commands available for replay.
+    try {
+      active.client.options.reconnectPeriod = 0
+      for (const [messageId, publication] of Object.entries(active.client.outgoing)) {
+        if (!publication.volatile) active.client.removeOutgoingMessage(Number(messageId))
+      }
+      active.client.end(true, {}, (endError) => {
+        if (!this.isCurrent(active.profile.id, active.generation)) return
+        if (endError) {
+          this.emitStatus(active.profile.id, 'error', endError.message)
+          return
+        }
+        if (active.profile.reconnectPeriod <= 0) return
+        active.restartTimer = setTimeout(() => {
+          active.restartTimer = undefined
+          if (!this.isCurrent(active.profile.id, active.generation)) return
+          active.resetting = false
+          this.emitStatus(active.profile.id, 'reconnecting')
+          try {
+            active.client.options.reconnectPeriod = active.profile.reconnectPeriod * 1_000
+            active.client.reconnect()
+          } catch (reconnectError) {
+            active.resetting = true
+            this.emitStatus(active.profile.id, 'error', errorMessage(reconnectError))
+          }
+        }, active.profile.reconnectPeriod * 1_000)
+      })
+    } catch (endError) {
+      active.client.stream.destroy()
+      this.emitStatus(active.profile.id, 'error', errorMessage(endError))
+    }
   }
 
   async subscribe(profileId: string, topic: string, qos: MqttQos): Promise<OperationResult> {

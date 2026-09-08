@@ -4,11 +4,11 @@ import {
   pbkdf2Sync,
   randomBytes,
 } from 'node:crypto'
+import { MAX_BACKUP_ENVELOPE_BYTES, MAX_BACKUP_PLAINTEXT_BYTES } from './webdav-backup-limits'
 
 const FORMAT = 'dji-cloud-studio-encrypted-backup'
 const AAD = Buffer.from(`${FORMAT}:1`, 'utf8')
 const DEFAULT_ITERATIONS = 310_000
-const MAX_ENCRYPTED_BYTES = 32 * 1024 * 1024
 
 interface EncryptedBackupEnvelope {
   format: typeof FORMAT
@@ -37,7 +37,7 @@ export const encryptWebDavBackup = (
   if (!secret) throw new Error('WebDAV 密钥不能为空')
   if (!Number.isInteger(iterations) || iterations < 1) throw new Error('密钥派生参数无效')
   const plaintext = Buffer.from(JSON.stringify(value), 'utf8')
-  if (plaintext.byteLength > MAX_ENCRYPTED_BYTES) throw new Error('备份数据超过 32 MiB 限制')
+  if (plaintext.byteLength > MAX_BACKUP_PLAINTEXT_BYTES) throw new Error('备份数据超过 32 MiB 限制')
   const salt = randomBytes(16)
   const iv = randomBytes(12)
   const key = pbkdf2Sync(secret, salt, iterations, 32, 'sha256')
@@ -55,12 +55,14 @@ export const encryptWebDavBackup = (
     tag: cipher.getAuthTag().toString('base64'),
     payload: encrypted.toString('base64'),
   }
-  return Buffer.from(JSON.stringify(envelope), 'utf8')
+  const result = Buffer.from(JSON.stringify(envelope), 'utf8')
+  if (result.byteLength > MAX_BACKUP_ENVELOPE_BYTES) throw new Error('备份文件超过加密大小限制')
+  return result
 }
 
 export const decryptWebDavBackup = (encrypted: Buffer, secret: string): unknown => {
   if (!secret) throw new Error('WebDAV 密钥不能为空')
-  if (encrypted.byteLength > MAX_ENCRYPTED_BYTES) throw new Error('备份文件超过 32 MiB 限制')
+  if (encrypted.byteLength > MAX_BACKUP_ENVELOPE_BYTES) throw new Error('备份文件超过加密大小限制')
   let envelope: Partial<EncryptedBackupEnvelope>
   try {
     envelope = JSON.parse(encrypted.toString('utf8')) as Partial<EncryptedBackupEnvelope>
@@ -82,6 +84,7 @@ export const decryptWebDavBackup = (encrypted: Buffer, secret: string): unknown 
   const iv = decodeBase64(envelope.iv, '随机向量')
   const tag = decodeBase64(envelope.tag, '认证标签')
   const payload = decodeBase64(envelope.payload, '密文')
+  if (payload.byteLength > MAX_BACKUP_PLAINTEXT_BYTES) throw new Error('备份数据超过 32 MiB 限制')
   if (salt.byteLength !== 16 || iv.byteLength !== 12 || tag.byteLength !== 16) {
     throw new Error('备份文件的加密参数长度无效')
   }

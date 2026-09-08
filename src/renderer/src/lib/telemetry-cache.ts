@@ -15,9 +15,12 @@ interface TelemetryCacheDocument {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 
-const withoutRuntimeOnlyState = (value: Record<string, unknown>): Record<string, unknown> => {
+export const withoutRuntimeOnlyState = (value: Record<string, unknown>): Record<string, unknown> => {
   const next = { ...value }
   delete next.live_status
+  delete next.drc_state
+  delete next.mode_code
+  delete next.control_source
   return next
 }
 

@@ -22,6 +22,17 @@ const telemetry = (
 })
 
 describe('telemetry cache', () => {
+  it.each(['osd', 'state', 'status'] as const)('strips session authority from serialized and legacy %s snapshots', (source) => {
+    const device = telemetry('profile', 'DOCK', Date.now())
+    device[source] = { temperature: 23, drc_state: 2, mode_code: 2, control_source: 'cloud-console', live_status: [] }
+
+    const serialized = JSON.parse(serializeTelemetryCache({ device })) as { devices: DeviceTelemetry[] }
+    expect(serialized.devices[0][source]).toEqual({ temperature: 23 })
+    const legacy = parseTelemetryCache({ version: 1, devices: [device] })
+    expect(legacy['profile:DOCK'][source]).toEqual({ temperature: 23 })
+    expect(device[source]).toHaveProperty('drc_state', 2)
+  })
+
   it('restores the last snapshot for each profile and marks it offline', () => {
     const cached = parseTelemetryCache(JSON.parse(serializeTelemetryCache({
       'test:DOCK-1': telemetry('test', 'DOCK-1', 100),

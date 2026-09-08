@@ -1340,7 +1340,12 @@ export const mergeTelemetry = (
 
 export const commandTransactions = (records: MqttMessageRecord[], now = Date.now()): CommandTransaction[] => {
   const transactions = new Map<string, CommandTransaction>()
-  for (const record of records) {
+  // Publish acknowledgements can arrive after device replies; index requests first.
+  const orderedRecords = [
+    ...records.filter((record) => record.direction === 'out' && record.topic.endsWith('/services')),
+    ...records.filter((record) => record.direction === 'in' && record.topic.endsWith('/services_reply')),
+  ]
+  for (const record of orderedRecords) {
     if (!record.topic.endsWith('/services') && !record.topic.endsWith('/services_reply')) continue
     try {
       const payload = JSON.parse(record.payload) as {

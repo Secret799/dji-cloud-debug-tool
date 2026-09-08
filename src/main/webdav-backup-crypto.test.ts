@@ -1,7 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import { decryptWebDavBackup, encryptWebDavBackup } from './webdav-backup-crypto'
+import { MAX_BACKUP_ENVELOPE_BYTES, MAX_BACKUP_PLAINTEXT_BYTES } from './webdav-backup-limits'
 
 describe('WebDAV backup encryption', () => {
+  it('round-trips 25 MiB of plaintext after base64 envelope expansion', () => {
+    const backup = { text: 'x'.repeat(25 * 1024 * 1024) }
+    const encrypted = encryptWebDavBackup(backup, 'secret', 1)
+    expect(encrypted.byteLength).toBeGreaterThan(32 * 1024 * 1024)
+    expect(decryptWebDavBackup(encrypted, 'secret')).toEqual(backup)
+  })
+
+  it('supports exactly 32 MiB of JSON plaintext and rejects larger plaintext', () => {
+    const backup = 'x'.repeat(MAX_BACKUP_PLAINTEXT_BYTES - 2)
+    const encrypted = encryptWebDavBackup(backup, 'secret', 1)
+    expect(encrypted.byteLength).toBeLessThanOrEqual(MAX_BACKUP_ENVELOPE_BYTES)
+    expect(decryptWebDavBackup(encrypted, 'secret')).toBe(backup)
+    expect(() => encryptWebDavBackup(`${backup}x`, 'secret', 1)).toThrow(/32 MiB/)
+    expect(() => decryptWebDavBackup(Buffer.alloc(MAX_BACKUP_ENVELOPE_BYTES + 1), 'secret')).toThrow(/大小限制/)
+  })
+
   it('round-trips structured backup data', () => {
     const backup = {
       version: 1,
