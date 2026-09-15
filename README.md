@@ -309,7 +309,7 @@ ZLMediaKit 不作为二进制资源提交到代码仓库。GitHub Actions 会为
 
 ### macOS 无证书签名
 
-macOS 构建使用 electron-builder 的 `identity: "-"` 执行 ad-hoc 签名，并在上传产物前通过 `codesign --verify --deep --strict` 检查签名完整性。该流程不需要配置 GitHub Actions Secrets，也不会向 Apple 提交公证。
+macOS 构建使用 electron-builder 的 `identity: "-"` 执行 ad-hoc 签名，并在上传产物前通过 `codesign --verify --deep --strict` 检查签名完整性，再使用 `scripts/macos-package-smoke.mjs` 实际启动签名后的应用、确认主进程与界面正常加载。ad-hoc 签名没有 Team ID，因此仅在应用自身的 entitlements 中设置 `com.apple.security.cs.disable-library-validation`，以允许加载随包签名的 Electron 框架；保留 Hardened Runtime。该流程不需要配置 GitHub Actions Secrets，也不会向 Apple 提交公证。
 
 ### 使用项目脚本发布
 

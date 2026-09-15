@@ -179,6 +179,13 @@ jobs:
             exit 1
           fi
 
+      - name: Verify macOS packaged application starts
+        if: matrix.platform == 'mac'
+        shell: bash
+        run: |
+          app_path="$(find release -mindepth 2 -maxdepth 2 -type d -name 'DJI Cloud Studio.app' -print -quit)"
+          node scripts/macos-package-smoke.mjs "$app_path"
+
       - name: Package Windows
         if: matrix.platform == 'win'
         shell: bash
