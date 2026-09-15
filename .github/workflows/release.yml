@@ -48,7 +48,7 @@ jobs:
             zlm_binary: vendor/zlmediakit/arm64/MediaServer
             arch: arm64
           - label: macOS Intel
-            os: macos-14
+            os: macos-15-intel
             platform: mac
             ffmpeg_platform: darwin
             zlm_binary: vendor/zlmediakit/x64/MediaServer
@@ -181,6 +181,8 @@ jobs:
 
       - name: Verify macOS packaged application starts
         if: matrix.platform == 'mac'
+        env:
+          DEBUG: pw:browser
         shell: bash
         run: |
           app_path="$(find release -mindepth 2 -maxdepth 2 -type d -name 'DJI Cloud Studio.app' -print -quit)"
