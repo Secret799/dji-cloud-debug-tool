@@ -4,15 +4,17 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$ReleaseTag = 'autobuild-2026-08-27-16-45'
+# BtbN keeps only 14 daily builds; month-end builds are retained for two years.
+# Pin a month-end release and update both archive hashes when upgrading.
+$ReleaseTag = 'autobuild-2026-08-31-13-27'
 $Assets = @{
   x64 = @{
-    Name = 'ffmpeg-n8.1.2-47-g156bb4d299-win64-lgpl-8.1.zip'
-    Sha256 = '8863f90df77e13897ce7559a55fbbe14d6c5b7aa2a8e8cbb4c750c742d106793'
+    Name = 'ffmpeg-n8.1.2-50-g1a748fe2cd-win64-lgpl-8.1.zip'
+    Sha256 = 'f6274bbd9c247f9e90c1bbed066b03ed4a3907cece2fb91be6dd352393936365'
   }
   arm64 = @{
-    Name = 'ffmpeg-n8.1.2-47-g156bb4d299-winarm64-lgpl-8.1.zip'
-    Sha256 = '0412331a4f3b46998b2643c1b946852aaba1b74dbb1459db31dca40c100f5b30'
+    Name = 'ffmpeg-n8.1.2-50-g1a748fe2cd-winarm64-lgpl-8.1.zip'
+    Sha256 = '0ad4d6e7342d6d77bbae4ac230964ebd51bdd6192414392e5f521d295b39b111'
   }
 }
 

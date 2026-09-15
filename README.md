@@ -296,6 +296,8 @@ npm run prepare:ffmpeg:mac -- x64
 
 Windows `x64` 和 `arm64` 正式安装包仅通过 GitHub Actions 生成。缓存未命中时，Windows Runner 会使用 Visual Studio 2022 和 CMake 编译目标架构的 `MediaServer.exe`，并下载经 SHA-256 校验的对应架构 FFmpeg。每个安装包只会携带当前平台与架构的 MediaServer 和 FFmpeg。
 
+Windows FFmpeg 固定使用 BtbN 的月末构建（当前为 `autobuild-2026-08-31-13-27`）。上游仅保留最近 14 个每日构建，月末构建保留两年；升级时应选择仍在保留期内的月末版本，并同步更新 `scripts/prepare-ffmpeg-windows.ps1` 中两个架构的文件名和 SHA-256，避免缓存失效后下载返回 404。
+
 ZLMediaKit 不作为二进制资源提交到代码仓库。GitHub Actions 会为 macOS 和 Windows 的 `x64/arm64` 四种目标动态编译，并分平台、架构缓存 MediaServer 与许可证。默认分支推送、每周维护任务和手工触发都可预热缓存；发布 tag 时优先恢复缓存，仅在首次运行、缓存过期或构建脚本变化时重新编译。
 
 ## GitHub Actions Tag 自动发布
