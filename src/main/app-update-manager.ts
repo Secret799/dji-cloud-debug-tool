@@ -23,7 +23,10 @@ interface GithubRelease {
 }
 
 const RELEASE_API_URL = 'https://api.github.com/repos/Secret799/dji-cloud-debug-tool/releases/latest'
+const RELEASES_URL = 'https://github.com/Secret799/dji-cloud-debug-tool/releases'
+const LATEST_RELEASE_URL = `${RELEASES_URL}/latest`
 const USER_AGENT = 'DJI-Cloud-Studio-Updater'
+const CHECK_TIMEOUT_MS = 15_000
 
 const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error))
 
@@ -81,17 +84,64 @@ export class AppUpdateManager {
     this.notify(this.getState())
   }
 
+  private async fetchRelease(): Promise<GithubRelease> {
+    const response = await net.fetch(RELEASE_API_URL, {
+      headers: { Accept: 'application/vnd.github+json', 'User-Agent': USER_AGENT },
+      signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
+    })
+    if (response.ok) return await response.json() as GithubRelease
+    const apiError = `GitHub Releases 请求失败（HTTP ${response.status}）`
+    if (response.status !== 403 && response.status !== 429) throw new Error(apiError)
+
+    const reason = response.status === 429 || response.headers.get('x-ratelimit-remaining') === '0'
+      ? 'GitHub API 已限流，请稍后重试'
+      : 'GitHub API 拒绝访问，请检查网络或代理设置'
+    try {
+      return await this.fetchPublicRelease()
+    } catch (error) {
+      throw new Error(`${apiError}；${reason}。公开发布页检查也失败：${errorMessage(error)}。可打开发布页面手动下载`)
+    }
+  }
+
+  private async fetchPublicRelease(): Promise<GithubRelease> {
+    // The public latest redirect and checksum asset do not consume REST API quota.
+    const response = await net.fetch(LATEST_RELEASE_URL, {
+      method: 'HEAD',
+      headers: { 'User-Agent': USER_AGENT },
+      signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
+    })
+    if (!response.ok) throw new Error(`发布页面请求失败（HTTP ${response.status}）`)
+    const prefix = `${RELEASES_URL}/tag/`
+    if (!response.url.startsWith(prefix)) throw new Error('发布页面未返回有效版本地址')
+    const tag = decodeURIComponent(response.url.slice(prefix.length))
+    const comparison = compareAppVersions(tag, this.state.currentVersion)
+    const release: GithubRelease = { tag_name: tag, name: null, body: null, html_url: response.url, assets: [] }
+    if (comparison <= 0) return release
+
+    // Pin every asset to the resolved tag so a new release cannot mix versions.
+    const downloadUrl = `${RELEASES_URL}/download/${encodeURIComponent(tag)}`
+    const checksumUrl = `${downloadUrl}/SHA256SUMS.txt`
+    const checksumResponse = await net.fetch(checksumUrl, {
+      headers: { 'User-Agent': USER_AGENT },
+      signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
+    })
+    if (!checksumResponse.ok) throw new Error(`下载校验文件失败（HTTP ${checksumResponse.status}）`)
+    const checksums = parseChecksums(await checksumResponse.text())
+    if (!checksums.size) throw new Error('发布版本的 SHA256SUMS.txt 无效')
+    // Older manifests contain paths/spaces; GitHub normalizes asset spaces to dots.
+    const names = new Set([...checksums.keys()].map((name) => name.replaceAll(' ', '.')))
+    release.assets = [...names].map((name) => ({ name, size: 0, browser_download_url: `${downloadUrl}/${encodeURIComponent(name)}` }))
+    release.assets.push({ name: 'SHA256SUMS.txt', size: 0, browser_download_url: checksumUrl })
+    return release
+  }
+
   private async performCheck(): Promise<AppUpdateState> {
     this.release = undefined
     this.installerAsset = undefined
     this.installerPath = undefined
-    this.setState({ status: 'checking', availableVersion: undefined, releaseName: undefined, releaseNotes: undefined, releaseUrl: undefined, progress: undefined, error: undefined })
+    this.setState({ status: 'checking', availableVersion: undefined, releaseName: undefined, releaseNotes: undefined, releaseUrl: LATEST_RELEASE_URL, progress: undefined, error: undefined })
     try {
-      const response = await net.fetch(RELEASE_API_URL, {
-        headers: { Accept: 'application/vnd.github+json', 'User-Agent': USER_AGENT },
-      })
-      if (!response.ok) throw new Error(`GitHub Releases 请求失败（HTTP ${response.status}）`)
-      const release = await response.json() as GithubRelease
+      const release = await this.fetchRelease()
       const availableVersion = release.tag_name.replace(/^v/i, '')
       if (compareAppVersions(availableVersion, this.state.currentVersion) <= 0) {
         this.setState({ status: 'not-available', availableVersion, releaseUrl: release.html_url })

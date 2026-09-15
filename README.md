@@ -84,6 +84,7 @@ DJI Cloud Studio 是一款面向 macOS 和 Windows 的机场上云 API、MQTT、
 ### 应用更新
 
 - 启动后静默检查 GitHub Releases，也可在“关于”窗口手动检查。
+- GitHub API 返回 403/429 时，自动改用公开 Release 地址和 `SHA256SUMS.txt` 检查版本，无需配置 Token；两条路径都失败时可通过发布页面手动下载。
 - 自动选择当前系统与架构对应的 DMG 或 Windows 安装包并显示下载进度。
 - 下载完成前使用发布页的 `SHA256SUMS.txt` 校验文件完整性；校验通过后才允许打开安装包。
 

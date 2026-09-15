@@ -65,3 +65,64 @@ it('finishes the output and verifies the digest before accepting the installer',
   expect(output.writableFinished).toBe(true)
   expect(manager.getState().status).toBe('downloaded')
 })
+
+const releasesUrl = 'https://github.com/Secret799/dji-cloud-debug-tool/releases'
+const tagUrl = `${releasesUrl}/tag/v1.0.0`
+const sumsUrl = `${releasesUrl}/download/v1.0.0/SHA256SUMS.txt`
+
+function publicRelease(status: number, options: { tagUrl?: string; sums?: string; sumsStatus?: number } = {}) {
+  mocks.fetch.mockImplementation(async (url: string) => {
+    if (url.startsWith('https://api.github.com/')) return new Response('{"message":"API rate limit exceeded"}', {
+      status, headers: { 'x-ratelimit-remaining': '0' },
+    })
+    if (url === `${releasesUrl}/latest`) {
+      const response = new Response(null)
+      Object.defineProperty(response, 'url', { value: options.tagUrl ?? tagUrl })
+      return response
+    }
+    if (url === sumsUrl) return new Response(options.sums ?? `${hash}  release/${name}\n`, { status: options.sumsStatus ?? 200 })
+    if (url === `${releasesUrl}/download/v1.0.0/${name}`) return new Response(payload)
+    throw new Error(`Unexpected URL: ${url}`)
+  })
+}
+
+it.each([403, 429])('checks and downloads the verified public release when the API returns %s', async (status) => {
+  publicRelease(status)
+  const chunks: Buffer[] = []
+  mocks.output.mockReturnValue(new Writable({ write(chunk, _encoding, callback) { chunks.push(chunk); callback() } }))
+  const manager = new AppUpdateManager(() => {})
+  expect(await manager.check()).toMatchObject({ status: 'available', availableVersion: '1.0.0', releaseUrl: tagUrl })
+  expect(await manager.download()).toEqual({ ok: true })
+  expect(Buffer.concat(chunks)).toEqual(payload)
+  expect(manager.getState().status).toBe('downloaded')
+})
+
+it('reports no update from the public release without needing assets for the installed version', async () => {
+  publicRelease(403, { tagUrl: `${releasesUrl}/tag/v0.1.0` })
+  expect(await new AppUpdateManager(() => {}).check()).toMatchObject({ status: 'not-available', availableVersion: '0.1.0' })
+})
+
+it.each([
+  { tagUrl: 'https://example.com/releases/tag/v1.0.0' },
+  { tagUrl: `${releasesUrl}/latest` },
+  { sumsStatus: 404 },
+  { sums: '<html>upstream error</html>' },
+])('retains the API failure and manual release link when public metadata is unusable: %j', async (options) => {
+  publicRelease(403, options)
+  const manager = new AppUpdateManager(() => {})
+  const state = await manager.check()
+  expect(state.status).toBe('error')
+  expect(state.error).toContain('403')
+  expect(state.error).toContain('限流')
+  expect(state.releaseUrl).toBe(`${releasesUrl}/latest`)
+  expect((await manager.download()).ok).toBe(false)
+})
+
+it('keeps a manual release link for API errors that are not rate limits', async () => {
+  mocks.fetch.mockResolvedValue(new Response(null, { status: 404 }))
+  const state = await new AppUpdateManager(() => {}).check()
+  expect(state.status).toBe('error')
+  expect(state.error).toContain('404')
+  expect(state.releaseUrl).toBe(`${releasesUrl}/latest`)
+  expect(mocks.fetch).toHaveBeenCalledTimes(1)
+})
