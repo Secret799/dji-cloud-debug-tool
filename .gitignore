@@ -13,3 +13,4 @@ build/icon.iconset/
 .idea
 vendor/zlmediakit/
 vendor/ffmpeg/*/
+src/renderer/public/cesium/
