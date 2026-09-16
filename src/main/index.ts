@@ -175,6 +175,27 @@ const fetchRemoteTileForProbe = async (
   }
 }
 
+/**
+ * 为探测解析出带 API Key 的底图源：渲染进程传来的 Key 优先，缺省时回退到已存密钥。
+ *
+ * Store 读回的底图源只带 hasApiKey，apiKey 永远为空；若直接用渲染进程入参探测，
+ * 「打开已保存的带密钥底图源后直接点测试」会被上游当成未授权，误报探测失败。
+ *
+ * @param source 已校验的底图源配置
+ * @param store 底图源存储，主进程中唯一能取到 API Key 明文的入口
+ * @returns 补好 API Key 的底图源；渲染进程已带 Key 或 id 为空时原样返回
+ */
+const resolveProbeMapTileSource = async (
+  source: MapTileSource,
+  store: MapTileSourceStore,
+): Promise<MapTileSource> => {
+  // 用户可能刚改了 Key 还没保存，此时以渲染进程传来的为准
+  if (source.apiKey || !source.id) return source
+  // id 未知视为「没有已存密钥」，不作为错误
+  const stored = await store.getWithApiKey(source.id)
+  return stored?.apiKey ? { ...source, apiKey: stored.apiKey } : source
+}
+
 const createWindow = (): void => {
   const window = new BrowserWindow({
     width: 1480,
@@ -463,7 +484,7 @@ const registerIpc = (): void => {
   })
   handleTrusted(IPC_CHANNELS.mapSourcesProbe, async (_event, rawSource: unknown) => {
     try {
-      const source = validateMapTileSource(rawSource)
+      const source = await resolveProbeMapTileSource(validateMapTileSource(rawSource), mapTileSourceStore)
       return await probeMapTileSource(source)
     } catch (error) {
       return { ok: false, error: errorMessage(error) }

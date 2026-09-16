@@ -246,7 +246,8 @@ const requireAbsolutePath = (value: string, label: string): string => {
 }
 
 export const validateMapTileSourceId = (value: unknown): string => {
-  const sourceId = validateProfileId(value)
+  const sourceId = requireString(value, '底图源 ID', { maxBytes: MAX_PROFILE_ID_BYTES }).trim()
+  // ID 会作为 map-tile URL 的路径段，必须限制字符集
   if (!/^[A-Za-z0-9_-]+$/.test(sourceId)) throw new IpcValidationError('底图源 ID 无效')
   return sourceId
 }
