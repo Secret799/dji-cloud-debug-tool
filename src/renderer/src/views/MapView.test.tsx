@@ -115,8 +115,13 @@ describe('describeMapDevice', () => {
   })
 
   it('labels the basemap coordinate as BD-09 for a bd09 basemap', () => {
+    const converted = toCoordinateSystem(position().wgs84, 'bd09')
     const described = describeMapDevice(position(), 'bd09')
     expect(described.lines.some((line) => line.includes('BD-09'))).toBe(true)
+    // 数值同样要断言：只要标签还在，把未转换的原始坐标填进这一行就能蒙混过关
+    expect(described.lines).toContain(
+      `底图坐标（BD-09） 纬度 ${converted.latitude.toFixed(6)}  经度 ${converted.longitude.toFixed(6)}`,
+    )
   })
 
   it('reports an offline device with its last seen time', () => {
@@ -170,7 +175,7 @@ describe('markerEntityOptions', () => {
     const expected = Cartesian3.fromDegrees(converted.longitude, converted.latitude, 43.5)
     expect(Cartesian3.equalsEpsilon(actual, expected, 1e-9)).toBe(true)
     // 原始 WGS-84 坐标直接摆点会整体偏移数百米，必须能被这条断言拦住
-    expect(Cartesian3.equalsEpsilon(actual, Cartesian3.fromDegrees(39.90869, 116.39740, 43.5), 1e-9)).toBe(false)
+    expect(Cartesian3.equalsEpsilon(actual, Cartesian3.fromDegrees(116.39740, 39.90869, 43.5), 1e-9)).toBe(false)
   })
 
   it('reads the latest position from the ref instead of a snapshot', () => {
