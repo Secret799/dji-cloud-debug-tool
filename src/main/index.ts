@@ -127,6 +127,24 @@ const operationFailure = (error: unknown): OperationResult => ({ ok: false, erro
 
 const PROBE_TIMEOUT_MS = 10_000
 
+/** 探测超时的中文提示，用于替换运行时抛出的英文原文 */
+const PROBE_TIMEOUT_MESSAGE = '探测超时，请检查地址与网络'
+
+/**
+ * 把探测过程中抛出的异常转成给用户看的文案。
+ *
+ * 只翻译「整体超时」：net.fetch 超时抛的是 DOMException（name 为 TimeoutError），
+ * 其英文原文 The operation was aborted due to timeout 与界面其余中文文案不一致；
+ * HTTP 401、DNS 失败等错误带有诊断价值，必须原样保留。
+ *
+ * @param error 探测过程中抛出的异常
+ * @returns 超时的中文提示，或原始的错误信息
+ */
+export const mapProbeErrorMessage = (error: unknown): string => {
+  if (error instanceof Error && error.name === 'TimeoutError') return PROBE_TIMEOUT_MESSAGE
+  return errorMessage(error)
+}
+
 /**
  * 用配置里的最小缩放级别与原点瓦片验证底图源是否可用。
  *
@@ -146,7 +164,8 @@ const probeMapTileSource = async (source: MapTileSource): Promise<MapTileProbeRe
         : await resolveMbtilesTile(source, request)
     return { ok: true, bytes: tile.body.byteLength }
   } catch (error) {
-    return { ok: false, error: errorMessage(error) }
+    // 超时要换成中文提示；其余错误（HTTP 状态、DNS 失败等）保留原始诊断信息
+    return { ok: false, error: mapProbeErrorMessage(error) }
   }
 }
 
