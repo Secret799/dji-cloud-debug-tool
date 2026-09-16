@@ -333,6 +333,11 @@ export const validateMapTileSource = (value: unknown): MapTileSource => {
 
   const attribution = requireString(source.attribution, '版权署名', { allowEmpty: true, maxBytes: 512 })
   requireOptionalBoolean(source.isDefault, '默认底图标记')
+  const apiKey = requireString(source.apiKey ?? '', 'API Key', {
+    allowEmpty: true,
+    allowNullCharacter: true,
+    maxBytes: 4_096,
+  })
   requireOptionalBoolean(source.hasApiKey, '已保存 API Key 标记')
   requireOptionalBoolean(source.clearApiKey, '清除 API Key 标记')
   const createdAt = requireFiniteNumber(source.createdAt, '创建时间')
@@ -353,6 +358,7 @@ export const validateMapTileSource = (value: unknown): MapTileSource => {
     tileExtension,
     attribution,
     isDefault: source.isDefault as boolean | undefined,
+    apiKey,
     hasApiKey: source.hasApiKey as boolean | undefined,
     clearApiKey: source.clearApiKey as boolean | undefined,
     createdAt,

@@ -523,4 +523,9 @@ describe('map tile source validation', () => {
   it('accepts an empty id so a new source can be saved without one', () => {
     expect(validateMapTileSource({ ...base, id: '' }).id).toBe('')
   })
+
+  it('passes the api key through for the write direction', () => {
+    expect(validateMapTileSource({ ...base, apiKey: 'token' }).apiKey).toBe('token')
+    expect(validateMapTileSource(base).apiKey).toBe('')
+  })
 })

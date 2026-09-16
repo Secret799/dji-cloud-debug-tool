@@ -371,6 +371,8 @@ export interface MapTileSource {
   attribution: string
   /** 是否为默认底图 */
   isDefault?: boolean
+  /** 待保存的 API Key 明文，仅写入方向使用，读取时永远为空 */
+  apiKey?: string
   /** 是否已保存 API Key（只读回显） */
   hasApiKey?: boolean
   /** 显式清除已保存的 API Key */
