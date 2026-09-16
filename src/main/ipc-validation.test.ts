@@ -514,6 +514,10 @@ describe('map tile source validation', () => {
     expect(() => validateMapTileSource({ ...base, headers: [{ name: 'Content-Length', value: '1' }] })).toThrow('保留')
   })
 
+  it('rejects header values containing a newline', () => {
+    expect(() => validateMapTileSource({ ...base, headers: [{ name: 'X-Key', value: 'a\nb' }] })).toThrow('换行')
+  })
+
   it('validates the source id', () => {
     expect(validateMapTileSourceId('source-1')).toBe('source-1')
     expect(() => validateMapTileSourceId('../etc')).toThrow()
