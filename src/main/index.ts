@@ -1,15 +1,17 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, net, protocol, shell } from 'electron'
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { IPC_CHANNELS } from '../shared/channels'
-import type { OperationResult } from '../shared/contracts'
+import type { MapTileProbeResult, MapTileSource, OperationResult } from '../shared/contracts'
 import { parseTelemetryLayoutConfig } from '../shared/telemetry-layout'
 import {
   validateConnectionProfile,
   validateDeviceArchives,
   validateExportMessageOptions,
   validateFirmwareUploadRequest,
+  validateMapTileSource,
+  validateMapTileSourceId,
   validateMediaServerProfile,
   validateObjectStorageProfile,
   validateProfileId,
@@ -29,6 +31,20 @@ import {
   validateWebDavVersionId,
   validateWhepOfferRequest,
 } from './ipc-validation'
+import { MapTileSourceStore } from './map-tile-source-store'
+import {
+  MAP_TILE_SCHEME,
+  MapTileProtocolHandler,
+  mapTileProtocolPrivileges,
+  registerMapTileProtocol,
+} from './map-tile-protocol'
+import {
+  buildTileHeaders,
+  buildTileUrl,
+  resolveDirectoryTile,
+  resolveMbtilesTile,
+  type ResolvedTile,
+} from './map-tile-resolver'
 import { MqttConnectionManager } from './mqtt-manager'
 import { ProfileStore } from './profile-store'
 import { MediaServerStore } from './media-server-store'
@@ -51,6 +67,11 @@ import {
 
 const PRODUCT_NAME = 'DJI Cloud Studio'
 
+// 必须在 app ready 之前注册协议特权，否则 protocol.handle 会失败
+protocol.registerSchemesAsPrivileged([
+  { scheme: MAP_TILE_SCHEME, privileges: mapTileProtocolPrivileges },
+])
+
 app.setName(PRODUCT_NAME)
 
 let mainWindow: BrowserWindow | null = null
@@ -68,6 +89,8 @@ let remoteLogUploadManager: RemoteLogUploadManager
 let appUpdateManager: AppUpdateManager
 let webDavConfigStore: WebDavConfigStore
 let webDavBackupManager: WebDavBackupManager
+let mapTileSourceStore: MapTileSourceStore
+let mapTileProtocolHandler: MapTileProtocolHandler
 let trustedRendererUrl: string | null = null
 let quitCleanupStarted = false
 let quitCleanupComplete = false
@@ -101,6 +124,56 @@ const developmentIconPath = app.isPackaged ? undefined : join(__dirname, '../../
 
 const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error))
 const operationFailure = (error: unknown): OperationResult => ({ ok: false, error: errorMessage(error) })
+
+const PROBE_TIMEOUT_MS = 10_000
+
+/**
+ * 用配置里的最小缩放级别与原点瓦片验证底图源是否可用。
+ *
+ * 刻意不复用 map-tile 协议处理器：协议层为了不把磁盘绝对路径透给渲染进程，任何失败都返回无响应体的 404，
+ * 而探测需要把失败原因回给用户。
+ *
+ * @param source 已校验的底图源配置
+ * @returns 探测结果，成功时带回瓦片字节数
+ */
+const probeMapTileSource = async (source: MapTileSource): Promise<MapTileProbeResult> => {
+  const request = { z: source.minZoom, x: 0, y: 0 }
+  try {
+    const tile = source.kind === 'url-template'
+      ? await fetchRemoteTileForProbe(source, request)
+      : source.kind === 'directory'
+        ? await resolveDirectoryTile(source, request)
+        : await resolveMbtilesTile(source, request)
+    return { ok: true, bytes: tile.body.byteLength }
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) }
+  }
+}
+
+/**
+ * 为探测直接向上游请求一张瓦片，绕过协议处理器，以便区分「上游拒绝」与「瓦片不存在」。
+ *
+ * @param source 已校验的底图源配置
+ * @param request 瓦片坐标
+ * @returns 瓦片字节与内容类型
+ * @throws Error 上游返回非成功状态，或请求超过 {@link PROBE_TIMEOUT_MS}
+ */
+const fetchRemoteTileForProbe = async (
+  source: MapTileSource,
+  request: { z: number; x: number; y: number },
+): Promise<ResolvedTile> => {
+  const apiKey = source.apiKey ?? ''
+  const url = buildTileUrl(source, request, apiKey, 0)
+  const response = await net.fetch(url, {
+    headers: buildTileHeaders(source, apiKey),
+    signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+  })
+  if (!response.ok) throw new Error(`上游返回 HTTP ${response.status}`)
+  return {
+    body: Buffer.from(await response.arrayBuffer()),
+    contentType: response.headers.get('content-type') ?? 'image/png',
+  }
+}
 
 const createWindow = (): void => {
   const window = new BrowserWindow({
@@ -372,6 +445,46 @@ const registerIpc = (): void => {
     }
   })
 
+  handleTrusted(IPC_CHANNELS.mapSourcesList, () => mapTileSourceStore.list())
+  handleTrusted(IPC_CHANNELS.mapSourcesSave, async (_event, rawSource: unknown) => {
+    const saved = await mapTileSourceStore.save(validateMapTileSource(rawSource))
+    // 底图源变化后缓存里的瓦片可能已失效
+    mapTileProtocolHandler.clearCache()
+    return saved
+  })
+  handleTrusted(IPC_CHANNELS.mapSourcesRemove, async (_event, rawSourceId: unknown) => {
+    try {
+      const removed = await mapTileSourceStore.remove(validateMapTileSourceId(rawSourceId))
+      mapTileProtocolHandler.clearCache()
+      return removed ? { ok: true } : { ok: false, error: '底图源不存在' }
+    } catch (error) {
+      return operationFailure(error)
+    }
+  })
+  handleTrusted(IPC_CHANNELS.mapSourcesProbe, async (_event, rawSource: unknown) => {
+    try {
+      const source = validateMapTileSource(rawSource)
+      return await probeMapTileSource(source)
+    } catch (error) {
+      return { ok: false, error: errorMessage(error) }
+    }
+  })
+  handleTrusted(IPC_CHANNELS.mapPickDirectory, async () => {
+    const result = await dialog.showOpenDialog({
+      title: '选择瓦片目录',
+      properties: ['openDirectory'],
+    })
+    return result.canceled ? null : result.filePaths[0]
+  })
+  handleTrusted(IPC_CHANNELS.mapPickMbtiles, async () => {
+    const result = await dialog.showOpenDialog({
+      title: '选择 MBTiles 文件',
+      properties: ['openFile'],
+      filters: [{ name: 'MBTiles', extensions: ['mbtiles'] }],
+    })
+    return result.canceled ? null : result.filePaths[0]
+  })
+
   handleTrusted(IPC_CHANNELS.objectStorageList, () => objectStorageStore.list())
   handleTrusted(IPC_CHANNELS.objectStorageSave, async (_event, rawProfile: unknown) => {
     const saved = await objectStorageStore.save(validateObjectStorageProfile(rawProfile))
@@ -526,6 +639,10 @@ app.whenReady().then(() => {
   appUpdateManager = new AppUpdateManager((state) => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC_CHANNELS.appUpdateEvent, state)
   })
+  // 协议处理必须在 app ready 之后注册，且早于任何渲染进程请求
+  mapTileSourceStore = new MapTileSourceStore()
+  mapTileProtocolHandler = new MapTileProtocolHandler(mapTileSourceStore)
+  registerMapTileProtocol(mapTileProtocolHandler)
   registerIpc()
   createWindow()
   setTimeout(() => void appUpdateManager.check(), 5_000)
