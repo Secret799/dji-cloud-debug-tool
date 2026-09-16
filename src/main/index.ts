@@ -41,9 +41,11 @@ import {
 import {
   buildTileHeaders,
   buildTileUrl,
+  findLocalTileRequest,
   resolveDirectoryTile,
   resolveMbtilesTile,
   type ResolvedTile,
+  type TileRequest,
 } from './map-tile-resolver'
 import { MqttConnectionManager } from './mqtt-manager'
 import { ProfileStore } from './profile-store'
@@ -146,7 +148,26 @@ export const mapProbeErrorMessage = (error: unknown): string => {
 }
 
 /**
- * 用配置里的最小缩放级别与原点瓦片验证底图源是否可用。
+ * 本地瓦片源里一张瓦片都找不到时的提示；路径填错与瓦片集为空合并成同一条。
+ */
+const PROBE_EMPTY_LOCAL_TILE_MESSAGE = '瓦片集为空或路径错误'
+
+/**
+ * 为探测挑一张瓦片坐标。
+ *
+ * 在线模板没有本地索引可查，且它本就能服务任意坐标，继续用最小缩放级的原点瓦片：
+ * 若被上游拒绝，用户得到的正是「模板或密钥有问题」这个有用信号。
+ * 本地源必须问数据源要一张真实存在的瓦片，否则城市级瓦片集会误报不可用。
+ *
+ * @param source 已校验的底图源配置
+ * @returns 探测用的瓦片坐标；本地源里没有瓦片时返回 undefined
+ * @throws TileRequestError 本地数据源不可读
+ */
+const probeTileRequest = async (source: MapTileSource): Promise<TileRequest | undefined> =>
+  source.kind === 'url-template' ? { z: source.minZoom, x: 0, y: 0 } : await findLocalTileRequest(source)
+
+/**
+ * 用一张真实存在的瓦片验证底图源是否可用。
  *
  * 刻意不复用 map-tile 协议处理器：协议层为了不把磁盘绝对路径透给渲染进程，任何失败都返回无响应体的 404，
  * 而探测需要把失败原因回给用户。
@@ -154,9 +175,10 @@ export const mapProbeErrorMessage = (error: unknown): string => {
  * @param source 已校验的底图源配置
  * @returns 探测结果，成功时带回瓦片字节数
  */
-const probeMapTileSource = async (source: MapTileSource): Promise<MapTileProbeResult> => {
-  const request = { z: source.minZoom, x: 0, y: 0 }
+export const probeMapTileSource = async (source: MapTileSource): Promise<MapTileProbeResult> => {
   try {
+    const request = await probeTileRequest(source)
+    if (!request) return { ok: false, error: PROBE_EMPTY_LOCAL_TILE_MESSAGE }
     const tile = source.kind === 'url-template'
       ? await fetchRemoteTileForProbe(source, request)
       : source.kind === 'directory'

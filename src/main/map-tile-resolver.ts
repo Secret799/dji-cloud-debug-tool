@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import { extname, join, resolve, sep } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import type { MapTileSource } from '../shared/contracts'
@@ -38,6 +38,17 @@ const contentTypeFor = (extension: string): string =>
   CONTENT_TYPES[extension.toLowerCase()] ?? DEFAULT_CONTENT_TYPE
 
 const maxIndexForZoom = (z: number): number => 2 ** z - 1
+
+/**
+ * 目录源可用的文件扩展名：配置了 tileExtension 时只认它，否则按候选表依次探测。
+ *
+ * @param source 底图源配置
+ * @returns 去掉前导点的扩展名列表
+ */
+const tileExtensionsFor = (source: MapTileSource): string[] => {
+  const configured = source.tileExtension.trim().replace(/^\./, '')
+  return configured ? [configured] : [...CANDIDATE_EXTENSIONS]
+}
 
 /**
  * 解析 map-tile://tiles/<源ID>/<z>/<x>/<y> 的路径部分。
@@ -127,9 +138,7 @@ export const resolveDirectoryTile = async (
   request: TileRequest,
 ): Promise<ResolvedTile> => {
   const root = resolve(source.path)
-  const extensions = source.tileExtension.trim()
-    ? [source.tileExtension.trim().replace(/^\./, '')]
-    : [...CANDIDATE_EXTENSIONS]
+  const extensions = tileExtensionsFor(source)
 
   for (const extension of extensions) {
     const candidate = join(root, String(request.z), String(request.x), `${request.y}.${extension}`)
@@ -179,3 +188,135 @@ export const resolveMbtilesTile = async (
     database.close()
   }
 }
+
+/** 探测目录源时最多检查的缩放级别数，避免在超大瓦片树上无界遍历 */
+const MAX_PROBE_ZOOM_LEVELS = 4
+/** 探测目录源时每个缩放级别最多检查的列目录数 */
+const MAX_PROBE_COLUMNS = 4
+/** 路径不存在或指向文件时的 errno，与「瓦片集为空」合并成同一条提示 */
+const MISSING_PATH_CODES = new Set(['ENOENT', 'ENOTDIR'])
+
+const isMissingPathError = (error: unknown): boolean =>
+  error instanceof Error && MISSING_PATH_CODES.has((error as NodeJS.ErrnoException).code ?? '')
+
+/**
+ * 列出目录下可作瓦片坐标的数字子目录，按数值升序。
+ *
+ * @param directory 待读取的目录
+ * @param limit 允许的最大数值，缩放级别用 {@link MAX_ZOOM}，列号用该级别的最大索引
+ * @returns 目录名可解析为 0..limit 的数值列表
+ */
+const numericSubdirectories = async (directory: string, limit: number): Promise<number[]> => {
+  const entries = await readdir(directory, { withFileTypes: true })
+  return entries
+    .filter((entry) => entry.isDirectory() && /^\d+$/.test(entry.name))
+    .map((entry) => Number(entry.name))
+    .filter((value) => value <= limit)
+    .sort((a, b) => a - b)
+}
+
+/**
+ * 在 <z>/<x> 目录里找一个可用的行号：文件名必须匹配 <y>.<ext> 且扩展名在允许列表内。
+ *
+ * @param directory <z>/<x> 对应的目录
+ * @param extensions 允许的扩展名
+ * @returns 升序排列后第一个合法的 y；没有合法文件时返回 undefined
+ */
+const findRowInDirectory = async (directory: string, extensions: string[]): Promise<number | undefined> => {
+  const names = await readdir(directory)
+  const rows = names
+    .map((name) => /^(\d+)\.([A-Za-z0-9]+)$/.exec(name))
+    .filter((match): match is RegExpExecArray => match !== null && extensions.includes(match[2].toLowerCase()))
+    .map((match) => Number(match[1]))
+    .filter((row) => Number.isSafeInteger(row))
+    .sort((a, b) => a - b)
+  return rows[0]
+}
+
+/**
+ * 按 <root>/<z>/<x>/<y>.<ext> 的目录结构读出一张真实存在的瓦片坐标。
+ *
+ * 只从目录里读坐标，不猜坐标再去试：z 级下世界是 2^z × 2^z 张瓦片，
+ * 猜出来的坐标大概率落在瓦片集覆盖范围之外。缩放级别与列目录各只取升序前若干个，
+ * 保证读取次数有界。目录不存在或为空都返回 undefined，由调用方给出统一提示。
+ *
+ * @param source 已校验的目录源配置
+ * @returns 真实存在的瓦片坐标；目录缺失或没有可解析的瓦片时返回 undefined
+ * @throws TileRequestError 目录存在但不可读（权限等）
+ */
+const findDirectoryTile = async (source: MapTileSource): Promise<TileRequest | undefined> => {
+  const root = resolve(source.path)
+  const extensions = tileExtensionsFor(source)
+  try {
+    const zoomLevels = await numericSubdirectories(root, MAX_ZOOM)
+    for (const z of zoomLevels.slice(0, MAX_PROBE_ZOOM_LEVELS)) {
+      const columns = await numericSubdirectories(join(root, String(z)), maxIndexForZoom(z))
+      for (const x of columns.slice(0, MAX_PROBE_COLUMNS)) {
+        const tileDirectory = join(root, String(z), String(x))
+        assertInsideRoot(root, tileDirectory)
+        const y = await findRowInDirectory(tileDirectory, extensions)
+        if (y !== undefined && y <= maxIndexForZoom(z)) return { z, x, y }
+      }
+    }
+    return undefined
+  } catch (error) {
+    if (error instanceof TileRequestError) throw error
+    if (isMissingPathError(error)) return undefined
+    throw new TileRequestError(`读取本地瓦片目录失败：${(error as Error).message}`)
+  }
+}
+
+/** 挑选探测瓦片的 SQL：滤掉无法还原成合法 XYZ 坐标的行，最小缩放级优先 */
+const FIND_MBTILES_TILE_SQL = `SELECT zoom_level, tile_column, tile_row FROM tiles
+  WHERE zoom_level BETWEEN 0 AND ?
+    AND tile_column BETWEEN 0 AND (1 << zoom_level) - 1
+    AND tile_row BETWEEN 0 AND (1 << zoom_level) - 1
+  ORDER BY zoom_level, tile_column, tile_row
+  LIMIT 1`
+
+interface MbtilesTileRow {
+  zoom_level: number
+  tile_column: number
+  tile_row: number
+}
+
+/**
+ * 从 MBTiles 里读出一张真实存在的瓦片坐标。
+ *
+ * MBTiles 存的是 TMS 行号，这里镜像 {@link resolveMbtilesTile} 的反向翻转，
+ * 得到的才是 XYZ 约定下的坐标。
+ *
+ * @param source 已校验的 MBTiles 源配置
+ * @returns 真实存在的瓦片坐标；tiles 表里没有合法瓦片时返回 undefined
+ * @throws TileRequestError 数据库打不开或读取失败
+ */
+const findMbtilesTile = async (source: MapTileSource): Promise<TileRequest | undefined> => {
+  let database: DatabaseSync
+  try {
+    database = new DatabaseSync(source.path, { readOnly: true })
+  } catch (error) {
+    throw new TileRequestError(`无法打开 MBTiles：${(error as Error).message}`)
+  }
+  try {
+    const row = database.prepare(FIND_MBTILES_TILE_SQL).get(MAX_ZOOM) as MbtilesTileRow | undefined
+    if (!row) return undefined
+    return { z: row.zoom_level, x: row.tile_column, y: maxIndexForZoom(row.zoom_level) - row.tile_row }
+  } catch (error) {
+    throw new TileRequestError(`读取 MBTiles 失败：${(error as Error).message}`)
+  } finally {
+    database.close()
+  }
+}
+
+/**
+ * 为本地瓦片源挑一张真实存在、可被读取的瓦片坐标，供可用性探测使用。
+ *
+ * 探测不能固定请求原点瓦片：城市级瓦片集在 z=10 只覆盖 x≈840、y≈400 一带，
+ * (minZoom, 0, 0) 不在其中，会把完全可用的本地源误判成不可用。
+ *
+ * @param source 已校验的本地底图源配置（directory 或 mbtiles）
+ * @returns 数据源内真实存在的瓦片坐标；一张瓦片都没有时返回 undefined
+ * @throws TileRequestError 数据源不可读（目录无权限、MBTiles 打不开或表损坏）
+ */
+export const findLocalTileRequest = async (source: MapTileSource): Promise<TileRequest | undefined> =>
+  source.kind === 'mbtiles' ? await findMbtilesTile(source) : await findDirectoryTile(source)

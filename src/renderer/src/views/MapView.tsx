@@ -199,9 +199,10 @@ export interface CesiumMapHandle {
 /**
  * 创建并维护 Cesium 地图控件的生命周期。
  *
- * 使用 CesiumWidget 而不是 Viewer：Viewer 会连带拉起 knockout 与 WebAssembly 依赖，
- * 而应用 CSP 的 script-src 'self' 禁止这两者，Viewer 构造时会直接抛错、整个视图白屏
- * （实测，见 MapView 的运行时验证记录）。本视图只需要地球、影像层与设备点位，
+ * 使用 CesiumWidget 而不是 Viewer：Viewer 会连带拉起 Cesium 自带的 knockout，其间接 eval 被
+ * CSP 的 script-src 拦下后构造即抛错、整个视图白屏。CSP 的 'wasm-unsafe-eval' 只放行
+ * WebAssembly 编译、不放行 JS 动态求值，所以这条限制依然成立（Viewer 依赖的 WebAssembly
+ * 本身已不再被拦）。本视图只需要地球、影像层与设备点位，
  * CesiumWidget 已提供 scene / imageryLayers / entities / camera，无需 Viewer 的控件外壳。
  *
  * 没有可用 WebGL2 的环境会在构造时抛错，这里捕获后交给界面提示，避免整个视图崩溃。

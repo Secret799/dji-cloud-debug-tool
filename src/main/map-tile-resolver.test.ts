@@ -7,10 +7,12 @@ import type { MapTileSource } from '../shared/contracts'
 import {
   buildTileHeaders,
   buildTileUrl,
+  findLocalTileRequest,
   parseTilePath,
   resolveDirectoryTile,
   resolveMbtilesTile,
   TileRequestError,
+  type TileRequest,
 } from './map-tile-resolver'
 
 const source = (patch: Partial<MapTileSource> = {}): MapTileSource => ({
@@ -166,5 +168,93 @@ describe('resolveMbtilesTile', () => {
   it('reports an unreadable database as a 404-equivalent error', async () => {
     const missing = source({ kind: 'mbtiles', path: join(root, 'missing.mbtiles') })
     await expect(resolveMbtilesTile(missing, { z: 3, x: 4, y: 5 })).rejects.toThrow(TileRequestError)
+  })
+})
+
+describe('findLocalTileRequest', () => {
+  // 城市级瓦片集：z=10 的覆盖范围在 x≈842、y≈400 一带，原点瓦片 (10, 0, 0) 不在其中。
+  // 这正是「固定请求原点瓦片」会误报不可用的场景。
+  const CITY_ZOOM = 10
+  const CITY_X = 842
+  const CITY_Y = 400
+  const CITY_TILE = 'city-tile'
+  const NEIGHBOUR_TILE = 'neighbour-tile'
+
+  let root = ''
+  let directoryRoot = ''
+  let mbtilesPath = ''
+
+  beforeEach(async () => {
+    root = await mkdtemp(join(tmpdir(), 'dji-map-find-'))
+    directoryRoot = join(root, 'city-tiles')
+    await mkdir(join(directoryRoot, String(CITY_ZOOM), String(CITY_X)), { recursive: true })
+    await writeFile(join(directoryRoot, String(CITY_ZOOM), String(CITY_X), `${CITY_Y}.png`), Buffer.from(CITY_TILE))
+
+    mbtilesPath = join(root, 'city.mbtiles')
+    const database = new DatabaseSync(mbtilesPath)
+    database.exec('CREATE TABLE tiles (zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_data BLOB)')
+    const cityRow = 2 ** CITY_ZOOM - 1 - CITY_Y
+    // 同一列上相邻的两行：翻转若写错方向，就会落到邻居而不是 CITY_Y 上
+    database.prepare('INSERT INTO tiles (zoom_level, tile_column, tile_row, tile_data) VALUES (?, ?, ?, ?)')
+      .run(CITY_ZOOM, CITY_X, cityRow, new Uint8Array(Buffer.from(CITY_TILE)))
+    database.prepare('INSERT INTO tiles (zoom_level, tile_column, tile_row, tile_data) VALUES (?, ?, ?, ?)')
+      .run(CITY_ZOOM, CITY_X, cityRow + 1, new Uint8Array(Buffer.from(NEIGHBOUR_TILE)))
+    database.close()
+  })
+
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true })
+  })
+
+  it('picks the tile a local directory actually contains instead of the origin tile', async () => {
+    const found = await findLocalTileRequest(source({ kind: 'directory', path: directoryRoot, minZoom: CITY_ZOOM }))
+    expect(found).toEqual({ z: CITY_ZOOM, x: CITY_X, y: CITY_Y })
+    const resolved = await resolveDirectoryTile(source({ kind: 'directory', path: directoryRoot }), found as TileRequest)
+    expect(resolved.body.toString()).toBe(CITY_TILE)
+  })
+
+  it('picks the tile an mbtiles source actually contains and round-trips the TMS flip', async () => {
+    const mbtiles = source({ kind: 'mbtiles', path: mbtilesPath, minZoom: CITY_ZOOM })
+    const found = await findLocalTileRequest(mbtiles)
+    expect(found).toEqual({ z: CITY_ZOOM, x: CITY_X, y: CITY_Y })
+    // 用现有读路径回读：翻转方向写错时这里读到的会是邻居瓦片
+    expect((await resolveMbtilesTile(mbtiles, found as TileRequest)).body.toString()).toBe(CITY_TILE)
+    expect((await resolveMbtilesTile(mbtiles, { ...(found as TileRequest), y: CITY_Y - 1 })).body.toString())
+      .toBe(NEIGHBOUR_TILE)
+  })
+
+  it('skips zoom levels that hold no tile', async () => {
+    await mkdir(join(directoryRoot, String(CITY_ZOOM + 1), String(CITY_X)), { recursive: true })
+    await writeFile(join(directoryRoot, String(CITY_ZOOM + 1), String(CITY_X), '801.png'), Buffer.from('deep-tile'))
+    // 去掉 z=10 那张，只留更深的级别
+    await rm(join(directoryRoot, String(CITY_ZOOM)), { recursive: true, force: true })
+    const found = await findLocalTileRequest(source({ kind: 'directory', path: directoryRoot }))
+    expect(found).toEqual({ z: CITY_ZOOM + 1, x: CITY_X, y: 801 })
+  })
+
+  it('ignores tile files whose extension the source does not accept', async () => {
+    const pngOnly = source({ kind: 'directory', path: directoryRoot, tileExtension: 'jpg' })
+    await writeFile(join(directoryRoot, String(CITY_ZOOM), String(CITY_X), '1.jpg'), Buffer.from('jpg-tile'))
+    expect(await findLocalTileRequest(pngOnly)).toEqual({ z: CITY_ZOOM, x: CITY_X, y: 1 })
+  })
+
+  it('returns undefined when a local source holds no tiles at all', async () => {
+    const emptyDirectory = join(root, 'empty-tiles')
+    await mkdir(emptyDirectory, { recursive: true })
+    expect(await findLocalTileRequest(source({ kind: 'directory', path: emptyDirectory }))).toBeUndefined()
+    expect(await findLocalTileRequest(source({ kind: 'directory', path: join(root, 'missing-tiles') }))).toBeUndefined()
+    expect(await findLocalTileRequest(source({ kind: 'directory', path: join(root, 'city-tiles', '10', '842', '400.png') })))
+      .toBeUndefined()
+
+    const emptyMbtiles = join(root, 'empty.mbtiles')
+    const database = new DatabaseSync(emptyMbtiles)
+    database.exec('CREATE TABLE tiles (zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_data BLOB)')
+    database.close()
+    expect(await findLocalTileRequest(source({ kind: 'mbtiles', path: emptyMbtiles }))).toBeUndefined()
+  })
+
+  it('reports an unreadable mbtiles as an error rather than an empty tileset', async () => {
+    const missing = source({ kind: 'mbtiles', path: join(root, 'missing.mbtiles') })
+    await expect(findLocalTileRequest(missing)).rejects.toThrow('无法打开 MBTiles')
   })
 })
