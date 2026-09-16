@@ -19,8 +19,13 @@ export const MAP_TILE_HOST = 'tiles'
 /**
  * 注册为主权协议所需的权限。
  *
- * supportFetchAPI 是必需的：Cesium 的 Resource.fetchImage 走 fetch + createImageBitmap，
- * 缺少该项会直接失败。secure 使其被视作安全上下文，避免混合内容拦截。
+ * 瓦片可用的实际依赖是 standard + secure：前者让 URL 走标准解析，后者使其被视作安全上下文、避免混合内容拦截。
+ *
+ * supportFetchAPI 只对 Fetch API 生效，实测并非当前取图路径的依赖：去掉它以后
+ * fetch('map-tile://…') 会以「URL scheme "map-tile" is not supported」失败，但 XHR 不受影响，
+ * Cesium 的瓦片请求照常返回 200。原因是 Resource.fetchImage 在本渲染进程走 XHR
+ * （XMLHttpRequest 已定义，不会退回 loadWithHttpRequest 的 fetch 路径）。
+ * 保留该项是为了不把 Cesium 当前的实现细节当成协议契约；要删它请先重跑 A/B。
  */
 export const mapTileProtocolPrivileges = {
   standard: true,
