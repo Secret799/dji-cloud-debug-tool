@@ -1,10 +1,10 @@
 import { renderToStaticMarkup } from 'react-dom/server'
-import { Cartesian3 } from 'cesium'
+import { CallbackPositionProperty, CallbackProperty, Cartesian3, Color, JulianDate } from 'cesium'
 import { describe, expect, it, vi } from 'vitest'
-import type { MapTileSource } from '../../../shared/contracts'
+import type { MapCoordinateSystem, MapTileSource } from '../../../shared/contracts'
 import type { DevicePosition } from '../lib/map-device-position'
 import { toCoordinateSystem } from '../lib/map-coord'
-import { activeImagerySource, describeMapDevice, deviceCartesian, focusDestination, imageryProviderUrl, MapView } from './MapView'
+import { activeImagerySource, describeMapDevice, deviceCartesian, focusDestination, imageryProviderUrl, MapView, markerEntityOptions } from './MapView'
 
 const source = (patch: Partial<MapTileSource> = {}): MapTileSource => ({
   id: 'source-1',
@@ -84,6 +84,18 @@ describe('focusDestination', () => {
     expect(Cartesian3.equalsEpsilon(destination!, Cartesian3.fromDegrees(116.4487, 39.904345, 2_000), 1e-6)).toBe(true)
   })
 
+  it('converts the camera destination for a gcj02 basemap', () => {
+    const devices = [position(), position({ sn: 'DOCK-2', wgs84: { latitude: 39.9, longitude: 116.5 } })]
+    const destination = focusDestination(devices, 'gcj02')
+    expect(Cartesian3.equalsEpsilon(destination!, Cartesian3.fromDegrees(116.4487, 39.904345, 2_000), 1e-9)).toBe(false)
+    const converted = devices.map((item) => toCoordinateSystem(item.wgs84, 'gcj02'))
+    expect(Cartesian3.equalsEpsilon(destination!, Cartesian3.fromDegrees(
+      converted.reduce((sum, point) => sum + point.longitude, 0) / converted.length,
+      converted.reduce((sum, point) => sum + point.latitude, 0) / converted.length,
+      2_000,
+    ), 1e-9)).toBe(true)
+  })
+
   it('has nothing to focus on without a located device', () => {
     expect(focusDestination([], 'wgs84')).toBeUndefined()
   })
@@ -100,6 +112,11 @@ describe('describeMapDevice', () => {
 
   it('marks the coordinate as untransformed for a wgs84 basemap', () => {
     expect(describeMapDevice(position(), 'wgs84').lines).toContain('未转换（底图为 WGS-84）')
+  })
+
+  it('labels the basemap coordinate as BD-09 for a bd09 basemap', () => {
+    const described = describeMapDevice(position(), 'bd09')
+    expect(described.lines.some((line) => line.includes('BD-09'))).toBe(true)
   })
 
   it('reports an offline device with its last seen time', () => {
@@ -129,6 +146,44 @@ describe('describeMapDevice', () => {
   })
 })
 
+describe('markerEntityOptions', () => {
+  const access = (positions: DevicePosition[], system: MapCoordinateSystem) => ({
+    positions: { current: new Map(positions.map((item) => [item.sn, item] as const)) },
+    system: { current: system },
+  })
+
+  it('colours an offline marker grey and an online marker blue', () => {
+    const time = JulianDate.now()
+    const offline = markerEntityOptions('DOCK-1', access([position({ online: false })], 'wgs84'))
+    const online = markerEntityOptions('DOCK-1', access([position({ online: true })], 'wgs84'))
+    const offlineColor = (offline.point!.color as CallbackProperty).getValue(time) as Color
+    const onlineColor = (online.point!.color as CallbackProperty).getValue(time) as Color
+    expect(Color.equals(offlineColor, Color.fromCssColorString('#9ca3af'))).toBe(true)
+    expect(Color.equals(onlineColor, Color.fromCssColorString('#2563eb'))).toBe(true)
+  })
+
+  it('places the marker at the converted coordinate for a gcj02 basemap', () => {
+    const time = JulianDate.now()
+    const options = markerEntityOptions('DOCK-1', access([position()], 'gcj02'))
+    const converted = toCoordinateSystem(position().wgs84, 'gcj02')
+    const actual = (options.position as CallbackPositionProperty).getValue(time)
+    const expected = Cartesian3.fromDegrees(converted.longitude, converted.latitude, 43.5)
+    expect(Cartesian3.equalsEpsilon(actual, expected, 1e-9)).toBe(true)
+    // 原始 WGS-84 坐标直接摆点会整体偏移数百米，必须能被这条断言拦住
+    expect(Cartesian3.equalsEpsilon(actual, Cartesian3.fromDegrees(39.90869, 116.39740, 43.5), 1e-9)).toBe(false)
+  })
+
+  it('reads the latest position from the ref instead of a snapshot', () => {
+    const time = JulianDate.now()
+    const positions: Map<string, DevicePosition> = new Map([['DOCK-1', position()]])
+    const system: MapCoordinateSystem = 'wgs84'
+    const options = markerEntityOptions('DOCK-1', { positions: { current: positions }, system: { current: system } })
+    positions.set('DOCK-1', position({ wgs84: { latitude: 30.1, longitude: 120.2 } }))
+    const actual = (options.position as CallbackPositionProperty).getValue(time)
+    expect(Cartesian3.equalsEpsilon(actual, Cartesian3.fromDegrees(120.2, 30.1, 43.5), 1e-9)).toBe(true)
+  })
+})
+
 describe('MapView rendering', () => {
   it('prompts for a basemap source when none is configured', () => {
     const markup = renderToStaticMarkup(
@@ -152,9 +207,12 @@ describe('MapView rendering', () => {
         onOpenSources={vi.fn()}
       />,
     )
-    // 简报原文断言的是「一号机场」。该断言无法成立：已定位设备的名称只作为 Cesium 标签渲染，
-    // 而 renderToStaticMarkup 不执行 useEffect、也不构造 WebGL 上下文，静态标记里永远不会出现它。
-    // 这条用例真正要验证的是「无定位的设备被单独列出」，故改断言未定位设备的名字。
+    // 已定位设备的名称与「原始上报（WGS-84）」行由 DeviceDetailPanel 在渲染期输出，
+    // 不依赖 useEffect，因此 renderToStaticMarkup 的静态标记里确实包含它们。
+    expect(markup).toContain('一号机场')
+    expect(markup).toContain('原始上报（WGS-84）')
+    // 具体数值也要断言：只比标题文字的话，把转换后的坐标填进这一行同样能通过
+    expect(markup).toContain('原始上报（WGS-84） 纬度 39.900000  经度 116.400000')
     expect(markup).toContain('二号机场')
     expect(markup).toContain('无定位')
   })
