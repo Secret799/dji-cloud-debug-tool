@@ -8,7 +8,7 @@ import {
   buildMapTileSourcePayload,
   createMapTileSource,
   mapProbeNotice,
-  mapSourceSelectionLoaded,
+  mapSourceReloadKey,
   mapTileSourceIssues,
   mapTileSourceNameFromPath,
   probeMapSource,
@@ -219,6 +219,12 @@ describe('map probe notices', () => {
 })
 
 describe('map source draft reloading', () => {
+  // 本组用例覆盖的是 `mapSourceReloadKey` 这个派生值本身的跃迁（空列表 → 列表到位 → 取值翻转；
+  // 选中项不变时列表刷新 → 取值不变），以及同一时刻 `reloadMapSourceDraft` 的产出。
+  //
+  // 未覆盖：React 对 effect 依赖数组的比较本身。仓库测试环境是 node，没有 jsdom、没有 hook 渲染器，
+  // 拿不到 `useEffect` 的依赖数组，因此「依赖键变化会让重装 effect 重跑」这一步只由代码阅读
+  // 与 task-12-report.md 记录的手工探针验证，不由本文件验证。改动依赖数组时必须人工复核。
   it('keeps the draft while it still belongs to the seen id, even when the list is a new array', () => {
     const editing = validSource({ id: 'source-1', name: '正在输入的名称' })
     expect(reloadMapSourceDraft(editing, [{ ...editing, name: '服务端返回的名称' }], 'source-1')).toBeNull()
@@ -238,29 +244,29 @@ describe('map source draft reloading', () => {
     expect(reloadMapSourceDraft(validSource({ id: 'source-1' }), [], 'source-9')?.id).toBe('')
   })
 
-  it('loads the selected source once an asynchronously loaded list arrives', () => {
+  it('flips the reload key from blank to the id once an asynchronously loaded list arrives', () => {
     const stored = validSource({ id: 'source-1', name: '已保存的底图' })
-    // 第一帧：列表还没回来，重装只会得到一份空草稿，此时依赖值仍是 false
-    expect(mapSourceSelectionLoaded([], 'source-1')).toBe(false)
+    // 第一帧：列表还没回来，选中项无从查得，依赖键是空串，此时重装只会得到一份空草稿
+    expect(mapSourceReloadKey([], 'source-1')).toBe('')
     expect(reloadMapSourceDraft(createMapTileSource(), [], 'source-1')?.id).toBe('')
-    // 列表到位：依赖值由 false 变 true，重装 effect 因此重跑，草稿换成已保存的那一份；
+    // 列表到位：依赖键由空串变成 'source-1'，同一时刻能装出已保存的那一份；
     // 这保证后续保存送出的 id 非空，主进程走更新而不是新建出第二份底图源
-    expect(mapSourceSelectionLoaded([stored], 'source-1')).toBe(true)
+    expect(mapSourceReloadKey([stored], 'source-1')).toBe('source-1')
     expect(reloadMapSourceDraft(createMapTileSource(), [stored], 'source-1'))
       .toMatchObject({ id: 'source-1', name: '已保存的底图' })
   })
 
-  it('keeps the reload dependency stable while the list refreshes for the same selection', () => {
+  it('keeps the reload key stable while the list refreshes for the same selection', () => {
     const stored = validSource({ id: 'source-1' })
     const refreshed = [{ ...stored, name: '服务端返回的名称' }, validSource({ id: 'source-2' })]
-    // 列表换了新对象但选中项没变，依赖值不变，effect 不会重跑，正在输入的内容不会被清掉
-    expect(mapSourceSelectionLoaded(refreshed, 'source-1'))
-      .toBe(mapSourceSelectionLoaded([stored], 'source-1'))
+    // 列表换了新对象但选中项没变，依赖键仍是同一个 id，重装 effect 不会因列表刷新而被触发
+    expect(mapSourceReloadKey([stored], 'source-1')).toBe('source-1')
+    expect(mapSourceReloadKey(refreshed, 'source-1')).toBe('source-1')
   })
 
   it('keeps a freshly saved draft when its new id turns into the selection', () => {
     const saved = validSource({ id: 'source-9', name: '刚保存的底图' })
-    expect(mapSourceSelectionLoaded([saved], 'source-9')).toBe(true)
+    expect(mapSourceReloadKey([saved], 'source-9')).toBe('source-9')
     expect(reloadMapSourceDraft(saved, [saved], 'source-9')).toBeNull()
   })
 })

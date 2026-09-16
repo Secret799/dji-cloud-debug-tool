@@ -211,20 +211,19 @@ export const reloadMapSourceDraft = (
 }
 
 /**
- * 判断选中的底图源是否已经出现在列表里。
+ * 计算底图源草稿重装 effect 的依赖键。
  *
- * 列表是异步加载的：弹窗带着非空 selectedId 打开时，列表可能还是空的，此时只会装出一份空草稿；
- * 若重装 effect 只依赖 selectedId，列表到位这一次渲染不会重跑 effect，表单会停在空表上，
- * 保存时送出空 id，主进程就会新建一份而不是更新选中的那份。
- * 把该判断并入依赖后，选中项「从不在列表到在列表」会让 effect 重跑一次；
- * 列表内容刷新（保存后主进程换回的新对象）不改变该值，因此不会打断正在进行的编辑。
+ * 选中项尚未出现在列表中时返回空串，出现后返回其 id。返回空串是因为
+ * `listSources` 是异步的：若在列表到位前就用 selectedId 作为依赖，
+ * 草稿会停在空态且不会重算，保存时会新建第二条源而不是更新选中的那条。
+ * 列表因刷新而换了新对象、但选中项未变时，返回值不变，因此不会清掉正在输入的内容。
  *
- * @param sources 已保存的底图源列表
- * @param selectedId 当前选中的底图源标识
- * @returns 选中项是否已在列表中；selectedId 为空（新建）时恒为 false
+ * @param sources 当前已加载的底图源列表
+ * @param selectedId 当前选中的底图源 id
+ * @returns 依赖键：选中项已加载时为该 id，否则为空串
  */
-export const mapSourceSelectionLoaded = (sources: MapTileSource[], selectedId: string): boolean =>
-  sources.some((source) => source.id === selectedId)
+export const mapSourceReloadKey = (sources: MapTileSource[], selectedId: string): string =>
+  sources.some((source) => source.id === selectedId) ? selectedId : ''
 
 /**
  * 校验底图源草稿，返回可直接展示给用户的中文问题列表。
@@ -422,15 +421,13 @@ export const useMapSourceDraft = (sources: MapTileSource[], selectedId: string):
   draftRef.current = draft
   const sourcesRef = useRef(sources)
   sourcesRef.current = sources
-  // 选中项在列表里出现 / 消失时也要重装，否则异步加载完的列表不会触发重装
-  const selectionLoaded = mapSourceSelectionLoaded(sources, selectedId)
 
   useEffect(() => {
     const reloaded = reloadMapSourceDraft(draftRef.current, sourcesRef.current, selectedId)
     if (!reloaded) return
     setDraft(reloaded)
     setApiKey('')
-  }, [selectedId, selectionLoaded])
+  }, [mapSourceReloadKey(sources, selectedId)])
 
   const issues = useMemo(() => mapTileSourceIssues(draft), [draft])
 
