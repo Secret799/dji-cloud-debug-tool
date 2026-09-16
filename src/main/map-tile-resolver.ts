@@ -99,8 +99,9 @@ export const buildTileUrl = (
 export const buildTileHeaders = (source: MapTileSource, apiKey: string): Record<string, string> => {
   const headers: Record<string, string> = {}
   for (const header of source.headers ?? []) {
-    if (!apiKey && header.value.includes('{key}')) continue
-    headers[header.name] = header.value.replace(/\{key\}/gi, apiKey)
+    // 用函数形式替换：字符串形式的替换串会把密钥里的 $& / $1 当成替换模式，静默篡改密钥
+    if (!apiKey && /\{key\}/i.test(header.value)) continue
+    headers[header.name] = header.value.replace(/\{key\}/gi, () => apiKey)
   }
   return headers
 }

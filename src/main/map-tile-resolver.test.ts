@@ -86,6 +86,11 @@ describe('buildTileHeaders', () => {
     expect(buildTileHeaders(source({ headers: [{ name: 'X-Key', value: '{key}' }] }), '')).toEqual({})
     expect(buildTileHeaders(source(), 'token-1')).toEqual({})
   })
+
+  it('keeps a key containing dollar signs intact', () => {
+    const withHeader = source({ headers: [{ name: 'Authorization', value: 'Bearer {key}' }] })
+    expect(buildTileHeaders(withHeader, 'a$&b')).toEqual({ Authorization: 'Bearer a$&b' })
+  })
 })
 
 describe('resolveDirectoryTile', () => {
@@ -119,8 +124,10 @@ describe('resolveDirectoryTile', () => {
   })
 
   it('refuses to escape the configured root', async () => {
-    const escaped = source({ kind: 'directory', path: join(root, '..', '..') })
-    await expect(resolveDirectoryTile(escaped, { z: 3, x: 4, y: 5 })).rejects.toThrow(TileRequestError)
+    // 穿越必须经 tileExtension 驱动：抬高 root 的写法不会触发越界检查，
+    // 且缺失瓦片与越界抛的是同一个异常类，只断言类型无法分辨二者。
+    const traversing = source({ kind: 'directory', path: root, tileExtension: 'x/../../../../etc/passwd' })
+    await expect(resolveDirectoryTile(traversing, { z: 3, x: 4, y: 5 })).rejects.toThrow('路径越界')
   })
 })
 
