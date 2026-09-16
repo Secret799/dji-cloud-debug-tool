@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, FolderOpen, Plus, Save, Trash2, X } from 'lucide-react'
+import { Check, FolderOpen, Plus, Save, Star, Trash2, X } from 'lucide-react'
 import type {
   MapCoordinateSystem,
   MapLayerKind,
@@ -385,6 +385,46 @@ export const removeMapSource = async (
   }
 }
 
+/**
+ * 把选中的底图源设为默认，其余来源一律取消默认。
+ *
+ * 主进程保证同一时刻只有一条默认源，渲染进程的列表必须同步收敛：
+ * 若只把选中项标成默认，地图仍会按 `isDefault` 取到列表中更靠前的那一条，表现为「点了没反应」。
+ *
+ * @param sources 当前底图源列表
+ * @param saved 主进程返回的、已保存为默认的底图源
+ * @returns 新的底图源列表
+ */
+export const mapSourcesWithDefault = (sources: MapTileSource[], saved: MapTileSource): MapTileSource[] =>
+  sources.map((item) => (item.id === saved.id ? { ...saved, isDefault: true } : { ...item, isDefault: false }))
+
+/**
+ * 把指定的底图源设为默认，并把结果转成提示文案。
+ *
+ * @param source 要设为默认的底图源
+ * @param sources 当前底图源列表
+ * @param onSave 保存底图源
+ * @param onSourcesChange 用新列表覆盖渲染进程状态
+ * @param onNotify 展示提示信息
+ * @returns 无返回值，结果通过 onSourcesChange 与 onNotify 呈现
+ */
+export const setDefaultMapSource = async (
+  source: MapTileSource,
+  sources: MapTileSource[],
+  onSave: (source: MapTileSource) => Promise<MapTileSource>,
+  onSourcesChange: (sources: MapTileSource[]) => void,
+  onNotify: MapSourceNotify,
+): Promise<void> => {
+  if (source.isDefault) return
+  try {
+    const saved = await onSave({ ...source, isDefault: true })
+    onSourcesChange(mapSourcesWithDefault(sources, saved))
+    onNotify(`已将${source.name}设为默认底图源`, 'success')
+  } catch (error) {
+    onNotify(`设为默认底图源失败：${errorMessage(error)}`, 'error')
+  }
+}
+
 /** 弹窗草稿状态 */
 export interface MapSourceDraftState {
   /** 当前草稿 */
@@ -453,6 +493,8 @@ export interface MapSourceModalProps {
   onSelect: (sourceId: string) => void
   /** 保存底图源 */
   onSave: (source: MapTileSource) => Promise<MapTileSource>
+  /** 用新列表覆盖渲染进程的底图源列表 */
+  onSourcesChange: (sources: MapTileSource[]) => void
   /** 删除底图源 */
   onRemove: (sourceId: string) => Promise<OperationResult>
   /** 探测底图源可用性 */
@@ -549,23 +591,75 @@ export const useMapSourceCommands = (options: MapSourceCommandOptions): MapSourc
   return { pending, save, probe, remove }
 }
 
+/** 弹窗上「设为默认」的状态与入口 */
+export interface MapSourceDefaultState {
+  /** 正在被设为默认的底图源标识，空串表示空闲 */
+  pendingDefaultId: string
+  /** 把某条底图源设为默认 */
+  setDefault: (source: MapTileSource) => Promise<void>
+}
+
+/**
+ * 把「设为默认」包装成带忙碌标记的处理器。
+ *
+ * 与草稿的保存/探测分开：设为默认不读草稿，因此也不该被草稿的校验问题挡住。
+ *
+ * @param sources 当前底图源列表
+ * @param onSave 保存底图源
+ * @param onSourcesChange 用新列表覆盖渲染进程状态
+ * @param onNotify 展示提示信息
+ * @returns 忙碌标识与切换入口
+ */
+export const useMapSourceDefault = (
+  sources: MapTileSource[],
+  onSave: (source: MapTileSource) => Promise<MapTileSource>,
+  onSourcesChange: (sources: MapTileSource[]) => void,
+  onNotify: MapSourceNotify,
+): MapSourceDefaultState => {
+  const [pendingDefaultId, setPendingDefaultId] = useState('')
+
+  const setDefault = async (source: MapTileSource): Promise<void> => {
+    setPendingDefaultId(source.id)
+    try {
+      await setDefaultMapSource(source, sources, onSave, onSourcesChange, onNotify)
+    } finally {
+      setPendingDefaultId('')
+    }
+  }
+
+  return { pendingDefaultId, setDefault }
+}
+
 /** 弹窗左侧列表的属性 */
 export interface MapSourceListProps {
   /** 已保存的底图源列表 */
   sources: MapTileSource[]
   /** 当前选中的底图源标识 */
   selectedId: string
+  /** 正在被设为默认的底图源标识，空串表示空闲 */
+  pendingDefaultId: string
   /** 切换选中的底图源，传空字符串表示新建 */
   onSelect: (sourceId: string) => void
+  /** 把某条底图源设为默认 */
+  onSetDefault: (source: MapTileSource) => Promise<void>
 }
 
 /**
  * 弹窗左侧的底图源列表。
  *
+ * 每行由「选中」与「设为默认」两个独立按钮组成，默认标记就地展示，
+ * 用户不必删掉当前底图源来等存储层顺势提升下一条。
+ *
  * @param props 见 {@link MapSourceListProps}
  * @returns 列表区域
  */
-export function MapSourceList({ sources, selectedId, onSelect }: MapSourceListProps) {
+export function MapSourceList({
+  sources,
+  selectedId,
+  pendingDefaultId,
+  onSelect,
+  onSetDefault,
+}: MapSourceListProps) {
   return (
     <aside className="map-source-list">
       <div className="map-source-list-header">
@@ -578,17 +672,25 @@ export function MapSourceList({ sources, selectedId, onSelect }: MapSourceListPr
       </div>
       {sources.length === 0 && <p className="map-source-empty">尚未配置底图源</p>}
       {sources.map((source) => (
-        <button
-          key={source.id}
-          className={`map-source-item ${source.id === selectedId ? 'active' : ''}`}
-          onClick={() => onSelect(source.id)}
-        >
-          <span className="map-source-item-name">{source.name}</span>
-          <span className="map-source-item-meta">
-            {KIND_LABELS[source.kind]}
-            {source.isDefault && <em>默认</em>}
-          </span>
-        </button>
+        <div key={source.id} className={`map-source-row ${source.id === selectedId ? 'active' : ''}`}>
+          <button className="map-source-item" onClick={() => onSelect(source.id)}>
+            <span className="map-source-item-name">{source.name}</span>
+            <span className="map-source-item-meta">
+              {KIND_LABELS[source.kind]}
+              {source.isDefault && <em>默认</em>}
+            </span>
+          </button>
+          <Tooltip label={source.isDefault ? '默认底图源' : '设为默认'}>
+            <button
+              className={`map-source-default ${source.isDefault ? 'active' : ''}`}
+              aria-pressed={Boolean(source.isDefault)}
+              disabled={source.isDefault || source.id === pendingDefaultId}
+              onClick={() => void onSetDefault(source)}
+            >
+              <Star size={14} fill={source.isDefault ? 'currentColor' : 'none'} />
+            </button>
+          </Tooltip>
+        </div>
       ))}
     </aside>
   )
@@ -927,6 +1029,7 @@ export function MapSourceModal({
   selectedId,
   onSelect,
   onSave,
+  onSourcesChange,
   onRemove,
   onProbe,
   onPickDirectory,
@@ -938,6 +1041,7 @@ export function MapSourceModal({
   const draftState = useMapSourceDraft(sources, selectedId)
   const { draft, apiKey, issues, update, replaceApiKey, applyPreset, applyPath } = draftState
   const { pending, save, probe, remove } = useMapSourceCommands({ ...draftState, onSave, onProbe, onRemove, onSelect, onNotify })
+  const { pendingDefaultId, setDefault } = useMapSourceDefault(sources, onSave, onSourcesChange, onNotify)
 
   const pickPath = async (): Promise<void> => {
     const picked = draft.kind === 'directory' ? await onPickDirectory() : await onPickMbtiles()
@@ -963,7 +1067,13 @@ export function MapSourceModal({
           </Tooltip>
         </header>
         <div className="modal-body map-source-body">
-          <MapSourceList sources={sources} selectedId={selectedId} onSelect={onSelect} />
+          <MapSourceList
+            sources={sources}
+            selectedId={selectedId}
+            pendingDefaultId={pendingDefaultId}
+            onSelect={onSelect}
+            onSetDefault={setDefault}
+          />
           <MapSourceForm
             draft={draft}
             apiKey={apiKey}

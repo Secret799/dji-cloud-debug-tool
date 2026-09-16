@@ -70,7 +70,8 @@ export class MapTileProtocolHandler {
       const parsed = parseTilePath(new URL(request.url).pathname)
       if (!parsed) return notFound()
 
-      const source = await this.store.getWithApiKey(parsed.sourceId)
+      // 走内存快照读入口：瓦片请求不排队等 WebDAV 同步事务，也不逐次读盘解析配置
+      const source = await this.store.getWithApiKeyForTile(parsed.sourceId)
       if (!source) return notFound()
 
       const cacheKey = `${parsed.sourceId}/${parsed.request.z}/${parsed.request.x}/${parsed.request.y}`

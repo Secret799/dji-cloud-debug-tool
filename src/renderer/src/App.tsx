@@ -1701,6 +1701,7 @@ export default function App() {
           selectedId={mapSourceSelection}
           onSelect={setMapSourceSelection}
           onSave={handleSaveMapSource}
+          onSourcesChange={setMapSources}
           onRemove={handleRemoveMapSource}
           onProbe={handleProbeMapSource}
           onPickDirectory={() => window.djiApi.map.pickDirectory()}

@@ -9,12 +9,14 @@ import {
   createMapTileSource,
   mapProbeNotice,
   mapSourceReloadKey,
+  mapSourcesWithDefault,
   mapTileSourceIssues,
   mapTileSourceNameFromPath,
   probeMapSource,
   reloadMapSourceDraft,
   removeMapSource,
   saveMapSource,
+  setDefaultMapSource,
 } from './MapSourceModal'
 import type { MapSourceModalProps } from './MapSourceModal'
 import type { MapTileSource } from '../../../shared/contracts'
@@ -37,6 +39,7 @@ const renderModal = (overrides: Partial<MapSourceModalProps> = {}): string => re
     selectedId=""
     onSelect={vi.fn()}
     onSave={vi.fn(async (value: MapTileSource) => value)}
+    onSourcesChange={vi.fn()}
     onRemove={vi.fn(async () => ({ ok: true }))}
     onProbe={vi.fn(async () => ({ ok: true }))}
     onPickDirectory={vi.fn(async () => null)}
@@ -318,6 +321,51 @@ describe('map source commands', () => {
   })
 })
 
+describe('map tile source default selection', () => {
+  it('marks the chosen source as the only default', () => {
+    const first = validSource({ id: 'source-1', isDefault: true })
+    const second = validSource({ id: 'source-2' })
+    const next = mapSourcesWithDefault([first, second], { ...second, isDefault: true })
+    expect(next.map((entry) => [entry.id, entry.isDefault])).toEqual([['source-1', false], ['source-2', true]])
+  })
+
+  it('forces the chosen source to default even if the caller did not flag it', () => {
+    // 主进程返回的默认标记是权威的，但列表收敛不能依赖它，否则一个漏标的返回值就会让默认不动
+    const sources = [validSource({ id: 'source-1', isDefault: true }), validSource({ id: 'source-2' })]
+    expect(mapSourcesWithDefault(sources, sources[1] as MapTileSource)[1]?.isDefault).toBe(true)
+  })
+
+  it('saves the chosen source with isDefault and replaces the whole list', async () => {
+    const onSave = vi.fn(async (value: MapTileSource) => ({ ...value, hasApiKey: true }))
+    const onSourcesChange = vi.fn()
+    const onNotify = vi.fn()
+    const sources = [validSource({ id: 'source-1', isDefault: true, name: '旧默认' }), validSource({ id: 'source-2', name: '新默认' })]
+    await setDefaultMapSource(sources[1] as MapTileSource, sources, onSave, onSourcesChange, onNotify)
+    expect(onSave.mock.calls[0][0]).toMatchObject({ id: 'source-2', isDefault: true })
+    expect(onSourcesChange.mock.calls[0][0].map((entry: MapTileSource) => entry.isDefault)).toEqual([false, true])
+    expect(onNotify).toHaveBeenCalledWith('已将新默认设为默认底图源', 'success')
+  })
+
+  it('does nothing when the source is already the default', async () => {
+    const onSave = vi.fn()
+    const onSourcesChange = vi.fn()
+    await setDefaultMapSource(validSource({ id: 'source-1', isDefault: true }), [], onSave, onSourcesChange, vi.fn())
+    expect(onSave).not.toHaveBeenCalled()
+    expect(onSourcesChange).not.toHaveBeenCalled()
+  })
+
+  it('reports a refused switch and leaves the list untouched', async () => {
+    const onSourcesChange = vi.fn()
+    const onNotify = vi.fn()
+    const rejected = vi.fn(async () => {
+      throw new Error('底图源不存在')
+    })
+    await setDefaultMapSource(validSource({ id: 'source-2' }), [], rejected, onSourcesChange, onNotify)
+    expect(onSourcesChange).not.toHaveBeenCalled()
+    expect(onNotify).toHaveBeenCalledWith('设为默认底图源失败：底图源不存在', 'error')
+  })
+})
+
 describe('MapSourceModal rendering', () => {
   it('renders the empty state when no source is selected', () => {
     expect(renderModal()).toContain('尚未配置底图源')
@@ -346,5 +394,25 @@ describe('MapSourceModal rendering', () => {
   it('asks for the api key placeholder when nothing is stored yet', () => {
     expect(renderModal({ sources: [validSource({ id: 'source-1' })], selectedId: 'source-1' }))
       .toContain('模板中的 {key} 占位符')
+  })
+
+  it('offers a default control on every row and disables it on the current default', () => {
+    const markup = renderModal({
+      sources: [
+        validSource({ id: 'source-1', name: '当前默认', isDefault: true }),
+        validSource({ id: 'source-2', name: '备选底图' }),
+      ],
+      selectedId: 'source-1',
+    })
+    const defaultButton = /<button[^>]*aria-pressed="true"[^>]*>/.exec(markup)?.[0] ?? ''
+    const otherButton = /<button[^>]*aria-pressed="false"[^>]*>/.exec(markup)?.[0] ?? ''
+    // 默认那条已经是默认，按钮不再可点；非默认那条才是切换入口
+    expect(defaultButton).toContain('map-source-default active')
+    expect(defaultButton).toContain('disabled')
+    expect(otherButton).toContain('map-source-default')
+    expect(otherButton).not.toContain('disabled')
+    // 徽标与按钮并存：徽标说明现状，按钮负责切换
+    expect(markup).toContain('<em>默认</em>')
+    expect(markup).toContain('设为默认')
   })
 })

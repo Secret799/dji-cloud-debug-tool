@@ -12282,11 +12282,27 @@ textarea {
   font-size: 13px;
 }
 
+.map-source-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 8px;
+}
+
+.map-source-row:hover {
+  background: var(--surface-soft);
+}
+
+.map-source-row.active {
+  background: var(--fill);
+}
+
 .map-source-item {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 2px;
-  width: 100%;
+  min-width: 0;
   padding: 8px 10px;
   border: none;
   border-radius: 8px;
@@ -12295,12 +12311,31 @@ textarea {
   cursor: pointer;
 }
 
-.map-source-item:hover {
-  background: var(--surface-soft);
+.map-source-default {
+  display: grid;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  margin-right: 4px;
+  place-items: center;
+  border: none;
+  border-radius: 5px;
+  color: var(--muted-2);
+  background: transparent;
+  cursor: pointer;
 }
 
-.map-source-item.active {
-  background: var(--fill);
+.map-source-default:hover:not(:disabled) {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.map-source-default.active {
+  color: var(--amber);
+}
+
+.map-source-default:disabled {
+  cursor: default;
 }
 
 .map-source-item-name {

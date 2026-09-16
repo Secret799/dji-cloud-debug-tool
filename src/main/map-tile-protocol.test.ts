@@ -107,6 +107,19 @@ describe('buildMapTileResponse', () => {
     expect(electronMocks.requests).toHaveLength(1)
   })
 
+  it('stops serving a tile once its source is removed', async () => {
+    await handler.store.save(remoteSource())
+    expect((await buildMapTileResponse(handler, 'map-tile://tiles/remote-1/3/4/5')).status).toBe(200)
+    await handler.store.remove('remote-1')
+    // 与 IPC handler 的写法一致：来源变动后清掉瓦片缓存，避免继续拿旧来源的图
+    handler.clearCache()
+    const removed = await buildMapTileResponse(handler, 'map-tile://tiles/remote-1/3/4/5')
+    expect(removed.status).toBe(404)
+    expect(await removed.text()).toBe('')
+    // 来源已不存在，必须在上游之前短路
+    expect(electronMocks.requests).toHaveLength(1)
+  })
+
   it('does not serve one source from another source cache entry', async () => {
     await handler.store.save(remoteSource())
     await handler.store.save(remoteSource({ id: 'remote-2', urlTemplate: 'https://other.example.com/{z}/{x}/{y}.png' }))
