@@ -1,3 +1,4 @@
+import { isAbsolute } from 'node:path'
 import type {
   ConnectionProfile,
   DeviceArchive,
@@ -5,6 +6,8 @@ import type {
   DeviceArchiveVideo,
   DjiDevice,
   FirmwareUploadRequest,
+  MapTileSource,
+  MapTileSourceHeader,
   MqttMessageRecord,
   MqttQos,
   MediaServerProfile,
@@ -221,6 +224,140 @@ export const validateSessionPassword = (value: unknown): string | undefined => {
     allowNullCharacter: true,
     maxBytes: MAX_TOPIC_BYTES,
   })
+}
+
+const MAX_MAP_MIN_ZOOM = 0
+const MAX_MAP_MAX_ZOOM = 22
+const MAX_MAP_HEADERS = 16
+// 这些请求头由协议层接管，允许用户覆盖会破坏响应语义
+const RESERVED_MAP_HEADER_NAMES = new Set([
+  'host',
+  'connection',
+  'content-length',
+  'content-encoding',
+  'transfer-encoding',
+  'upgrade',
+])
+
+const requireAbsolutePath = (value: string, label: string): string => {
+  if (!isAbsolute(value)) throw new IpcValidationError(`${label}必须是绝对路径`)
+  return value
+}
+
+export const validateMapTileSourceId = (value: unknown): string => {
+  const sourceId = validateProfileId(value)
+  if (!/^[A-Za-z0-9_-]+$/.test(sourceId)) throw new IpcValidationError('底图源 ID 无效')
+  return sourceId
+}
+
+export const validateMapTileSource = (value: unknown): MapTileSource => {
+  const source = requireRecord(value, '底图源配置')
+  // 新建的底图源 id 为空，由 Store 在保存时分配
+  const id = source.id === '' ? '' : validateMapTileSourceId(source.id)
+  const name = requireString(source.name, '底图源名称', { maxBytes: 256 })
+
+  if (source.layer !== 'imagery' && source.layer !== 'terrain') {
+    throw new IpcValidationError('底图源图层类型无效')
+  }
+  const layer = source.layer
+
+  if (source.kind !== 'url-template' && source.kind !== 'directory' && source.kind !== 'mbtiles') {
+    throw new IpcValidationError('底图源类型无效')
+  }
+  const kind = source.kind
+
+  const urlTemplate = requireString(source.urlTemplate, 'URL 模板', { allowEmpty: true, maxBytes: 4_096 }).trim()
+  const path = requireString(source.path, '本地路径', { allowEmpty: true, maxBytes: 4_096 }).trim()
+
+  if (kind === 'url-template') {
+    let parsedTemplate: URL
+    try {
+      parsedTemplate = new URL(urlTemplate.replace(/\{[a-z]+\}/gi, '0'))
+    } catch {
+      throw new IpcValidationError('URL 模板格式无效')
+    }
+    if (parsedTemplate.protocol !== 'http:' && parsedTemplate.protocol !== 'https:') {
+      throw new IpcValidationError('URL 模板仅支持 HTTP 或 HTTPS')
+    }
+    for (const placeholder of ['{z}', '{x}', '{y}']) {
+      if (!urlTemplate.includes(placeholder)) {
+        throw new IpcValidationError(`URL 模板必须包含 ${placeholder} 占位符`)
+      }
+    }
+  } else {
+    requireAbsolutePath(path, '本地路径')
+    if (kind === 'mbtiles' && !path.toLowerCase().endsWith('.mbtiles')) {
+      throw new IpcValidationError('MBTiles 路径必须以 .mbtiles 结尾')
+    }
+  }
+
+  const rawHeaders = requireArray(source.headers, '自定义请求头', MAX_MAP_HEADERS)
+  const headers: MapTileSourceHeader[] = rawHeaders.map((entry, index) => {
+    const header = requireRecord(entry, `自定义请求头 ${index + 1}`)
+    const headerName = requireString(header.name, `自定义请求头 ${index + 1} 名称`, { maxBytes: 256 }).trim()
+    if (!/^[A-Za-z0-9-]+$/.test(headerName)) {
+      throw new IpcValidationError(`自定义请求头 ${index + 1} 名称无效`)
+    }
+    if (RESERVED_MAP_HEADER_NAMES.has(headerName.toLowerCase())) {
+      throw new IpcValidationError(`自定义请求头 ${index + 1} 使用了保留名称：${headerName}`)
+    }
+    const headerValue = requireString(header.value, `自定义请求头 ${index + 1} 值`, {
+      allowEmpty: true,
+      allowNullCharacter: true,
+      maxBytes: 4_096,
+    })
+    if (/[\r\n]/.test(headerValue)) {
+      throw new IpcValidationError(`自定义请求头 ${index + 1} 值不能包含换行`)
+    }
+    return { name: headerName, value: headerValue }
+  })
+
+  if (source.coordinateSystem !== 'wgs84' && source.coordinateSystem !== 'gcj02' && source.coordinateSystem !== 'bd09') {
+    throw new IpcValidationError('底图坐标系无效')
+  }
+  const coordinateSystem = source.coordinateSystem
+
+  const minZoom = requireInteger(source.minZoom, '最小缩放级别', MAX_MAP_MIN_ZOOM, MAX_MAP_MAX_ZOOM)
+  const maxZoom = requireInteger(source.maxZoom, '最大缩放级别', MAX_MAP_MIN_ZOOM, MAX_MAP_MAX_ZOOM)
+  if (maxZoom < minZoom) throw new IpcValidationError('最大缩放级别不能小于最小缩放级别')
+
+  if (source.tileSize !== 256 && source.tileSize !== 512) {
+    throw new IpcValidationError('瓦片边长只能是 256 或 512')
+  }
+  const tileSize = source.tileSize
+
+  const tileExtension = requireString(source.tileExtension, '瓦片扩展名', { allowEmpty: true, maxBytes: 16 }).trim()
+  if (tileExtension && !/^[A-Za-z0-9]+$/.test(tileExtension)) {
+    throw new IpcValidationError('瓦片扩展名只能包含字母和数字')
+  }
+
+  const attribution = requireString(source.attribution, '版权署名', { allowEmpty: true, maxBytes: 512 })
+  requireOptionalBoolean(source.isDefault, '默认底图标记')
+  requireOptionalBoolean(source.hasApiKey, '已保存 API Key 标记')
+  requireOptionalBoolean(source.clearApiKey, '清除 API Key 标记')
+  const createdAt = requireFiniteNumber(source.createdAt, '创建时间')
+  const updatedAt = requireFiniteNumber(source.updatedAt, '更新时间')
+
+  return {
+    id,
+    name,
+    layer,
+    kind,
+    urlTemplate,
+    path,
+    headers,
+    coordinateSystem,
+    minZoom,
+    maxZoom,
+    tileSize,
+    tileExtension,
+    attribution,
+    isDefault: source.isDefault as boolean | undefined,
+    hasApiKey: source.hasApiKey as boolean | undefined,
+    clearApiKey: source.clearApiKey as boolean | undefined,
+    createdAt,
+    updatedAt,
+  }
 }
 
 export const validateWebDavConfig = (value: unknown): WebDavConfig => {
