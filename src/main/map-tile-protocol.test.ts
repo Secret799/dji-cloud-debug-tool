@@ -72,11 +72,20 @@ describe('buildMapTileResponse', () => {
   it('returns 404 for an unknown source', async () => {
     const response = await buildMapTileResponse(handler, 'map-tile://tiles/missing/3/4/5')
     expect(response.status).toBe(404)
+    // 来源不存在必须在触网前短路，且失败响应不带任何响应体（错误细节不外泄）
+    expect(await response.text()).toBe('')
+    expect(electronMocks.requests).toHaveLength(0)
   })
 
   it('returns 404 for a malformed path', async () => {
-    expect((await buildMapTileResponse(handler, 'map-tile://tiles/remote-1/3/4')).status).toBe(404)
-    expect((await buildMapTileResponse(handler, 'map-tile://tiles/remote-1/a/4/5')).status).toBe(404)
+    const missingSegment = await buildMapTileResponse(handler, 'map-tile://tiles/remote-1/3/4')
+    const nonNumeric = await buildMapTileResponse(handler, 'map-tile://tiles/remote-1/a/4/5')
+    expect(missingSegment.status).toBe(404)
+    expect(nonNumeric.status).toBe(404)
+    // 路径解析失败同样在触网前短路，404 来自分支判断而非异常被吞
+    expect(await missingSegment.text()).toBe('')
+    expect(await nonNumeric.text()).toBe('')
+    expect(electronMocks.requests).toHaveLength(0)
   })
 
   it('returns 404 when the upstream request fails', async () => {
@@ -158,5 +167,7 @@ describe('buildMapTileResponse', () => {
     expect(response.status).toBe(404)
     // TileRequestError 的消息里带的是磁盘绝对路径，必须整体丢弃，不能回给渲染进程
     expect(await response.text()).toBe('')
+    // 本地目录来源走磁盘读取，不得回落到上游网络
+    expect(electronMocks.requests).toHaveLength(0)
   })
 })
