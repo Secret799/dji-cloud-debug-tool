@@ -58,8 +58,16 @@ describe('device position extraction', () => {
     expect(position?.home).toEqual({ latitude: 39.90869, longitude: 116.39740 })
   })
 
-  it('omits the home point for docks', () => {
-    expect(devicePosition(telemetry())?.home).toBeUndefined()
+  it('omits the home point for docks even when the device reports one', () => {
+    const position = devicePosition(telemetry({
+      osd: {
+        latitude: 39.90869,
+        longitude: 116.39740,
+        home_latitude: 39.8,
+        home_longitude: 116.3,
+      },
+    }))
+    expect(position?.home).toBeUndefined()
   })
 
   it('rejects devices without a usable fix', () => {
