@@ -103,7 +103,7 @@ SEI 解析链（`sei-parser.ts` / `sei-parser-manager.ts`）从本地 ZLMediaKit
 - 底图源的坐标系决定设备点位是否偏移：设备上报 WGS-84，高德/百度底图分别是 GCJ-02/BD-09。`lib/map-coord.ts` 只做单向转换（`wgs84ToGcj02` / `gcj02ToBd09` / `toCoordinateSystem`，按 `isInsideChina` 判定国境），境外坐标必须原样返回。**设备上报的原始 WGS-84 读数必须始终可见**，不能被转换结果掩盖。
 - `MapTileSourceStore` 刻意不接入 `WebDavBackupManager`：本地路径跨机器失效，URL 模板含密钥。
 - Cesium 静态资源由 `scripts/prepare-cesium.mjs` 拷贝到 `src/renderer/public/cesium/`（已在 `.gitignore` 中），不引入 `vite-plugin-cesium`；`CESIUM_BASE_URL` 通过副作用模块 `lib/cesium-base-url.ts` 设置，因为 CSP 禁止内联脚本，且该 import 必须排在 `cesium` 之前。
-- 地图相关逻辑必须保持可测：坐标转换、位置提取、瓦片解析、Store 都是不依赖 WebGL 的纯逻辑，`MapView` 自身可在 node 环境用 `renderToStaticMarkup` 静态渲染（`useEffect` 不执行，不会构造 WebGL 上下文），真正的三维行为靠 `smoke:ui` 覆盖。
+- 地图相关逻辑必须保持可测：坐标转换、位置提取、瓦片解析、Store 都是不依赖 WebGL 的纯逻辑，`MapView` 自身也能在 node 环境用 `renderToStaticMarkup` 静态渲染（`useEffect` 不执行，不会构造 WebGL 上下文），静态渲染只覆盖标记与纯函数。**三维行为没有自动化覆盖**：相机、影像切换、实体的增删改与 `requestRender` 时机只能靠真机复核 —— `smoke:ui` 只断言侧栏入口的 tooltip 与顺序，不进入地图视图。改动这些路径时不要以为有回归网。
 
 ### WebDAV 数据版本
 
