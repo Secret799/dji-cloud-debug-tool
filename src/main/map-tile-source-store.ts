@@ -127,8 +127,15 @@ export class MapTileSourceStore {
       hasApiKey: _hasApiKey,
       clearApiKey,
       apiKey: rawApiKey,
+      // 存储字段一律由本方法生成：解构丢弃，防止调用方传入的 storedApiKey 明文经 ...plain 原样落盘
+      storedApiKey: _storedApiKey,
+      encryptedApiKey: _inputEncryptedApiKey,
       ...plain
-    } = source as MapTileSource & { apiKey?: unknown }
+    } = source as MapTileSource & {
+      apiKey?: unknown
+      storedApiKey?: string
+      encryptedApiKey?: string
+    }
     const apiKey = typeof rawApiKey === 'string' ? rawApiKey : undefined
 
     let encryptedApiKey = existing?.encryptedApiKey

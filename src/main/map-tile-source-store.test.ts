@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -67,6 +67,16 @@ describe('MapTileSourceStore', () => {
     await store.save(source({ apiKey: 'secret-token' } as Partial<MapTileSource>))
     const listed = (await store.list())[0] as unknown as Record<string, unknown>
     expect(JSON.stringify(listed)).not.toContain('secret-token')
+  })
+
+  it('persists the api key only as an encrypted envelope', async () => {
+    const store = new MapTileSourceStore()
+    await store.save(source({ apiKey: 'secret-token' } as Partial<MapTileSource>))
+    const stored = await readFile(join(userDataPath, 'map-tile-sources.json'), 'utf8')
+    expect(stored).not.toContain('secret-token')
+    expect(stored).toContain('encryptedApiKey')
+    expect(stored).toContain('dcdt:v1:k1:')
+    expect(stored).not.toContain('storedApiKey')
   })
 
   it('resolves the stored api key for the main process only', async () => {
