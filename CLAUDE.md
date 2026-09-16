@@ -103,6 +103,7 @@ SEI 解析链（`sei-parser.ts` / `sei-parser-manager.ts`）从本地 ZLMediaKit
 - CSP 已放行 `img-src map-tile:` 与 `connect-src map-tile:`（Cesium 的 XHR 路径与 `Image` 回退路径各需要一条），**不为用户自填的瓦片域名开口子**。`script-src` 为 `'self' 'wasm-unsafe-eval'`：Cesium 的 worker 在模块加载时即实例化内联 wasm，缺该关键字每次启动会报 5 条 pageerror。**必须是 `'wasm-unsafe-eval'` 而非 `'unsafe-eval'`** —— 前者只放开 WebAssembly 编译，后者会连带放开 JS 动态求值。渲染进程的地图视图因此用 `CesiumWidget` 而不是 `Viewer`：`Viewer` 会拉起 Cesium 自带的 knockout，其间接 `eval` 被 `script-src` 拦下后构造即抛错、整个视图白屏。
 - 底图源的坐标系决定设备点位是否偏移：设备上报 WGS-84，高德/百度底图分别是 GCJ-02/BD-09。`lib/map-coord.ts` 只做单向转换（`wgs84ToGcj02` / `gcj02ToBd09` / `toCoordinateSystem`，按 `isInsideChina` 判定国境），境外坐标必须原样返回。**设备上报的原始 WGS-84 读数必须始终可见**，不能被转换结果掩盖。
 - `MapTileSourceStore` 刻意不接入 `WebDavBackupManager`：本地路径跨机器失效，URL 模板含密钥。
+- 瓦片读路径必须走内存快照入口 `getWithApiKeyForTile`，不得改回事务串行化的 `getWithApiKey` / `runExclusive`：底图源既然不参与备份，挤进全局配置事务队列换不到任何一致性，只会在 WebDAV 同步把整次上传包在同一个事务里时把取图顶住。
 - Cesium 静态资源由 `scripts/prepare-cesium.mjs` 拷贝到 `src/renderer/public/cesium/`（已在 `.gitignore` 中），不引入 `vite-plugin-cesium`；`CESIUM_BASE_URL` 通过副作用模块 `lib/cesium-base-url.ts` 设置，因为 CSP 禁止内联脚本，且该 import 必须排在 `cesium` 之前。
 - 地图相关逻辑必须保持可测：坐标转换、位置提取、瓦片解析、Store 都是不依赖 WebGL 的纯逻辑，`MapView` 自身也能在 node 环境用 `renderToStaticMarkup` 静态渲染（`useEffect` 不执行，不会构造 WebGL 上下文），静态渲染只覆盖标记与纯函数。**三维行为没有自动化覆盖**：相机、影像切换、实体的增删改与 `requestRender` 时机只能靠真机复核 —— `smoke:ui` 只断言侧栏入口的 tooltip 与顺序，不进入地图视图。改动这些路径时不要以为有回归网。
 

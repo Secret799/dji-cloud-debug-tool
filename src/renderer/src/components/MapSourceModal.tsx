@@ -399,26 +399,36 @@ export const mapSourcesWithDefault = (sources: MapTileSource[], saved: MapTileSo
   sources.map((item) => (item.id === saved.id ? { ...saved, isDefault: true } : { ...item, isDefault: false }))
 
 /**
+ * 按当前列表计算新列表的更新入口，对应 `setState` 的函数式更新。
+ *
+ * 必须是函数式而不是整表覆盖：设为默认要等主进程保存返回，而保存会排在配置事务队列里，
+ * WebDAV 上传期间这个等待可能很长，期间用户还能删除或新建底图源；用渲染时的快照整表覆盖，
+ * 会把这期间的变化丢掉（复活已删除的行、丢掉刚新建的行），且列表只在挂载时加载一次，错了要到重启才恢复。
+ *
+ * @param updater 接收当前列表、返回新列表的更新函数
+ * @returns 无返回值
+ */
+export type MapSourcesUpdater = (updater: (current: MapTileSource[]) => MapTileSource[]) => void
+
+/**
  * 把指定的底图源设为默认，并把结果转成提示文案。
  *
  * @param source 要设为默认的底图源
- * @param sources 当前底图源列表
  * @param onSave 保存底图源
- * @param onSourcesChange 用新列表覆盖渲染进程状态
+ * @param onSourcesChange 按当前列表更新渲染进程的底图源列表
  * @param onNotify 展示提示信息
  * @returns 无返回值，结果通过 onSourcesChange 与 onNotify 呈现
  */
 export const setDefaultMapSource = async (
   source: MapTileSource,
-  sources: MapTileSource[],
   onSave: (source: MapTileSource) => Promise<MapTileSource>,
-  onSourcesChange: (sources: MapTileSource[]) => void,
+  onSourcesChange: MapSourcesUpdater,
   onNotify: MapSourceNotify,
 ): Promise<void> => {
   if (source.isDefault) return
   try {
     const saved = await onSave({ ...source, isDefault: true })
-    onSourcesChange(mapSourcesWithDefault(sources, saved))
+    onSourcesChange((current) => mapSourcesWithDefault(current, saved))
     onNotify(`已将${source.name}设为默认底图源`, 'success')
   } catch (error) {
     onNotify(`设为默认底图源失败：${errorMessage(error)}`, 'error')
@@ -493,8 +503,8 @@ export interface MapSourceModalProps {
   onSelect: (sourceId: string) => void
   /** 保存底图源 */
   onSave: (source: MapTileSource) => Promise<MapTileSource>
-  /** 用新列表覆盖渲染进程的底图源列表 */
-  onSourcesChange: (sources: MapTileSource[]) => void
+  /** 按当前列表更新渲染进程的底图源列表 */
+  onSourcesChange: MapSourcesUpdater
   /** 删除底图源 */
   onRemove: (sourceId: string) => Promise<OperationResult>
   /** 探测底图源可用性 */
@@ -604,16 +614,14 @@ export interface MapSourceDefaultState {
  *
  * 与草稿的保存/探测分开：设为默认不读草稿，因此也不该被草稿的校验问题挡住。
  *
- * @param sources 当前底图源列表
  * @param onSave 保存底图源
- * @param onSourcesChange 用新列表覆盖渲染进程状态
+ * @param onSourcesChange 按当前列表更新渲染进程的底图源列表
  * @param onNotify 展示提示信息
  * @returns 忙碌标识与切换入口
  */
 export const useMapSourceDefault = (
-  sources: MapTileSource[],
   onSave: (source: MapTileSource) => Promise<MapTileSource>,
-  onSourcesChange: (sources: MapTileSource[]) => void,
+  onSourcesChange: MapSourcesUpdater,
   onNotify: MapSourceNotify,
 ): MapSourceDefaultState => {
   const [pendingDefaultId, setPendingDefaultId] = useState('')
@@ -621,7 +629,7 @@ export const useMapSourceDefault = (
   const setDefault = async (source: MapTileSource): Promise<void> => {
     setPendingDefaultId(source.id)
     try {
-      await setDefaultMapSource(source, sources, onSave, onSourcesChange, onNotify)
+      await setDefaultMapSource(source, onSave, onSourcesChange, onNotify)
     } finally {
       setPendingDefaultId('')
     }
@@ -1041,7 +1049,7 @@ export function MapSourceModal({
   const draftState = useMapSourceDraft(sources, selectedId)
   const { draft, apiKey, issues, update, replaceApiKey, applyPreset, applyPath } = draftState
   const { pending, save, probe, remove } = useMapSourceCommands({ ...draftState, onSave, onProbe, onRemove, onSelect, onNotify })
-  const { pendingDefaultId, setDefault } = useMapSourceDefault(sources, onSave, onSourcesChange, onNotify)
+  const { pendingDefaultId, setDefault } = useMapSourceDefault(onSave, onSourcesChange, onNotify)
 
   const pickPath = async (): Promise<void> => {
     const picked = draft.kind === 'directory' ? await onPickDirectory() : await onPickMbtiles()

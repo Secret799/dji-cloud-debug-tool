@@ -1,4 +1,4 @@
-import { readFile, readdir } from 'node:fs/promises'
+import { access, readFile, readdir } from 'node:fs/promises'
 import { extname, join, resolve, sep } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import type { MapTileSource } from '../shared/contracts'
@@ -200,37 +200,90 @@ const isMissingPathError = (error: unknown): boolean =>
   error instanceof Error && MISSING_PATH_CODES.has((error as NodeJS.ErrnoException).code ?? '')
 
 /**
+ * 判断目录名能不能被读路径原样拼出来。
+ *
+ * 读路径按 `String(Number(name))` 拼目录，`010` 会被拼成 `10`，两者不是同一个目录。
+ * 零填充的缩放级别与列目录因此必须排除，否则探测会报出服务端根本取不到的坐标。
+ *
+ * @param name 目录名
+ * @returns 目录名与读路径拼出的名字一致时为 true
+ */
+const isCanonicalIndexName = (name: string): boolean => String(Number(name)) === name
+
+/**
  * 列出目录下可作瓦片坐标的数字子目录，按数值升序。
+ *
+ * 只收「名字与读路径拼出的名字一致」的目录：零填充的名字进不到读路径里，
+ * 一旦向下走进 `010`，读路径要去的 `10` 并不存在，整个探测会被 ENOENT 拉成「瓦片集为空」。
  *
  * @param directory 待读取的目录
  * @param limit 允许的最大数值，缩放级别用 {@link MAX_ZOOM}，列号用该级别的最大索引
- * @returns 目录名可解析为 0..limit 的数值列表
+ * @returns 目录名可解析为 0..limit 且能被读路径原样拼出的数值列表
  */
 const numericSubdirectories = async (directory: string, limit: number): Promise<number[]> => {
   const entries = await readdir(directory, { withFileTypes: true })
   return entries
-    .filter((entry) => entry.isDirectory() && /^\d+$/.test(entry.name))
+    .filter((entry) => entry.isDirectory() && /^\d+$/.test(entry.name) && isCanonicalIndexName(entry.name))
     .map((entry) => Number(entry.name))
     .filter((value) => value <= limit)
     .sort((a, b) => a - b)
 }
 
 /**
- * 在 <z>/<x> 目录里找一个可用的行号：文件名必须匹配 <y>.<ext> 且扩展名在允许列表内。
+ * 判断路径是否存在，用于比对读路径会拼出的瓦片名。
  *
- * @param directory <z>/<x> 对应的目录
+ * @param path 待检查的路径
+ * @returns 路径存在时为 true
+ */
+const pathExists = async (path: string): Promise<boolean> => {
+  try {
+    await access(path)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 判断读路径能否真的取到该行号的瓦片。
+ *
+ * 依据必须是「按 `<y>.<ext>` 拼出来的名字存在」，而不是磁盘上叫什么：
+ * `0400.png` 会被读路径拼成 `400.png`，两者不是同一个文件，按磁盘名报绿等于给取不到的瓦片放行；
+ * 反过来，大小写不敏感的文件系统上磁盘名是 `400.PNG`、读路径要的 `400.png` 照样能打开，这里也会放行。
+ *
+ * @param directory `<z>/<x>` 对应的目录
+ * @param row 候选行号
+ * @param extensions 允许的扩展名，顺序与读路径的候选顺序一致
+ * @returns 读路径能取到该行号的瓦片时为 true
+ */
+const hasServableTileFile = async (directory: string, row: number, extensions: string[]): Promise<boolean> => {
+  for (const extension of extensions) {
+    if (await pathExists(join(directory, `${row}.${extension}`))) return true
+  }
+  return false
+}
+
+/**
+ * 在 `<z>/<x>` 目录里找一个可用的行号：文件名必须匹配 `<y>.<ext>`，且读路径按该行号拼出的瓦片确实存在。
+ *
+ * 逐个候选行号做一次存在性检查，命中即返回，因此常见情况下只多一次 stat；
+ * 检查次数由这次 `readdir` 已经读到的目录项数封顶，不会随瓦片树规模增长。
+ *
+ * @param directory `<z>/<x>` 对应的目录
  * @param extensions 允许的扩展名
- * @returns 升序排列后第一个合法的 y；没有合法文件时返回 undefined
+ * @returns 升序排列后第一个可用且读路径确实能取到的 y；没有合法文件时返回 undefined
  */
 const findRowInDirectory = async (directory: string, extensions: string[]): Promise<number | undefined> => {
   const names = await readdir(directory)
-  const rows = names
+  const rows = new Set(names
     .map((name) => /^(\d+)\.([A-Za-z0-9]+)$/.exec(name))
     .filter((match): match is RegExpExecArray => match !== null && extensions.includes(match[2].toLowerCase()))
     .map((match) => Number(match[1]))
-    .filter((row) => Number.isSafeInteger(row))
-    .sort((a, b) => a - b)
-  return rows[0]
+    .filter((row) => Number.isSafeInteger(row)))
+  for (const row of [...rows].sort((a, b) => a - b)) {
+    if (await hasServableTileFile(directory, row, extensions)) return row
+  }
+  return undefined
 }
 
 /**
@@ -239,6 +292,9 @@ const findRowInDirectory = async (directory: string, extensions: string[]): Prom
  * 只从目录里读坐标，不猜坐标再去试：z 级下世界是 2^z × 2^z 张瓦片，
  * 猜出来的坐标大概率落在瓦片集覆盖范围之外。缩放级别与列目录各只取升序前若干个，
  * 保证读取次数有界。目录不存在或为空都返回 undefined，由调用方给出统一提示。
+ *
+ * 只认读路径能原样拼出来的名字：`010/842/0400.png` 这类零填充的名字服务端一张都取不到，
+ * 报绿等于给一个渲染不出来的源放行，因此目录名与文件名都必须与 `String(数值)` 拼出的结果一致。
  *
  * @param source 已校验的目录源配置
  * @returns 真实存在的瓦片坐标；目录缺失或没有可解析的瓦片时返回 undefined

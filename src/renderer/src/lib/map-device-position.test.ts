@@ -67,6 +67,8 @@ describe('device position extraction', () => {
         home_longitude: 116.3,
       },
     }))
+    // 先锁住「机场有位置」：否则 devicePosition 返回 undefined 时下面这条断言也会通过，规则没被锁住
+    expect(position).toBeDefined()
     expect(position?.home).toBeUndefined()
   })
 

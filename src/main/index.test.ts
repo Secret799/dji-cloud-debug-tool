@@ -126,6 +126,15 @@ describe('probeMapTileSource', () => {
     expect(await probeMapTileSource(probeSource({ kind: 'mbtiles', path: emptyMbtiles }))).toEqual(expected)
   })
 
+  it('does not pass a padded tile tree the serving path would rewrite', async () => {
+    // 010/842/0400.png：读路径会去取 10/842/400.png，一张都取不到，探测不能给这个源报绿
+    const paddedRoot = join(root, 'padded-tiles')
+    await mkdir(join(paddedRoot, `0${CITY_ZOOM}`, String(CITY_X)), { recursive: true })
+    await writeFile(join(paddedRoot, `0${CITY_ZOOM}`, String(CITY_X), `0${CITY_Y}.png`), Buffer.from(CITY_TILE))
+    expect(await probeMapTileSource(probeSource({ kind: 'directory', path: paddedRoot })))
+      .toEqual({ ok: false, error: '瓦片集为空或路径错误' })
+  })
+
   it('keeps the underlying reason when a local source is unreadable', async () => {
     const result = await probeMapTileSource(probeSource({ kind: 'mbtiles', path: join(root, 'missing.mbtiles') }))
     expect(result.ok).toBe(false)

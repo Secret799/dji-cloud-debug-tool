@@ -335,21 +335,36 @@ describe('map tile source default selection', () => {
     expect(mapSourcesWithDefault(sources, sources[1] as MapTileSource)[1]?.isDefault).toBe(true)
   })
 
-  it('saves the chosen source with isDefault and replaces the whole list', async () => {
+  it('saves the chosen source with isDefault and converges the list to a single default', async () => {
     const onSave = vi.fn(async (value: MapTileSource) => ({ ...value, hasApiKey: true }))
     const onSourcesChange = vi.fn()
     const onNotify = vi.fn()
     const sources = [validSource({ id: 'source-1', isDefault: true, name: '旧默认' }), validSource({ id: 'source-2', name: '新默认' })]
-    await setDefaultMapSource(sources[1] as MapTileSource, sources, onSave, onSourcesChange, onNotify)
+    await setDefaultMapSource(sources[1] as MapTileSource, onSave, onSourcesChange, onNotify)
     expect(onSave.mock.calls[0][0]).toMatchObject({ id: 'source-2', isDefault: true })
-    expect(onSourcesChange.mock.calls[0][0].map((entry: MapTileSource) => entry.isDefault)).toEqual([false, true])
+    const updater = onSourcesChange.mock.calls[0][0] as (current: MapTileSource[]) => MapTileSource[]
+    expect(updater(sources).map((entry) => entry.isDefault)).toEqual([false, true])
     expect(onNotify).toHaveBeenCalledWith('已将新默认设为默认底图源', 'success')
+  })
+
+  it('applies the switch to the list as it is when the save returns, not to the list captured at call time', async () => {
+    const onSave = vi.fn(async (value: MapTileSource) => ({ ...value, hasApiKey: true }))
+    const onSourcesChange = vi.fn()
+    const onNotify = vi.fn()
+    const sources = [validSource({ id: 'source-1', isDefault: true }), validSource({ id: 'source-2' })]
+    await setDefaultMapSource(sources[1] as MapTileSource, onSave, onSourcesChange, onNotify)
+    const updater = onSourcesChange.mock.calls[0][0] as (current: MapTileSource[]) => MapTileSource[]
+    // 保存被 WebDAV 同步顶住的这段时间里，用户删掉了 source-1、又新建了 source-3：
+    // 函数式更新必须按这份新列表收敛，整表覆盖会把删除过的行复活、把新建的行丢掉。
+    const current = [validSource({ id: 'source-2' }), validSource({ id: 'source-3' })]
+    expect(updater(current).map((entry) => [entry.id, entry.isDefault]))
+      .toEqual([['source-2', true], ['source-3', false]])
   })
 
   it('does nothing when the source is already the default', async () => {
     const onSave = vi.fn()
     const onSourcesChange = vi.fn()
-    await setDefaultMapSource(validSource({ id: 'source-1', isDefault: true }), [], onSave, onSourcesChange, vi.fn())
+    await setDefaultMapSource(validSource({ id: 'source-1', isDefault: true }), onSave, onSourcesChange, vi.fn())
     expect(onSave).not.toHaveBeenCalled()
     expect(onSourcesChange).not.toHaveBeenCalled()
   })
@@ -360,7 +375,7 @@ describe('map tile source default selection', () => {
     const rejected = vi.fn(async () => {
       throw new Error('底图源不存在')
     })
-    await setDefaultMapSource(validSource({ id: 'source-2' }), [], rejected, onSourcesChange, onNotify)
+    await setDefaultMapSource(validSource({ id: 'source-2' }), rejected, onSourcesChange, onNotify)
     expect(onSourcesChange).not.toHaveBeenCalled()
     expect(onNotify).toHaveBeenCalledWith('设为默认底图源失败：底图源不存在', 'error')
   })

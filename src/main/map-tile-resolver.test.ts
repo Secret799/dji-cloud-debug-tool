@@ -238,6 +238,33 @@ describe('findLocalTileRequest', () => {
     expect(await findLocalTileRequest(pngOnly)).toEqual({ z: CITY_ZOOM, x: CITY_X, y: 1 })
   })
 
+  it('does not report a row whose file name the serving path would rewrite', async () => {
+    // 磁盘上是 10/842/0400.png，读路径会去取 10/842/400.png：两者不是同一个文件，探测不能按磁盘名报绿
+    const paddedRoot = join(root, 'padded-row')
+    await mkdir(join(paddedRoot, String(CITY_ZOOM), String(CITY_X)), { recursive: true })
+    await writeFile(join(paddedRoot, String(CITY_ZOOM), String(CITY_X), `0${CITY_Y}.png`), Buffer.from('padded-row'))
+    const padded = source({ kind: 'directory', path: paddedRoot })
+    expect(await findLocalTileRequest(padded)).toBeUndefined()
+    // 「没有可用瓦片」必须与服务端一致：读路径确实取不到这张 0400.png
+    await expect(resolveDirectoryTile(padded, { z: CITY_ZOOM, x: CITY_X, y: CITY_Y }))
+      .rejects.toThrow(TileRequestError)
+  })
+
+  it('keeps probing past directories the serving path would rewrite', async () => {
+    const paddedRoot = join(root, 'padded-directory')
+    // 010 会被读路径拼成 10：这一层目录下的瓦片服务端一张都取不到
+    await mkdir(join(paddedRoot, `0${CITY_ZOOM}`, String(CITY_X)), { recursive: true })
+    await writeFile(join(paddedRoot, `0${CITY_ZOOM}`, String(CITY_X), `${CITY_Y}.png`), Buffer.from('padded-zoom'))
+    // 同理，0842 会被拼成 842，这一列的瓦片也取不到
+    await mkdir(join(paddedRoot, String(CITY_ZOOM), `0${CITY_X}`), { recursive: true })
+    await writeFile(join(paddedRoot, String(CITY_ZOOM), `0${CITY_X}`, `${CITY_Y}.png`), Buffer.from('padded-column'))
+    // 同一棵树里还有一份命名规范的瓦片，它才是这个源真正能渲染的内容，探测不能被上面那些名字打断
+    await mkdir(join(paddedRoot, String(CITY_ZOOM + 1), String(CITY_X)), { recursive: true })
+    await writeFile(join(paddedRoot, String(CITY_ZOOM + 1), String(CITY_X), '801.png'), Buffer.from('canonical-tile'))
+    expect(await findLocalTileRequest(source({ kind: 'directory', path: paddedRoot })))
+      .toEqual({ z: CITY_ZOOM + 1, x: CITY_X, y: 801 })
+  })
+
   it('returns undefined when a local source holds no tiles at all', async () => {
     const emptyDirectory = join(root, 'empty-tiles')
     await mkdir(emptyDirectory, { recursive: true })
