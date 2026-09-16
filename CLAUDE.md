@@ -95,6 +95,16 @@ Windows 安装包只在 GitHub Actions 生成，本地不要尝试交叉打包�
 
 SEI 解析链（`sei-parser.ts` / `sei-parser-manager.ts`）从本地 ZLMediaKit 的 RTSP 旁路或 SecretEMS 的 SSE 接口读取码流，只解析标准 H.264/H.265 SEI 语法，**不得把未公开 payload 推断为飞行遥测字段**。渲染侧播放用 `hls.js`（HLS）与 `mpegts.js`（WebRTC）。
 
+### 三维地图
+
+- 瓦片统一走主进程特权协议 `map-tile://tiles/<源ID>/<z>/<x>/<y>`，由 `map-tile-protocol.ts` 处理（`MAP_TILE_SCHEME` / `MAP_TILE_HOST`）。三种来源（在线地址模板、本地目录、MBTiles）在 `map-tile-resolver.ts` 收敛，渲染进程不接触真实底图地址与 API Key；任何失败（路径非法、来源不存在、上游异常、本地文件缺失）一律返回不带响应体的 404，避免把磁盘绝对路径透给渲染进程。
+- `protocol.registerSchemesAsPrivileged` **必须在 `app.whenReady()` 之前调用**（`src/main/index.ts` 顶层），否则 `protocol.handle` 注册会失败；`privileges` 中的 `supportFetchAPI: true` 是硬性依赖 —— Cesium 的 `Resource.fetchImage` 走 `fetch` + `createImageBitmap`，缺这项直接失败。协议处理函数本身在 ready 之后才注册。
+- CSP 已放行 `img-src map-tile:` 与 `connect-src map-tile:`（Cesium 的 fetch 路径与 `Image` 回退路径各需要一条），**不为用户自填的瓦片域名开口子**。`script-src` 为 `'self' 'wasm-unsafe-eval'`：Cesium 的 worker 在模块加载时即实例化内联 wasm，缺该关键字每次启动会报 5 条 pageerror。**必须是 `'wasm-unsafe-eval'` 而非 `'unsafe-eval'`** —— 前者只放开 WebAssembly 编译，后者会连带放开 JS 动态求值。渲染进程的地图视图因此用 `CesiumWidget` 而不是 `Viewer`：`Viewer` 会拉起 Cesium 自带的 knockout，其间接 `eval` 被 `script-src` 拦下后构造即抛错、整个视图白屏。
+- 底图源的坐标系决定设备点位是否偏移：设备上报 WGS-84，高德/百度底图分别是 GCJ-02/BD-09。`lib/map-coord.ts` 只做单向转换（`wgs84ToGcj02` / `gcj02ToBd09` / `toCoordinateSystem`，按 `isInsideChina` 判定国境），境外坐标必须原样返回。**设备上报的原始 WGS-84 读数必须始终可见**，不能被转换结果掩盖。
+- `MapTileSourceStore` 刻意不接入 `WebDavBackupManager`：本地路径跨机器失效，URL 模板含密钥。
+- Cesium 静态资源由 `scripts/prepare-cesium.mjs` 拷贝到 `src/renderer/public/cesium/`（已在 `.gitignore` 中），不引入 `vite-plugin-cesium`；`CESIUM_BASE_URL` 通过副作用模块 `lib/cesium-base-url.ts` 设置，因为 CSP 禁止内联脚本，且该 import 必须排在 `cesium` 之前。
+- 地图相关逻辑必须保持可测：坐标转换、位置提取、瓦片解析、Store 都是不依赖 WebGL 的纯逻辑，`MapView` 自身可在 node 环境用 `renderToStaticMarkup` 静态渲染（`useEffect` 不执行，不会构造 WebGL 上下文），真正的三维行为靠 `smoke:ui` 覆盖。
+
 ### WebDAV 数据版本
 
 `WebDavBackupManager` 把连接配置、设备档案、媒体服务、对象存储与渲染进程 localStorage 快照聚合成一份可移植文档，用 WebDAV 密码/Token 派生的独立密钥做 AES-256-GCM 加密后上传（`webdav-backup-crypto.ts`）。
