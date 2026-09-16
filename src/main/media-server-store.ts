@@ -155,7 +155,11 @@ export class MediaServerStore {
           delete server.storedSecret
           migrated = true
         }
-        if (server.webrtcPort === undefined || (server.kind === 'local-zlm' && server.webrtcPort === 0)) {
+        // SecretEMS 早期版本允许配置独立的 WebRTC 媒体端口，现统一归一为 0
+        if (server.kind === 'remote-easymedia' && server.webrtcPort !== 0) {
+          server.webrtcPort = 0
+          migrated = true
+        } else if (server.webrtcPort === undefined || (server.kind === 'local-zlm' && server.webrtcPort === 0)) {
           server.webrtcPort = 8000
           migrated = true
         }
@@ -204,6 +208,7 @@ export class MediaServerStore {
       ...plain,
       name: profile.name.trim(),
       host: profile.host.trim(),
+      webrtcPort: profile.kind === 'remote-easymedia' ? 0 : plain.webrtcPort,
       updatedAt: Date.now(),
       encryptedSecret,
     }
@@ -218,7 +223,7 @@ export class MediaServerStore {
     } = profile as StoredMediaServerProfile & { clearStoredSecret?: boolean }
     return {
       ...plain,
-      webrtcPort: profile.webrtcPort ?? 8000,
+      webrtcPort: profile.kind === 'remote-easymedia' ? 0 : profile.webrtcPort ?? 8000,
       secret: '',
       hasStoredSecret: hasStoredCredential({ encrypted: encryptedSecret, plaintext: storedSecret }),
     }

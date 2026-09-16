@@ -344,9 +344,10 @@ describe('IPC validation', () => {
     const profile = {
       id: 'easymedia-1', name: 'SecretEMS', kind: 'remote-easymedia', host: 'webrtc.example.com',
       apiProtocol: 'https', apiPort: 443, httpProtocol: 'https', httpPort: 443,
-      rtmpPort: 1935, rtspPort: 0, webrtcPort: 8000, secret: '', createdAt: 1, updatedAt: 1,
+      rtmpPort: 1935, rtspPort: 0, webrtcPort: 0, secret: '', createdAt: 1, updatedAt: 1,
     }
-    expect(validateMediaServerProfile(profile).kind).toBe('remote-easymedia')
+    expect(validateMediaServerProfile(profile)).toMatchObject({ kind: 'remote-easymedia', webrtcPort: 0 })
+    expect(validateMediaServerProfile({ ...profile, webrtcPort: 8000 }).webrtcPort).toBe(0)
     expect(() => validateMediaServerProfile({ ...profile, rtmpPort: 0 })).toThrow('RTMP 端口')
     expect(() => validateMediaServerProfile({ ...profile, rtspPort: 554 })).toThrow('SecretEMS 不开放')
     expect(() => validateMediaServerProfile({ ...profile, httpPort: 8443 })).toThrow('WHIP/WHEP')

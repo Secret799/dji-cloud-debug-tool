@@ -134,11 +134,16 @@ describe('MediaServerStore', () => {
         id: 'remote-zlm-1', name: 'ZLM', kind: 'remote-zlm', host: 'media.example.com',
         apiProtocol: 'http', apiPort: 80, httpProtocol: 'http', httpPort: 80,
         rtmpPort: 1935, rtspPort: 554, createdAt: now, updatedAt: now,
+      }, {
+        id: 'easymedia-1', name: 'SecretEMS', kind: 'remote-easymedia', host: 'webrtc.example.com',
+        apiProtocol: 'https', apiPort: 443, httpProtocol: 'https', httpPort: 443,
+        rtmpPort: 1935, rtspPort: 0, webrtcPort: 8000, createdAt: now, updatedAt: now,
       }],
     }))
 
     const profiles = await new MediaServerStore().list()
     expect(profiles.find((profile) => profile.id === 'remote-zlm-1')?.webrtcPort).toBe(8000)
+    expect(profiles.find((profile) => profile.id === 'easymedia-1')?.webrtcPort).toBe(0)
     expect(profiles.find((profile) => profile.id === LOCAL_ZLM_ID)?.webrtcPort).toBe(8000)
   })
 
@@ -151,7 +156,7 @@ describe('MediaServerStore', () => {
       createdAt: now, updatedAt: now,
     })
 
-    expect(saved).toMatchObject({ kind: 'remote-easymedia', hasStoredSecret: false })
+    expect(saved).toMatchObject({ kind: 'remote-easymedia', webrtcPort: 0, hasStoredSecret: false })
     expect((await new MediaServerStore().getWithSecret('easymedia-1'))?.secret).toBe('')
   })
 

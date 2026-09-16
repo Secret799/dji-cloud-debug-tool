@@ -56,7 +56,7 @@ describe('media endpoint helpers', () => {
       httpPort: 443,
       rtmpPort: 1935,
       rtspPort: 0,
-      webrtcPort: 8000,
+      webrtcPort: 0,
     })
     const endpoints = buildMediaEndpoints(secretEms, 'live feed', 'camera/01')
     expect(endpoints).toEqual({

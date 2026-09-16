@@ -51,7 +51,7 @@ const remoteKindDefaults = (kind: RemoteMediaServerKind): Partial<MediaServerPro
     return { name: '远程 SRS', apiProtocol: 'http', apiPort: 1985, httpProtocol: 'http', httpPort: 8080, rtmpPort: 1935, rtspPort: 0, webrtcPort: 8000 }
   }
   if (kind === 'remote-easymedia') {
-    return { name: 'SecretEMS', apiProtocol: 'https', apiPort: 443, httpProtocol: 'https', httpPort: 443, rtmpPort: 1935, rtspPort: 0, webrtcPort: 8000, secret: '', clearStoredSecret: true }
+    return { name: 'SecretEMS', apiProtocol: 'https', apiPort: 443, httpProtocol: 'https', httpPort: 443, rtmpPort: 1935, rtspPort: 0, webrtcPort: 0, secret: '', clearStoredSecret: true }
   }
   return { name: '远程 ZLMediaKit', apiProtocol: 'http', apiPort: 80, httpProtocol: 'http', httpPort: 80, rtmpPort: 1935, rtspPort: 554, webrtcPort: 8000 }
 }
@@ -330,13 +330,12 @@ export function MediaCenter({
               )}
               <div className="field-grid two-columns"><label className="field"><span>名称</span><input value={editor.name} onChange={(event) => setEditor({ ...editor, name: event.target.value })} /></label><label className="field"><span>{editor.kind === 'local-zlm' ? '对设备公布的局域网 IP' : '主机或 IP'}</span><input value={editor.host} onChange={(event) => setEditor({ ...editor, host: event.target.value })} /></label></div>
               {editor.kind === 'remote-easymedia' ? <>
-                <div className="field-grid three-columns media-port-grid">
+                <div className="field-grid two-columns">
                   <label className="field"><span>WHIP/WHEP 端口</span><input type="number" min={1} max={65535} value={editor.httpPort} onChange={(event) => {
                     const port = Number(event.target.value)
                     setEditor({ ...editor, apiPort: port, httpPort: port })
                   }} /></label>
                   <label className="field"><span>RTMP 端口</span><input type="number" min={1} max={65535} value={editor.rtmpPort} onChange={(event) => setEditor({ ...editor, rtmpPort: Number(event.target.value) })} /></label>
-                  <label className="field"><span>WebRTC 媒体端口</span><input type="number" min={1} max={65535} value={editor.webrtcPort} onChange={(event) => setEditor({ ...editor, webrtcPort: Number(event.target.value) })} /></label>
                 </div>
                 <label className="field reconnect-field"><span>信令协议</span><select value={editor.httpProtocol} onChange={(event) => {
                   const protocol = event.target.value as 'http' | 'https'

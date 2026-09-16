@@ -421,7 +421,7 @@ export const validateMediaServerProfile = (value: unknown): MediaServerProfile =
   const httpPort = requireInteger(profile.httpPort, 'HTTP 端口', 1, 65_535)
   const rtmpPort = requireInteger(profile.rtmpPort, 'RTMP 端口', 1, 65_535)
   const rtspPort = requireInteger(profile.rtspPort, 'RTSP 端口', 0, 65_535)
-  const webrtcPort = requireInteger(profile.webrtcPort, 'WebRTC 端口', kind === 'local-zlm' || kind === 'remote-easymedia' ? 1 : 0, 65_535)
+  const webrtcPort = requireInteger(profile.webrtcPort, 'WebRTC 端口', kind === 'local-zlm' ? 1 : 0, 65_535)
   if (profile.kind === 'local-zlm' && profile.apiPort !== profile.httpPort) {
     throw new IpcValidationError('本地 ZLMediaKit 的 API 端口必须与 HTTP 端口一致')
   }
@@ -448,7 +448,8 @@ export const validateMediaServerProfile = (value: unknown): MediaServerProfile =
     httpPort,
     rtmpPort,
     rtspPort,
-    webrtcPort,
+    // SecretEMS 通过 WHIP/WHEP 直接承载媒体，不使用独立的 WebRTC 媒体端口
+    webrtcPort: kind === 'remote-easymedia' ? 0 : webrtcPort,
     secret,
     isDefault: profile.isDefault as boolean | undefined,
     hasStoredSecret: profile.hasStoredSecret as boolean | undefined,
