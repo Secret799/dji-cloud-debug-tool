@@ -64,13 +64,14 @@ try {
 
   await assertTooltip('设备工作台')
   await assertTooltip('添加网关')
+  await assertTooltip('地图')
   await assertTooltip('云同步')
 
   const railOrder = await window.locator('.app-rail').evaluate((rail) => ({
     top: [...rail.querySelectorAll('.rail-top button')].map((button) => button.getAttribute('aria-label')),
     bottom: [...rail.querySelectorAll('.rail-bottom button')].map((button) => button.getAttribute('aria-label')),
   }))
-  if (railOrder.top.join('|') !== '设备工作台|媒体中心|OSS 管理|监测项配置') {
+  if (railOrder.top.join('|') !== '设备工作台|媒体中心|地图|OSS 管理|监测项配置') {
     errors.push(`navigation: unexpected top rail order (${railOrder.top.join(', ')})`)
   }
   if (railOrder.bottom.join('|') !== '云同步|设置|关于') {

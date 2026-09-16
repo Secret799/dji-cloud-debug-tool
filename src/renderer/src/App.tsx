@@ -18,6 +18,7 @@ import {
   Download,
   Info,
   LayoutDashboard,
+  Map as MapIcon,
   MonitorPlay,
   Power,
   Settings,
@@ -33,6 +34,8 @@ import type {
   MediaServerRuntime,
   MqttMessageRecord,
   MqttQos,
+  MapTileProbeResult,
+  MapTileSource,
   ObjectStorageProfile,
   OperationResult,
   TopicSubscription,
@@ -43,6 +46,7 @@ import { ConnectionModal } from './components/ConnectionModal'
 import { AboutModal } from './components/AboutModal'
 import { BrandLogo } from './components/BrandLogo'
 import { DeviceModal } from './components/DeviceModal'
+import { MapSourceModal } from './components/MapSourceModal'
 import { Sidebar } from './components/Sidebar'
 import { Tooltip } from './components/Tooltip'
 import {
@@ -62,6 +66,7 @@ import {
   type ServiceCaller,
   type ServiceCallResult,
 } from './lib/dji'
+import { MapView } from './views/MapView'
 import { MediaCenter } from './views/MediaCenter'
 import { Overview } from './views/Overview'
 import { DjiConfigCenter } from './views/DjiConfigCenter'
@@ -91,10 +96,11 @@ import {
 import { notifyWebDavChanged } from './lib/webdav-sync'
 import { defaultDockModel, deviceProvider } from './lib/superdock'
 
-type WorkspaceView = 'overview' | 'media' | 'dji-config' | 'oss' | 'versions' | 'settings'
+type WorkspaceView = 'overview' | 'map' | 'media' | 'dji-config' | 'oss' | 'versions' | 'settings'
 
 const viewMeta: Record<WorkspaceView, { label: string; description: string }> = {
   overview: { label: '设备工作台', description: '设备状态与调试功能' },
+  map: { label: '地图', description: '三维地球与设备实时位置' },
   media: { label: '媒体中心', description: '外部视频源与本地流媒体' },
   'dji-config': { label: '监测项配置', description: '大疆与草莓设备的监测布局、物模型字段与错误码资料' },
   oss: { label: 'OSS 管理', description: '多个远程日志存储目标与临时凭证' },
@@ -191,6 +197,9 @@ export default function App() {
   const deviceArchivesRef = useRef<DeviceArchive[]>([])
   const [selectedDeviceSn, setSelectedDeviceSn] = useState('')
   const [activeView, setActiveView] = useState<WorkspaceView>('overview')
+  const [mapSources, setMapSources] = useState<MapTileSource[]>([])
+  const [mapSourceSelection, setMapSourceSelection] = useState('')
+  const [mapSourceModalOpen, setMapSourceModalOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [sidebarWidth, setSidebarWidth] = useState(loadSidebarWidth)
   const [sidebarResizing, setSidebarResizing] = useState(false)
@@ -354,6 +363,39 @@ export default function App() {
       disposed = true
     }
   }, [showToast])
+
+  useEffect(() => {
+    let disposed = false
+    void window.djiApi.map.listSources().then((sources) => {
+      if (!disposed) setMapSources(sources)
+    }).catch((error) => {
+      if (!disposed) showToast(`读取底图源失败：${errorMessage(error)}`, 'error')
+    })
+    return () => {
+      disposed = true
+    }
+  }, [showToast])
+
+  const handleSaveMapSource = useCallback(async (source: MapTileSource): Promise<MapTileSource> => {
+    const saved = await window.djiApi.map.saveSource(source)
+    setMapSources((current) => {
+      const index = current.findIndex((entry) => entry.id === saved.id)
+      if (index < 0) return [...current, saved]
+      return current.map((entry) => (entry.id === saved.id ? saved : entry))
+    })
+    return saved
+  }, [])
+
+  const handleRemoveMapSource = useCallback(async (sourceId: string): Promise<OperationResult> => {
+    const result = await window.djiApi.map.removeSource(sourceId)
+    if (result.ok) setMapSources((current) => current.filter((entry) => entry.id !== sourceId))
+    return result
+  }, [])
+
+  const handleProbeMapSource = useCallback(
+    (source: MapTileSource): Promise<MapTileProbeResult> => window.djiApi.map.probeSource(source),
+    [],
+  )
 
   const setProfilesSnapshot = (next: ConnectionProfile[]): void => {
     profilesRef.current = next
@@ -1431,6 +1473,9 @@ export default function App() {
             <Tooltip label="媒体中心">
               <button className={activeView === 'media' ? 'active' : ''} onClick={() => setActiveView('media')}><MonitorPlay size={20} /></button>
             </Tooltip>
+            <Tooltip label="地图">
+              <button className={activeView === 'map' ? 'active' : ''} onClick={() => setActiveView('map')}><MapIcon size={20} /></button>
+            </Tooltip>
             <Tooltip label="OSS 管理">
               <button className={activeView === 'oss' ? 'active' : ''} onClick={() => setActiveView('oss')}><Database size={20} /></button>
             </Tooltip>
@@ -1524,7 +1569,12 @@ export default function App() {
                 <span className="eyebrow">{viewMeta[activeView].description}</span>
                 <h1>{viewMeta[activeView].label}</h1>
               </div>
-              {activeView === 'media' ? (
+              {activeView === 'map' ? (
+                <div className="workspace-status">
+                  <span>{mapSources.length} 个底图源</span>
+                  <span>{activeTelemetry.length} 台已发现设备</span>
+                </div>
+              ) : activeView === 'media' ? (
                 <div className="workspace-status">
                   <span className={`connection-state ${activeStatus}`}><Activity size={14} />{statusCopy[activeStatus]}</span>
                   {subscriptionSyncing[activeProfile.id] && <span>正在恢复订阅</span>}
@@ -1577,6 +1627,13 @@ export default function App() {
                 mediaServers={mediaServers}
               />
             </div>
+            {activeView === 'map' && (
+              <MapView
+                sources={mapSources}
+                devices={activeTelemetry}
+                onOpenSources={() => setMapSourceModalOpen(true)}
+              />
+            )}
             {activeView === 'media' && (
               <MediaCenter
                 servers={mediaServers}
@@ -1638,6 +1695,20 @@ export default function App() {
         />
       )}
       {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
+      {mapSourceModalOpen && (
+        <MapSourceModal
+          sources={mapSources}
+          selectedId={mapSourceSelection}
+          onSelect={setMapSourceSelection}
+          onSave={handleSaveMapSource}
+          onRemove={handleRemoveMapSource}
+          onProbe={handleProbeMapSource}
+          onPickDirectory={() => window.djiApi.map.pickDirectory()}
+          onPickMbtiles={() => window.djiApi.map.pickMbtiles()}
+          onClose={() => setMapSourceModalOpen(false)}
+          onNotify={showToast}
+        />
+      )}
       {toast && (
         <div key={toast.id} className={`toast ${toast.tone}`} role="status" aria-live="polite">
           {toast.tone === 'success' ? <CheckCircle2 size={16} /> : toast.tone === 'error' ? <CircleAlert size={16} /> : <Info size={16} />}
