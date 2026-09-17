@@ -87,6 +87,10 @@ const KIND_LABELS: Record<MapTileSourceKind, string> = {
   'url-template': '在线地址模板',
   directory: '本地瓦片目录',
   mbtiles: '本地 MBTiles 文件',
+  // 三类地形来源由地形增量引入，弹窗仅在下拉中按需展示，标签保持中文
+  'terrain-ion': 'Cesium ion 地形',
+  'terrain-arcgis': 'ArcGIS 高程服务',
+  'terrain-url': '自定义地形地址',
 }
 
 /**

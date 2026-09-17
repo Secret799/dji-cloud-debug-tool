@@ -6,6 +6,7 @@ import type {
   DeviceArchiveVideo,
   DjiDevice,
   FirmwareUploadRequest,
+  MapLayerKind,
   MapTileSource,
   MapTileSourceHeader,
   MapTileSourceKind,
@@ -318,6 +319,50 @@ export const validateMapTileSourceHeaders = (value: unknown): MapTileSourceHeade
   })
 }
 
+/**
+ * 校验来源类型与图层的配对关系及各类型的字段要求：
+ * - terrain-ion / terrain-arcgis 只能挂在地形层，不要求 urlTemplate 与 path；
+ * - terrain-url 只能挂在地形层，且必须提供非空的 HTTP/HTTPS 根地址；
+ * - 既有影像三类不能挂到地形层，urlTemplate / path 规则沿用原校验。
+ *
+ * @param kind 底图源类型
+ * @param layer 图层类型
+ * @param urlTemplate 已去除首尾空白的 URL 模板
+ * @param path 已去除首尾空白的本地路径
+ * @returns 无返回值，校验失败时抛出 IpcValidationError
+ */
+export const validateMapTileSourceKind = (
+  kind: MapTileSourceKind,
+  layer: MapLayerKind,
+  urlTemplate: string,
+  path: string,
+): void => {
+  if (kind === 'url-template') {
+    if (layer === 'terrain') throw new IpcValidationError('地形源必须使用 terrain-* 类型')
+    validateMapTileSourceUrlTemplate(urlTemplate)
+    return
+  }
+  if (kind === 'directory' || kind === 'mbtiles') {
+    if (layer === 'terrain') throw new IpcValidationError('地形源必须使用 terrain-* 类型')
+    validateMapTileSourceLocalPath(kind, path)
+    return
+  }
+  // 以下为 terrain-* 三类：必须挂在地形层
+  if (layer !== 'terrain') throw new IpcValidationError('底图源图层类型必须为 terrain')
+  if (kind !== 'terrain-url') return
+  // terrain-url 复用 urlTemplate 字段存放地形服务根地址，必须是完整的 HTTP/HTTPS URL
+  if (!urlTemplate) throw new IpcValidationError('地形源必须提供 HTTP 或 HTTPS 根地址')
+  let parsedRoot: URL
+  try {
+    parsedRoot = new URL(urlTemplate)
+  } catch {
+    throw new IpcValidationError('地形源必须提供 HTTP 或 HTTPS 根地址')
+  }
+  if (parsedRoot.protocol !== 'http:' && parsedRoot.protocol !== 'https:') {
+    throw new IpcValidationError('地形源必须提供 HTTP 或 HTTPS 根地址')
+  }
+}
+
 export const validateMapTileSource = (value: unknown): MapTileSource => {
   const source = requireRecord(value, '底图源配置')
   // 新建的底图源 id 为空，由 Store 在保存时分配
@@ -329,7 +374,8 @@ export const validateMapTileSource = (value: unknown): MapTileSource => {
   }
   const layer = source.layer
 
-  if (source.kind !== 'url-template' && source.kind !== 'directory' && source.kind !== 'mbtiles') {
+  if (source.kind !== 'url-template' && source.kind !== 'directory' && source.kind !== 'mbtiles'
+    && source.kind !== 'terrain-ion' && source.kind !== 'terrain-arcgis' && source.kind !== 'terrain-url') {
     throw new IpcValidationError('底图源类型无效')
   }
   const kind = source.kind
@@ -337,11 +383,7 @@ export const validateMapTileSource = (value: unknown): MapTileSource => {
   const urlTemplate = requireString(source.urlTemplate, 'URL 模板', { allowEmpty: true, maxBytes: 4_096 }).trim()
   const path = requireString(source.path, '本地路径', { allowEmpty: true, maxBytes: 4_096 }).trim()
 
-  if (kind === 'url-template') {
-    validateMapTileSourceUrlTemplate(urlTemplate)
-  } else {
-    validateMapTileSourceLocalPath(kind, path)
-  }
+  validateMapTileSourceKind(kind, layer, urlTemplate, path)
 
   const headers = validateMapTileSourceHeaders(source.headers)
 

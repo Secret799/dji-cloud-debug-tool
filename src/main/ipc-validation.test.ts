@@ -532,4 +532,39 @@ describe('map tile source validation', () => {
     expect(validateMapTileSource({ ...base, apiKey: 'token' }).apiKey).toBe('token')
     expect(validateMapTileSource(base).apiKey).toBe('')
   })
+
+  describe('terrain source kinds', () => {
+    const terrainBase = {
+      ...base,
+      layer: 'terrain',
+      kind: 'terrain-ion',
+      urlTemplate: '',
+      path: '',
+    }
+
+    it('accepts the three terrain kinds', () => {
+      expect(validateMapTileSource(terrainBase).kind).toBe('terrain-ion')
+      expect(validateMapTileSource({ ...terrainBase, kind: 'terrain-arcgis' }).kind).toBe('terrain-arcgis')
+      expect(validateMapTileSource({
+        ...terrainBase,
+        kind: 'terrain-url',
+        urlTemplate: 'https://terrain.example.com/myterrain/',
+      }).kind).toBe('terrain-url')
+    })
+
+    it('requires terrain kinds to pair with the terrain layer', () => {
+      expect(() => validateMapTileSource({ ...terrainBase, layer: 'imagery' })).toThrow('图层')
+      expect(() => validateMapTileSource({ ...base, kind: 'directory', path: '/data/tiles', layer: 'terrain' })).toThrow('地形')
+    })
+
+    it('requires terrain-url to carry an http(s) root url', () => {
+      expect(() => validateMapTileSource({ ...terrainBase, kind: 'terrain-url', urlTemplate: '' })).toThrow('地形')
+      expect(() => validateMapTileSource({ ...terrainBase, kind: 'terrain-url', urlTemplate: 'ftp://x/' })).toThrow('HTTP')
+    })
+
+    it('ignores imagery-only rules for terrain kinds', () => {
+      // minZoom=0 maxZoom=19 的默认值直接可用；tileSize 等字段不因 terrain 强制
+      expect(validateMapTileSource(terrainBase).layer).toBe('terrain')
+    })
+  })
 })

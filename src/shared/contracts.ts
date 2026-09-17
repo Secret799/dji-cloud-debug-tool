@@ -332,7 +332,14 @@ export interface ExportMessageOptions {
 }
 
 export type MapLayerKind = 'imagery' | 'terrain'
-export type MapTileSourceKind = 'url-template' | 'directory' | 'mbtiles'
+/** terrain-* 三类为地形层专用：terrain-ion / terrain-arcgis 由厂商服务承载，terrain-url 为自定义 quantized-mesh 根地址 */
+export type MapTileSourceKind =
+  | 'url-template'
+  | 'directory'
+  | 'mbtiles'
+  | 'terrain-ion'
+  | 'terrain-arcgis'
+  | 'terrain-url'
 export type MapCoordinateSystem = 'wgs84' | 'gcj02' | 'bd09'
 
 export interface MapTileSourceHeader {
