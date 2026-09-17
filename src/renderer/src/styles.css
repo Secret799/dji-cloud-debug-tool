@@ -12371,6 +12371,17 @@ textarea {
   font-style: normal;
 }
 
+.map-source-layer {
+  align-self: flex-start;
+}
+
+.map-source-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .map-source-issues {
   margin: 0;
   padding-left: 18px;

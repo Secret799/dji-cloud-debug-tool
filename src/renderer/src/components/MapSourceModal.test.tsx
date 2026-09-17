@@ -5,12 +5,16 @@ import {
   MapSourceModal,
   applyMapTilePreset,
   applyPickedPath,
+  applyTerrainPreset,
   buildMapTileSourcePayload,
   createMapTileSource,
   mapProbeNotice,
+  mapSourcePresetOptions,
   mapSourceReloadKey,
   mapSourcesWithDefault,
+  mapTileSourceDraftForLayer,
   mapTileSourceIssues,
+  mapTileSourceKindsForLayer,
   mapTileSourceNameFromPath,
   probeMapSource,
   reloadMapSourceDraft,
@@ -19,6 +23,7 @@ import {
   setDefaultMapSource,
 } from './MapSourceModal'
 import type { MapSourceModalProps } from './MapSourceModal'
+import { TERRAIN_PRESETS, createTerrainSource } from '../lib/terrain-source'
 import type { MapTileSource } from '../../../shared/contracts'
 
 const source = (patch: Partial<MapTileSource> = {}): MapTileSource => ({
@@ -30,6 +35,13 @@ const source = (patch: Partial<MapTileSource> = {}): MapTileSource => ({
 const validSource = (patch: Partial<MapTileSource> = {}): MapTileSource => source({
   name: '示例底图',
   urlTemplate: 'https://example.com/{z}/{x}/{y}.png',
+  ...patch,
+})
+
+/** 已经能通过校验的 Cesium ion 地形源 */
+const validTerrain = (patch: Partial<MapTileSource> = {}): MapTileSource => ({
+  ...createTerrainSource('terrain-ion'),
+  name: '示例地形',
   ...patch,
 })
 
@@ -64,6 +76,60 @@ describe('map tile source defaults', () => {
 
   it('starts with an empty id so the store assigns identity on save', () => {
     expect(createMapTileSource().id).toBe('')
+  })
+})
+
+describe('map tile source layers', () => {
+  it('splits the kind options by layer', () => {
+    expect(mapTileSourceKindsForLayer('imagery')).toEqual(['url-template', 'directory', 'mbtiles'])
+    expect(mapTileSourceKindsForLayer('terrain')).toEqual(['terrain-ion', 'terrain-arcgis', 'terrain-url'])
+  })
+
+  it('rebuilds the draft for the target layer instead of patching the layer field', () => {
+    const imagery = validSource({
+      id: 'source-1',
+      name: '我的底图',
+      kind: 'directory',
+      path: '/data/tiles',
+      coordinateSystem: 'gcj02',
+      minZoom: 3,
+      maxZoom: 12,
+      tileSize: 512,
+    })
+    const terrain = mapTileSourceDraftForLayer(imagery, 'terrain')
+    expect(terrain.layer).toBe('terrain')
+    expect(terrain.kind).toBe('terrain-ion')
+    // 影像专属字段必须清掉：留在草稿里会被当成地形源的字段写进存储
+    expect(terrain.path).toBe('')
+    expect(terrain.coordinateSystem).toBe('wgs84')
+    expect(terrain.minZoom).toBe(0)
+    expect(terrain.maxZoom).toBe(19)
+    expect(terrain.tileSize).toBe(256)
+    // 标识与名称与图层无关，切换后仍在编辑同一条源
+    expect(terrain.id).toBe('source-1')
+    expect(terrain.name).toBe('我的底图')
+  })
+
+  it('rebuilds the draft back into an imagery url template source', () => {
+    const terrain = validTerrain({
+      id: 'source-2',
+      name: '全球地形',
+      kind: 'terrain-url',
+      urlTemplate: 'https://terrain.example.com/',
+    })
+    const imagery = mapTileSourceDraftForLayer(terrain, 'imagery')
+    expect(imagery.layer).toBe('imagery')
+    expect(imagery.kind).toBe('url-template')
+    expect(imagery.urlTemplate).toBe('')
+    expect(imagery.coordinateSystem).toBe('wgs84')
+    expect(imagery.maxZoom).toBe(19)
+    expect(imagery.id).toBe('source-2')
+    expect(imagery.name).toBe('全球地形')
+  })
+
+  it('keeps the very same draft object when the layer does not change', () => {
+    const draft = validSource()
+    expect(mapTileSourceDraftForLayer(draft, 'imagery')).toBe(draft)
   })
 })
 
@@ -107,6 +173,46 @@ describe('map tile presets', () => {
     const applied = applyMapTilePreset(source({ kind: 'mbtiles', path: '/data/a.mbtiles' }), preset)
     expect(applied.kind).toBe('url-template')
     expect(applied.name).toBe(preset.name)
+  })
+})
+
+describe('terrain presets', () => {
+  it('turns every terrain preset into a button that needs a key', () => {
+    const options = mapSourcePresetOptions('terrain')
+    expect(options.map((option) => option.name)).toEqual(TERRAIN_PRESETS.map((preset) => preset.name))
+    expect(options.every((option) => option.requiresKey)).toBe(true)
+  })
+
+  it('keeps the imagery presets on the imagery layer', () => {
+    expect(mapSourcePresetOptions('imagery').map((option) => option.name))
+      .toEqual(MAP_TILE_PRESETS.map((preset) => preset.name))
+  })
+
+  it('applies a terrain preset without dragging imagery fields along', () => {
+    const option = mapSourcePresetOptions('terrain')[1]
+    const applied = option.apply(validSource({
+      id: 'source-1',
+      name: '',
+      path: '/data/tiles',
+      coordinateSystem: 'gcj02',
+      minZoom: 3,
+      maxZoom: 12,
+      tileSize: 512,
+    }))
+    expect(applied.layer).toBe('terrain')
+    expect(applied.kind).toBe('terrain-arcgis')
+    expect(applied.path).toBe('')
+    expect(applied.coordinateSystem).toBe('wgs84')
+    expect(applied.maxZoom).toBe(19)
+    expect(applied.name).toBe(TERRAIN_PRESETS[1].name)
+    expect(applied.id).toBe('source-1')
+  })
+
+  it('keeps a name the user already typed when applying a terrain preset', () => {
+    const applied = applyTerrainPreset(validTerrain({ name: '我的地形' }), TERRAIN_PRESETS[0])
+    expect(applied.name).toBe('我的地形')
+    expect(applied.layer).toBe('terrain')
+    expect(applied.kind).toBe('terrain-ion')
   })
 })
 
@@ -165,6 +271,39 @@ describe('map tile source issues', () => {
       .toContain('第 1 个请求头使用了保留名称：Host')
     expect(mapTileSourceIssues(source({ headers: [{ name: 'content-length', value: '1' }] })))
       .toContain('第 1 个请求头使用了保留名称：content-length')
+  })
+})
+
+describe('terrain source issues', () => {
+  it('delegates to the terrain rules for the vendor hosted kinds', () => {
+    expect(mapTileSourceIssues(validTerrain())).toEqual([])
+    expect(mapTileSourceIssues(validTerrain({ kind: 'terrain-arcgis' }))).toEqual([])
+  })
+
+  it('only asks for an address on a custom terrain url', () => {
+    expect(mapTileSourceIssues(validTerrain({ kind: 'terrain-url' }))).toContain('请填写地形服务地址')
+    expect(mapTileSourceIssues(validTerrain({ kind: 'terrain-url', urlTemplate: 'ftp://terrain.example.com/' })))
+      .toContain('地形服务地址仅支持 HTTP 或 HTTPS')
+    expect(mapTileSourceIssues(validTerrain({ kind: 'terrain-url', urlTemplate: 'https://terrain.example.com/' })))
+      .toEqual([])
+  })
+
+  it('does not ask for the imagery url placeholders on a terrain url', () => {
+    const issues = mapTileSourceIssues(validTerrain({ kind: 'terrain-url', urlTemplate: 'https://terrain.example.com/' }))
+    expect(issues).not.toContain('URL 模板必须包含 {z} 占位符')
+  })
+
+  it('still requires a name', () => {
+    expect(mapTileSourceIssues(validTerrain({ name: '  ' }))).toContain('请填写底图源名称')
+  })
+
+  it('skips the imagery zoom and header rules', () => {
+    const issues = mapTileSourceIssues(validTerrain({
+      minZoom: 10,
+      maxZoom: 5,
+      headers: [{ name: 'Host', value: 'evil.example.com' }],
+    }))
+    expect(issues).toEqual([])
   })
 })
 
@@ -429,5 +568,69 @@ describe('MapSourceModal rendering', () => {
     // 徽标与按钮并存：徽标说明现状，按钮负责切换
     expect(markup).toContain('<em>默认</em>')
     expect(markup).toContain('设为默认')
+  })
+})
+
+describe('MapSourceModal terrain rendering', () => {
+  /** 取当前被按下的图层按钮文案，用于断言表单处在哪一层 */
+  const pressedLayer = (markup: string): string =>
+    /<button[^>]*aria-pressed="true"[^>]*>(影像|地形)<\/button>/.exec(markup)?.[1] ?? ''
+
+  it('starts a new source on the imagery layer', () => {
+    expect(pressedLayer(renderModal())).toBe('影像')
+  })
+
+  it('marks the layer of the selected source as pressed', () => {
+    const markup = renderModal({ sources: [validTerrain({ id: 'terrain-1' })], selectedId: 'terrain-1' })
+    expect(pressedLayer(markup)).toBe('地形')
+  })
+
+  it('asks for the cesium ion token and points at the free registration page', () => {
+    const markup = renderModal({ sources: [validTerrain({ id: 'terrain-1' })], selectedId: 'terrain-1' })
+    expect(markup).toContain('Cesium ion Access Token')
+    expect(markup).toContain('cesium.com/ion')
+    expect(markup).not.toContain('高德矢量')
+  })
+
+  it('asks for the arcgis key instead when the arcgis kind is selected', () => {
+    const markup = renderModal({
+      sources: [validTerrain({ id: 'terrain-2', kind: 'terrain-arcgis' })],
+      selectedId: 'terrain-2',
+    })
+    expect(markup).toContain('ArcGIS API Key')
+    expect(markup).toContain('developers.arcgis.com')
+  })
+
+  it('hides the imagery only fields on the terrain layer', () => {
+    const markup = renderModal({ sources: [validTerrain({ id: 'terrain-1' })], selectedId: 'terrain-1' })
+    expect(markup).not.toContain('坐标系')
+    expect(markup).not.toContain('最小级别')
+    expect(markup).not.toContain('URL 模板')
+    expect(markup).not.toContain('本地瓦片目录')
+  })
+
+  it('asks for the quantized mesh root address on a custom terrain url', () => {
+    const markup = renderModal({
+      sources: [validTerrain({ id: 'terrain-3', kind: 'terrain-url' })],
+      selectedId: 'terrain-3',
+    })
+    expect(markup).toContain('地形服务地址')
+    expect(markup).toContain('layer.json')
+    expect(markup).not.toContain('{z}/{x}/{y}.png')
+  })
+
+  it('keeps the coordinate system and the zoom range on the imagery layer', () => {
+    const markup = renderModal({ sources: [validSource({ id: 'source-1' })], selectedId: 'source-1' })
+    expect(markup).toContain('坐标系')
+    expect(markup).toContain('最小级别')
+    expect(markup).not.toContain('Cesium World Terrain')
+  })
+
+  it('keeps the stored key hint on a terrain source', () => {
+    const markup = renderModal({
+      sources: [validTerrain({ id: 'terrain-1', hasApiKey: true })],
+      selectedId: 'terrain-1',
+    })
+    expect(markup).toContain('已保存，留空则不修改')
   })
 })

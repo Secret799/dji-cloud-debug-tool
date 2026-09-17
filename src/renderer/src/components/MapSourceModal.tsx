@@ -10,6 +10,13 @@ import type {
 } from '../../../shared/contracts'
 import { SecretInput } from './SecretInput'
 import { Tooltip } from './Tooltip'
+import {
+  TERRAIN_PRESETS,
+  createTerrainSource,
+  isTerrainKind,
+  terrainSourceIssues,
+} from '../lib/terrain-source'
+import type { TerrainSourcePreset } from '../lib/terrain-source'
 
 /** 底图源配置预设 */
 export interface MapTileSourcePreset {
@@ -93,6 +100,27 @@ const KIND_LABELS: Record<MapTileSourceKind, string> = {
   'terrain-url': '自定义地形地址',
 }
 
+const LAYER_LABELS: Record<MapLayerKind, string> = {
+  imagery: '影像',
+  terrain: '地形',
+}
+
+/** 切到地形图层时的默认来源类型，取覆盖范围最广的 Cesium 全球地形 */
+const DEFAULT_TERRAIN_KIND: MapTileSourceKind = 'terrain-ion'
+
+/**
+ * 列出某个图层可选的来源类型。
+ *
+ * 取值顺序沿用 `KIND_LABELS` 的声明顺序，与下拉框此前的顺序一致；地形三类由 `isTerrainKind` 判定，
+ * 避免弹窗里再抄一份地形类型清单而与纯函数库脱节。
+ *
+ * @param layer 图层类型
+ * @returns 该图层可选的来源类型
+ */
+export const mapTileSourceKindsForLayer = (layer: MapLayerKind): MapTileSourceKind[] =>
+  (Object.keys(KIND_LABELS) as MapTileSourceKind[])
+    .filter((kind) => (layer === 'terrain') === isTerrainKind(kind))
+
 /**
  * 主进程拒绝的自定义请求头名称，与 `src/main/ipc-validation.ts` 的 `RESERVED_MAP_HEADER_NAMES` 保持一致。
  *
@@ -150,6 +178,23 @@ export const createMapTileSource = (): MapTileSource => ({
 })
 
 /**
+ * 计算切换图层后的草稿。
+ *
+ * 不能只把现有草稿的 layer 字段改掉：影像专属的本地路径、坐标系与缩放级别会留在草稿里，
+ * 保存时被当成地形源的字段写进存储。这里按目标图层重建草稿，只保留与图层无关的标识与名称，
+ * 使右侧表单「始终在编辑左侧选中的那一条」的语义在切换图层后依然成立。
+ *
+ * @param draft 当前草稿
+ * @param layer 目标图层
+ * @returns 切换后的草稿；目标图层与当前一致时原样返回
+ */
+export const mapTileSourceDraftForLayer = (draft: MapTileSource, layer: MapLayerKind): MapTileSource => {
+  if (draft.layer === layer) return draft
+  const rebuilt = layer === 'terrain' ? createTerrainSource(DEFAULT_TERRAIN_KIND) : createMapTileSource()
+  return { ...rebuilt, id: draft.id, name: draft.name }
+}
+
+/**
  * 把预设写到草稿上。
  *
  * 名称只在用户还没填写时才采用预设名，避免覆盖用户已经输入的内容；来源类型一律切回在线模板。
@@ -168,6 +213,80 @@ export const applyMapTilePreset = (draft: MapTileSource, preset: MapTileSourcePr
   attribution: preset.attribution,
   maxZoom: preset.maxZoom,
 })
+
+/**
+ * 把地形预设写到草稿上。
+ *
+ * 与影像预设同构：名称只在用户还没填写时才采用预设名，标识沿用草稿；其余字段一律回到地形源的默认值，
+ * 避免影像的本地路径、坐标系与缩放级别被带进地形源。
+ *
+ * @param draft 当前草稿
+ * @param preset 要应用的地形预设
+ * @returns 应用预设后的新草稿
+ */
+export const applyTerrainPreset = (draft: MapTileSource, preset: TerrainSourcePreset): MapTileSource => ({
+  ...createTerrainSource(preset.kind),
+  id: draft.id,
+  name: draft.name.trim() || preset.name,
+})
+
+/**
+ * 取与来源类型匹配的地形预设说明文案。
+ *
+ * 文案里含注册地址与「注册免费」的说明，是用户自备访问令牌的唯一线索，因此就地展示在令牌输入框下方。
+ *
+ * @param kind 底图源类型
+ * @returns 说明文案；没有匹配预设的来源类型（例如自定义地形地址）返回空串
+ */
+export const terrainPresetHelp = (kind: MapTileSourceKind): string =>
+  TERRAIN_PRESETS.find((preset) => preset.kind === kind)?.help ?? ''
+
+/**
+ * 计算地形源令牌输入框的占位提示。
+ *
+ * 三种地形来源的令牌出处不同，占位文案必须点名是哪一个（ion 的 Access Token、ArcGIS 的 API Key），
+ * 否则用户不知道该往这里填什么；已经存过令牌时优先提示留空不改动，避免误清掉已保存的密钥。
+ *
+ * @param source 地形源草稿
+ * @returns 占位提示文案
+ */
+export const terrainTokenPlaceholder = (source: MapTileSource): string => {
+  if (source.hasApiKey) return '已保存，留空则不修改'
+  if (source.kind === 'terrain-arcgis') return 'ArcGIS API Key，免费注册获取'
+  if (source.kind === 'terrain-ion') return 'Cesium ion Access Token，免费注册获取'
+  return '地形服务访问令牌，不需要则留空'
+}
+
+/** 预设按钮的展示与写入数据 */
+export interface MapSourcePresetOption {
+  /** 预设名称，同时用作按钮文案与列表 key */
+  name: string
+  /** 是否必须自备密钥，为真时按钮上标注「需 Key」 */
+  requiresKey: boolean
+  /** 把该预设写到草稿上的变换 */
+  apply: (draft: MapTileSource) => MapTileSource
+}
+
+/**
+ * 列出某个图层可用的预设选项。
+ *
+ * 影像与地形是两套结构不同的预设（影像带地址模板与坐标系，地形只有来源类型与访问令牌），
+ * 这里统一收敛成同一种按钮数据，弹窗只渲染一套按钮，不必为地形另写一遍。
+ *
+ * @param layer 当前图层
+ * @returns 该图层的预设选项，顺序与预设清单一致
+ */
+export const mapSourcePresetOptions = (layer: MapLayerKind): MapSourcePresetOption[] => layer === 'terrain'
+  ? TERRAIN_PRESETS.map((preset) => ({
+    name: preset.name,
+    requiresKey: preset.requiresToken,
+    apply: (draft: MapTileSource) => applyTerrainPreset(draft, preset),
+  }))
+  : MAP_TILE_PRESETS.map((preset) => ({
+    name: preset.name,
+    requiresKey: preset.requiresApiKey,
+    apply: (draft: MapTileSource) => applyMapTilePreset(draft, preset),
+  }))
 
 /**
  * 取路径的最后一段作为底图源名称。
@@ -240,6 +359,10 @@ export const mapSourceReloadKey = (sources: MapTileSource[], selectedId: string)
 export const mapTileSourceIssues = (source: MapTileSource): string[] => {
   const issues: string[] = []
   if (!source.name.trim()) issues.push('请填写底图源名称')
+
+  // 地形源只有「地址是否合法」一条规则（ion 与 ArcGIS 由厂商服务承载，不要求任何地址），
+  // 表单在 terrain 图层也不渲染缩放级别与请求头，因此影像那几条规则一律不参与
+  if (isTerrainKind(source.kind)) return [...issues, ...terrainSourceIssues(source)]
 
   if (source.kind === 'url-template') {
     const template = source.urlTemplate.trim()
@@ -453,8 +576,10 @@ export interface MapSourceDraftState {
   update: (patch: Partial<MapTileSource>) => void
   /** 更新 API Key 明文 */
   replaceApiKey: (apiKey: string) => void
-  /** 应用预设 */
-  applyPreset: (preset: MapTileSourcePreset) => void
+  /** 应用预设选项 */
+  applyPreset: (option: MapSourcePresetOption) => void
+  /** 切换图层，草稿按目标图层重建 */
+  switchLayer: (layer: MapLayerKind) => void
   /** 应用选中的本地路径 */
   applyPath: (path: string) => void
 }
@@ -492,7 +617,8 @@ export const useMapSourceDraft = (sources: MapTileSource[], selectedId: string):
     reset: (source: MapTileSource) => setDraft({ ...source }),
     update: (patch: Partial<MapTileSource>) => setDraft((current) => ({ ...current, ...patch })),
     replaceApiKey: setApiKey,
-    applyPreset: (preset: MapTileSourcePreset) => setDraft((current) => applyMapTilePreset(current, preset)),
+    applyPreset: (option: MapSourcePresetOption) => setDraft((current) => option.apply(current)),
+    switchLayer: (layer: MapLayerKind) => setDraft((current) => mapTileSourceDraftForLayer(current, layer)),
     applyPath: (path: string) => setDraft((current) => applyPickedPath(current, path)),
   }
 }
@@ -710,26 +836,68 @@ export function MapSourceList({
 
 /** 预设列表的属性 */
 export interface MapSourcePresetPickerProps {
-  /** 把预设写到当前草稿上 */
-  onApply: (preset: MapTileSourcePreset) => void
+  /** 当前图层可用的预设选项 */
+  options: MapSourcePresetOption[]
+  /** 把选项写到当前草稿上 */
+  onApply: (option: MapSourcePresetOption) => void
 }
 
 /**
  * 新建底图源时展示的预设入口。
  *
+ * 影像与地形共用这套按钮：两边都收在 `MapSourcePresetOption` 里，缺省「需 Key」标注的规则也就只有一处。
+ *
  * @param props 见 {@link MapSourcePresetPickerProps}
  * @returns 预设按钮组
  */
-export function MapSourcePresetPicker({ onApply }: MapSourcePresetPickerProps) {
+export function MapSourcePresetPicker({ options, onApply }: MapSourcePresetPickerProps) {
   return (
     <div className="map-source-presets">
       <span className="eyebrow">从预设开始</span>
-      {MAP_TILE_PRESETS.map((preset) => (
-        <button key={preset.name} className="button secondary compact" onClick={() => onApply(preset)}>
-          {preset.name}
-          {preset.requiresApiKey && <em>需 Key</em>}
+      {options.map((option) => (
+        <button key={option.name} className="button secondary compact" onClick={() => onApply(option)}>
+          {option.name}
+          {option.requiresKey && <em>需 Key</em>}
         </button>
       ))}
+    </div>
+  )
+}
+
+/** 图层单选控件的属性 */
+export interface MapSourceLayerFieldProps {
+  /** 当前草稿所属的图层 */
+  layer: MapLayerKind
+  /** 切换图层 */
+  onLayerChange: (layer: MapLayerKind) => void
+}
+
+/**
+ * 渲染影像 / 地形图层单选控件。
+ *
+ * 用按钮组而不是下拉：图层决定来源类型、坐标系与缩放级别是否出现，切换的后果比普通下拉的一个取值更重，
+ * 两个按钮并排能让用户一眼看清当前处在哪一层。
+ *
+ * @param props 见 {@link MapSourceLayerFieldProps}
+ * @returns 图层单选按钮组
+ */
+export function MapSourceLayerField({ layer, onLayerChange }: MapSourceLayerFieldProps) {
+  return (
+    <div className="field">
+      <span>图层</span>
+      <div className="segmented map-source-layer" role="group" aria-label="图层">
+        {(Object.keys(LAYER_LABELS) as MapLayerKind[]).map((item) => (
+          <button
+            key={item}
+            type="button"
+            className={item === layer ? 'active' : ''}
+            aria-pressed={item === layer}
+            onClick={() => onLayerChange(item)}
+          >
+            {LAYER_LABELS[item]}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -761,6 +929,31 @@ export function MapSourceKindFields({
   onApiKeyChange,
   onPickPath,
 }: MapSourceKindFieldsProps) {
+  if (isTerrainKind(draft.kind)) {
+    const help = terrainPresetHelp(draft.kind)
+    return (
+      <>
+        {draft.kind === 'terrain-url' && (
+          <label className="field">
+            <span>地形服务地址</span>
+            <input
+              value={draft.urlTemplate}
+              placeholder="https://example.com/terrain（quantized-mesh 服务根地址，即提供 layer.json 的地址）"
+              onChange={(event) => onDraftChange({ urlTemplate: event.target.value })}
+            />
+          </label>
+        )}
+        <SecretInput
+          label="API Key"
+          value={apiKey}
+          placeholder={terrainTokenPlaceholder(draft)}
+          onChange={onApiKeyChange}
+        />
+        {help && <p className="map-source-hint">{help}</p>}
+      </>
+    )
+  }
+
   if (draft.kind !== 'url-template') {
     return (
       <label className="field">
@@ -792,6 +985,38 @@ export function MapSourceKindFields({
         onChange={onApiKeyChange}
       />
     </>
+  )
+}
+
+/** 坐标系字段的属性 */
+export interface MapSourceCoordinateFieldProps {
+  /** 当前草稿 */
+  draft: MapTileSource
+  /** 合并草稿字段 */
+  onDraftChange: (patch: Partial<MapTileSource>) => void
+}
+
+/**
+ * 渲染底图坐标系字段。
+ *
+ * 只有影像源需要它：地形源不参与设备点位的坐标系转换，因此 terrain 图层不渲染本字段。
+ *
+ * @param props 见 {@link MapSourceCoordinateFieldProps}
+ * @returns 坐标系下拉字段
+ */
+export function MapSourceCoordinateField({ draft, onDraftChange }: MapSourceCoordinateFieldProps) {
+  return (
+    <label className="field">
+      <span>坐标系</span>
+      <select
+        value={draft.coordinateSystem}
+        onChange={(event) => onDraftChange({ coordinateSystem: event.target.value as MapCoordinateSystem })}
+      >
+        {(Object.keys(COORDINATE_SYSTEM_LABELS) as MapCoordinateSystem[]).map((system) => (
+          <option key={system} value={system}>{COORDINATE_SYSTEM_LABELS[system]}</option>
+        ))}
+      </select>
+    </label>
   )
 }
 
@@ -936,8 +1161,10 @@ export interface MapSourceFormProps {
   onDraftChange: (patch: Partial<MapTileSource>) => void
   /** 更新 API Key 明文 */
   onApiKeyChange: (apiKey: string) => void
+  /** 切换图层 */
+  onLayerChange: (layer: MapLayerKind) => void
   /** 应用预设 */
-  onApplyPreset: (preset: MapTileSourcePreset) => void
+  onApplyPreset: (option: MapSourcePresetOption) => void
   /** 选择本地路径 */
   onPickPath: () => Promise<void>
   /** 保存当前草稿 */
@@ -963,6 +1190,7 @@ export function MapSourceForm({
   hasSource,
   onDraftChange,
   onApiKeyChange,
+  onLayerChange,
   onApplyPreset,
   onPickPath,
   onSave,
@@ -971,7 +1199,11 @@ export function MapSourceForm({
 }: MapSourceFormProps) {
   return (
     <section className="map-source-form">
-      {showPresets && <MapSourcePresetPicker onApply={onApplyPreset} />}
+      {showPresets && (
+        <MapSourcePresetPicker options={mapSourcePresetOptions(draft.layer)} onApply={onApplyPreset} />
+      )}
+
+      <MapSourceLayerField layer={draft.layer} onLayerChange={onLayerChange} />
 
       <label className="field">
         <span>名称</span>
@@ -984,7 +1216,7 @@ export function MapSourceForm({
           value={draft.kind}
           onChange={(event) => onDraftChange({ kind: event.target.value as MapTileSourceKind })}
         >
-          {(Object.keys(KIND_LABELS) as MapTileSourceKind[]).map((kind) => (
+          {mapTileSourceKindsForLayer(draft.layer).map((kind) => (
             <option key={kind} value={kind}>{KIND_LABELS[kind]}</option>
           ))}
         </select>
@@ -998,19 +1230,12 @@ export function MapSourceForm({
         onPickPath={onPickPath}
       />
 
-      <label className="field">
-        <span>坐标系</span>
-        <select
-          value={draft.coordinateSystem}
-          onChange={(event) => onDraftChange({ coordinateSystem: event.target.value as MapCoordinateSystem })}
-        >
-          {(Object.keys(COORDINATE_SYSTEM_LABELS) as MapCoordinateSystem[]).map((system) => (
-            <option key={system} value={system}>{COORDINATE_SYSTEM_LABELS[system]}</option>
-          ))}
-        </select>
-      </label>
-
-      <MapSourceRangeFields draft={draft} onDraftChange={onDraftChange} />
+      {draft.layer === 'imagery' && (
+        <>
+          <MapSourceCoordinateField draft={draft} onDraftChange={onDraftChange} />
+          <MapSourceRangeFields draft={draft} onDraftChange={onDraftChange} />
+        </>
+      )}
 
       <label className="field">
         <span>版权署名</span>
@@ -1051,7 +1276,7 @@ export function MapSourceModal({
 }: MapSourceModalProps) {
   const selected = sources.find((source) => source.id === selectedId)
   const draftState = useMapSourceDraft(sources, selectedId)
-  const { draft, apiKey, issues, update, replaceApiKey, applyPreset, applyPath } = draftState
+  const { draft, apiKey, issues, update, replaceApiKey, applyPreset, switchLayer, applyPath } = draftState
   const { pending, save, probe, remove } = useMapSourceCommands({ ...draftState, onSave, onProbe, onRemove, onSelect, onNotify })
   const { pendingDefaultId, setDefault } = useMapSourceDefault(onSave, onSourcesChange, onNotify)
 
@@ -1095,6 +1320,7 @@ export function MapSourceModal({
             hasSource={Boolean(selected)}
             onDraftChange={update}
             onApiKeyChange={replaceApiKey}
+            onLayerChange={switchLayer}
             onApplyPreset={applyPreset}
             onPickPath={pickPath}
             onSave={save}
