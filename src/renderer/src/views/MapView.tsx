@@ -5,6 +5,7 @@ import 'cesium/Build/Cesium/Widgets/widgets.css'
 import { useEffect, useMemo, useRef, useState, type MutableRefObject, type RefObject } from 'react'
 import { Layers, Locate, MapPin } from 'lucide-react'
 import {
+  buildModuleUrl,
   CallbackPositionProperty,
   CallbackProperty,
   Cartesian2,
@@ -16,6 +17,7 @@ import {
   EntityCollection,
   LabelStyle,
   SceneMode,
+  TileMapServiceImageryProvider,
   UrlTemplateImageryProvider,
 } from 'cesium'
 import type { MapCoordinateSystem, MapTileSource } from '../../../shared/contracts'
@@ -270,6 +272,21 @@ export const useBasemapLayer = (handle: CesiumMapHandle, source: MapTileSource |
         tileHeight: source.tileSize,
         credit: source.attribution || undefined,
       }))
+    } else {
+      // Cesium 包自带的 Natural Earth II 离线影像：免费、无需 token、完全离线，
+      // 作为未配置底图源时的兜底，避免用户面对一个裸椭球。
+      // 1.145 的 TileMapServiceImageryProvider 构造函数不再接受 url，须走 fromUrl。
+      void TileMapServiceImageryProvider.fromUrl(
+        buildModuleUrl('Assets/Textures/NaturalEarthII'),
+        { credit: 'Natural Earth II（Cesium 内置离线影像）' },
+      ).then((provider) => {
+        if (widgetRef.current && !widgetRef.current.isDestroyed() && !layers.isDestroyed()) {
+          layers.addImageryProvider(provider)
+          widgetRef.current.scene.requestRender()
+        }
+      }).catch(() => {
+        // 兜底影像加载失败时保持椭球，不阻塞用户
+      })
     }
     widget.scene.requestRender()
   }, [source, ready, widgetRef])
