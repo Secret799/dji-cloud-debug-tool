@@ -4,7 +4,22 @@ import { describe, expect, it, vi } from 'vitest'
 import type { MapCoordinateSystem, MapTileSource } from '../../../shared/contracts'
 import type { DevicePosition } from '../lib/map-device-position'
 import { toCoordinateSystem } from '../lib/map-coord'
-import { activeImagerySource, describeMapDevice, deviceCartesian, focusDestination, imageryProviderUrl, MapView, markerEntityOptions } from './MapView'
+import {
+  activeImagerySource,
+  activeTerrainSource,
+  describeMapDevice,
+  deviceCartesian,
+  focusDestination,
+  imageryProviderUrl,
+  MapView,
+  markerEntityOptions,
+  TERRAIN_ARCGIS_URL,
+  TERRAIN_LOAD_TIMEOUT_MS,
+  TERRAIN_TIMEOUT_REASON,
+  terrainFailureMessage,
+  terrainProviderOptions,
+  terrainUnavailableReason,
+} from './MapView'
 
 const source = (patch: Partial<MapTileSource> = {}): MapTileSource => ({
   id: 'source-1',
@@ -23,6 +38,17 @@ const source = (patch: Partial<MapTileSource> = {}): MapTileSource => ({
   isDefault: true,
   createdAt: 1,
   updatedAt: 1,
+  ...patch,
+})
+
+/** 地形源草稿：默认是「Cesium 世界地形」，其余字段由用例覆盖 */
+const terrainSource = (patch: Partial<MapTileSource> = {}): MapTileSource => source({
+  id: 'terrain-1',
+  name: 'Cesium 世界地形',
+  layer: 'terrain',
+  kind: 'terrain-ion',
+  urlTemplate: '',
+  isDefault: true,
   ...patch,
 })
 
@@ -59,6 +85,115 @@ describe('activeImagerySource', () => {
     const terrain = source({ id: 'terrain-1', name: '地形', layer: 'terrain', isDefault: true })
     const imagery = source({ id: 'imagery-1', name: '影像', isDefault: undefined })
     expect(activeImagerySource([terrain, imagery])?.id).toBe('imagery-1')
+  })
+})
+
+describe('activeTerrainSource', () => {
+  it('prefers the default terrain source', () => {
+    const fallback = terrainSource({ id: 'terrain-2', isDefault: false })
+    expect(activeTerrainSource([fallback, terrainSource()])?.id).toBe('terrain-1')
+  })
+
+  it('falls back to the first terrain source and ignores imagery sources', () => {
+    const imagery = source({ id: 'imagery-1', isDefault: true })
+    const terrain = terrainSource({ id: 'terrain-3', isDefault: undefined })
+    expect(activeTerrainSource([imagery, terrain])?.id).toBe('terrain-3')
+  })
+
+  it('has no terrain source when none is configured', () => {
+    expect(activeTerrainSource([source()])).toBeUndefined()
+  })
+})
+
+describe('terrainProviderOptions', () => {
+  it('maps a terrain-ion source to the two-step ion construction', () => {
+    expect(terrainProviderOptions(terrainSource(), 'ion-token')).toEqual({
+      kind: 'ion',
+      assetId: 1,
+      token: 'ion-token',
+    })
+  })
+
+  it('refuses an ion source without a token instead of falling back to the bundled Cesium token', () => {
+    expect(terrainProviderOptions(terrainSource(), '')).toBeUndefined()
+    expect(terrainProviderOptions(terrainSource(), '   ')).toBeUndefined()
+  })
+
+  it('maps a terrain-arcgis source to the WorldElevation3D image service', () => {
+    expect(terrainProviderOptions(terrainSource({ kind: 'terrain-arcgis' }), 'arcgis-key')).toEqual({
+      kind: 'arcgis',
+      url: TERRAIN_ARCGIS_URL,
+      token: 'arcgis-key',
+    })
+    expect(TERRAIN_ARCGIS_URL).toContain('WorldElevation3D/Terrain3D/ImageServer')
+  })
+
+  it('refuses an arcgis source without a token', () => {
+    expect(terrainProviderOptions(terrainSource({ kind: 'terrain-arcgis' }), ' ')).toBeUndefined()
+  })
+
+  it('maps a terrain-url source to a resource url with its configured headers', () => {
+    const selfHosted = terrainSource({
+      kind: 'terrain-url',
+      urlTemplate: 'https://terrain.example.com/terrain/',
+      headers: [{ name: 'X-Tenant', value: 'dji' }],
+    })
+    expect(terrainProviderOptions(selfHosted, '')).toEqual({
+      kind: 'url',
+      url: 'https://terrain.example.com/terrain/',
+      headers: { 'X-Tenant': 'dji' },
+    })
+  })
+
+  it('sends the stored token as a bearer header for a self-hosted terrain service', () => {
+    const selfHosted = terrainSource({
+      kind: 'terrain-url',
+      urlTemplate: 'https://terrain.example.com/terrain/',
+      headers: [{ name: 'X-Tenant', value: 'dji' }],
+    })
+    expect(terrainProviderOptions(selfHosted, 'terrain-token')?.headers).toEqual({
+      'X-Tenant': 'dji',
+      Authorization: 'Bearer terrain-token',
+    })
+  })
+
+  it('trims the address of a self-hosted terrain service', () => {
+    const selfHosted = terrainSource({ kind: 'terrain-url', urlTemplate: '  https://terrain.example.com/  ' })
+    expect(terrainProviderOptions(selfHosted, '')?.url).toBe('https://terrain.example.com/')
+  })
+
+  it('refuses a terrain-url source without an address', () => {
+    expect(terrainProviderOptions(terrainSource({ kind: 'terrain-url', urlTemplate: '   ' }), 'token')).toBeUndefined()
+  })
+
+  it('ignores imagery sources', () => {
+    expect(terrainProviderOptions(source(), 'ion-token')).toBeUndefined()
+  })
+})
+
+describe('terrainUnavailableReason', () => {
+  it('asks for the Cesium ion access token', () => {
+    expect(terrainUnavailableReason(terrainSource(), '')).toBe('未填写 Cesium ion Access Token')
+  })
+
+  it('asks for the ArcGIS API key', () => {
+    expect(terrainUnavailableReason(terrainSource({ kind: 'terrain-arcgis' }), '  ')).toBe('未填写 ArcGIS API Key')
+  })
+
+  it('asks for the address of a self-hosted terrain service', () => {
+    expect(terrainUnavailableReason(terrainSource({ kind: 'terrain-url', urlTemplate: '' }), 'token')).toBe('地形服务地址为空')
+  })
+})
+
+describe('terrainFailureMessage', () => {
+  it('wraps the reason into the fallback banner copy', () => {
+    expect(terrainFailureMessage('未填写 Cesium ion Access Token'))
+      .toBe('地形加载失败：未填写 Cesium ion Access Token，已回退椭球')
+  })
+
+  it('keeps the timeout path distinguishable from a construction failure', () => {
+    expect(terrainFailureMessage(TERRAIN_TIMEOUT_REASON)).toContain('地形加载超时（3 秒）')
+    expect(TERRAIN_LOAD_TIMEOUT_MS).toBe(3_000)
   })
 })
 
@@ -220,5 +355,19 @@ describe('MapView rendering', () => {
     expect(markup).toContain('原始上报（WGS-84） 纬度 39.900000  经度 116.400000')
     expect(markup).toContain('二号机场')
     expect(markup).toContain('无定位')
+  })
+
+  it('still asks for an imagery source when only a terrain source is configured', () => {
+    const markup = renderToStaticMarkup(
+      <MapView
+        sources={[terrainSource()]}
+        devices={[]}
+        onOpenSources={vi.fn()}
+      />,
+    )
+    // 地形源不提供影像：只配地形时必须继续提示补影像底图，且工具栏不显示地形源名称
+    expect(markup).toContain('请配置底图源')
+    expect(markup).toContain('配置底图源')
+    expect(markup).not.toContain('Cesium 世界地形')
   })
 })

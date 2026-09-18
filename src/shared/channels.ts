@@ -37,6 +37,7 @@ export const IPC_CHANNELS = {
   mapSourcesProbe: 'map:sources-probe',
   mapPickDirectory: 'map:pick-directory',
   mapPickMbtiles: 'map:pick-mbtiles',
+  mapGetTerrainToken: 'map:get-terrain-token',
   objectStorageList: 'object-storage:list',
   objectStorageSave: 'object-storage:save',
   objectStorageRemove: 'object-storage:remove',

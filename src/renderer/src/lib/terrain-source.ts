@@ -1,11 +1,13 @@
 import type { MapTileSource, MapTileSourceKind } from '../../../shared/contracts'
+import { TERRAIN_SOURCE_KINDS } from '../../../shared/contracts'
 
-/** 地形层专用的三类来源类型 */
-const TERRAIN_KINDS: ReadonlySet<MapTileSourceKind> = new Set<MapTileSourceKind>([
-  'terrain-ion',
-  'terrain-arcgis',
-  'terrain-url',
-])
+/**
+ * 地形层专用的三类来源类型。
+ *
+ * 直接由契约里的 {@link TERRAIN_SOURCE_KINDS} 构造，主进程的令牌分流用的是同一份清单，
+ * 两处判断不可能各写各的而逐渐漂移。
+ */
+const TERRAIN_KINDS: ReadonlySet<MapTileSourceKind> = new Set<MapTileSourceKind>(TERRAIN_SOURCE_KINDS)
 
 /** 地形源配置预设 */
 export interface TerrainSourcePreset {

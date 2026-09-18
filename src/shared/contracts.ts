@@ -342,6 +342,14 @@ export type MapTileSourceKind =
   | 'terrain-url'
 export type MapCoordinateSystem = 'wgs84' | 'gcj02' | 'bd09'
 
+/**
+ * 地形层专用的三类来源类型。
+ *
+ * 主进程与渲染进程共用这一份清单：渲染进程的 `isTerrainKind` 与主进程的分流判断都据此建立，
+ * 新增地形类型时只需改这里，避免两处判断各写各的 Set 而逐渐漂移。
+ */
+export const TERRAIN_SOURCE_KINDS: readonly MapTileSourceKind[] = ['terrain-ion', 'terrain-arcgis', 'terrain-url']
+
 export interface MapTileSourceHeader {
   /** 请求头名称 */
   name: string
@@ -649,6 +657,7 @@ export interface DjiDesktopApi {
     probeSource: (source: MapTileSource) => Promise<MapTileProbeResult>
     pickDirectory: () => Promise<string | null>
     pickMbtiles: () => Promise<string | null>
+    getTerrainToken: (sourceId: string) => Promise<string>
   }
   objectStorage: {
     list: () => Promise<ObjectStorageProfile[]>

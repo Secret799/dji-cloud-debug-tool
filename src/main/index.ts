@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { IPC_CHANNELS } from '../shared/channels'
 import type { MapTileProbeResult, MapTileSource, OperationResult } from '../shared/contracts'
+import { TERRAIN_SOURCE_KINDS } from '../shared/contracts'
 import { parseTelemetryLayoutConfig } from '../shared/telemetry-layout'
 import {
   validateConnectionProfile,
@@ -530,6 +531,16 @@ const registerIpc = (): void => {
     } catch (error) {
       return { ok: false, error: errorMessage(error) }
     }
+  })
+  // 这是「已存凭据不回传渲染进程」不变量的唯一刻意例外，且只对地形源开口：
+  // Cesium 在渲染进程内构造地形 provider，厂商地形服务要求把 token 放进查询参数或
+  // Authorization 头，因此渲染进程必须拿到明文才能加载地形。影像 API Key 永不走此通道。
+  handleTrusted(IPC_CHANNELS.mapGetTerrainToken, async (_event, rawSourceId: unknown) => {
+    const sourceId = validateMapTileSourceId(rawSourceId)
+    const source = await mapTileSourceStore.getWithApiKey(sourceId)
+    // 来源不存在或不是 terrain-* 三类时一律返回空串，让渲染进程按「未填写 token」处理
+    if (!source || !TERRAIN_SOURCE_KINDS.includes(source.kind)) return ''
+    return source.apiKey ?? ''
   })
   handleTrusted(IPC_CHANNELS.mapPickDirectory, async () => {
     const result = await dialog.showOpenDialog({

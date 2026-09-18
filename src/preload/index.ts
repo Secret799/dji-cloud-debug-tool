@@ -93,6 +93,7 @@ const api: DjiDesktopApi = {
     probeSource: (source: MapTileSource) => ipcRenderer.invoke(IPC_CHANNELS.mapSourcesProbe, source),
     pickDirectory: () => ipcRenderer.invoke(IPC_CHANNELS.mapPickDirectory),
     pickMbtiles: () => ipcRenderer.invoke(IPC_CHANNELS.mapPickMbtiles),
+    getTerrainToken: (sourceId: string) => ipcRenderer.invoke(IPC_CHANNELS.mapGetTerrainToken, sourceId),
   },
   objectStorage: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.objectStorageList),

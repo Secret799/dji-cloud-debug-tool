@@ -5,25 +5,31 @@ import 'cesium/Build/Cesium/Widgets/widgets.css'
 import { useEffect, useMemo, useRef, useState, type MutableRefObject, type RefObject } from 'react'
 import { Layers, Locate, MapPin } from 'lucide-react'
 import {
+  ArcGISTiledElevationTerrainProvider,
   buildModuleUrl,
   CallbackPositionProperty,
   CallbackProperty,
   Cartesian2,
   Cartesian3,
+  CesiumTerrainProvider,
   CesiumWidget,
   Color,
   EllipsoidTerrainProvider,
   Entity,
   EntityCollection,
+  IonResource,
   LabelStyle,
+  Resource,
   SceneMode,
   TileMapServiceImageryProvider,
+  type TerrainProvider,
   UrlTemplateImageryProvider,
 } from 'cesium'
-import type { MapCoordinateSystem, MapTileSource } from '../../../shared/contracts'
+import type { MapCoordinateSystem, MapTileSource, MapTileSourceHeader } from '../../../shared/contracts'
 import type { DeviceTelemetry } from '../lib/dji'
 import { devicePositions, type DevicePosition } from '../lib/map-device-position'
 import { toCoordinateSystem } from '../lib/map-coord'
+import { isTerrainKind } from '../lib/terrain-source'
 
 /** 设备标记点的像素直径 */
 const MARKER_SIZE = 18
@@ -35,6 +41,26 @@ const MARKER_COLOR_OFFLINE = '#9ca3af'
 const FOCUS_HEIGHT_METERS = 2_000
 /** 名称标签相对标记点的垂直偏移，单位像素 */
 const LABEL_OFFSET_Y = -22
+/** Cesium ion 上 Cesium World Terrain 的资产编号 */
+export const TERRAIN_ION_ASSET_ID = 1
+/** ArcGIS 全球地形的固定服务地址，用户只需要提供 API Key */
+export const TERRAIN_ARCGIS_URL =
+  'https://elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer'
+/** 地形 provider 的构造超时，单位毫秒 */
+export const TERRAIN_LOAD_TIMEOUT_MS = 3_000
+/** 超时原因文案；秒数由超时常量算出，避免两处数字漂移 */
+export const TERRAIN_TIMEOUT_REASON = `地形加载超时（${TERRAIN_LOAD_TIMEOUT_MS / 1_000} 秒）`
+
+/** 非地形源被误传到地形分支时的兜底原因，正常路径不会出现 */
+const NOT_TERRAIN_REASON = '不是地形来源'
+
+/**
+ * 把异常转成可展示的中文文案。
+ *
+ * @param error 捕获到的异常
+ * @returns Error 取 message，其余类型按字符串转换
+ */
+const terrainErrorText = (error: unknown): string => (error instanceof Error ? error.message : String(error))
 
 const markerColor = (online: boolean): Color =>
   Color.fromCssColorString(online ? MARKER_COLOR_ONLINE : MARKER_COLOR_OFFLINE)
@@ -55,7 +81,8 @@ export const imageryProviderUrl = (source: MapTileSource): string =>
 /**
  * 选取当前生效的影像底图源。
  *
- * 配置里可能同时存在影像源与地形源，地形源第一期不参与渲染，必须排除。
+ * 配置里可能同时存在影像源与地形源：地形只提供地表高程，不提供影像，
+ * 地形源由下面的 {@link activeTerrainSource} 单独消费，这里必须排除。
  *
  * @param sources 全部底图源
  * @returns 优先取默认影像源，其次取第一个影像源；没有影像源时返回 undefined
@@ -63,6 +90,140 @@ export const imageryProviderUrl = (source: MapTileSource): string =>
 export const activeImagerySource = (sources: MapTileSource[]): MapTileSource | undefined => {
   const imagery = sources.filter((source) => source.layer === 'imagery')
   return imagery.find((source) => source.isDefault) ?? imagery[0]
+}
+
+/**
+ * 选取当前生效的地形源。
+ *
+ * 与 {@link activeImagerySource} 对称：地形源只影响地表几何，不参与影像图层。
+ *
+ * @param sources 全部底图源
+ * @returns 优先取默认地形源，其次取第一个地形源；没有地形源时返回 undefined
+ */
+export const activeTerrainSource = (sources: MapTileSource[]): MapTileSource | undefined => {
+  const terrain = sources.filter((source) => source.layer === 'terrain')
+  return terrain.find((source) => source.isDefault) ?? terrain[0]
+}
+
+/** 构造地形 provider 所需的输入，三类来源各自取用其中一部分字段 */
+export interface TerrainProviderOptions {
+  /** 构造分支：ion 走两步构造，arcgis 用固定服务地址，url 用自建地址与请求头 */
+  kind: 'ion' | 'arcgis' | 'url'
+  /** ion 专用：Cesium World Terrain 的资产编号 */
+  assetId?: number
+  /** arcgis / url 专用：地形服务地址 */
+  url?: string
+  /** 访问令牌明文 */
+  token?: string
+  /** url 专用：随地形瓦片请求发出的请求头，已含 Authorization（若配了令牌） */
+  headers?: Record<string, string>
+}
+
+/**
+ * 组装自建地形服务的请求头。
+ *
+ * 自建 quantized-mesh 服务的令牌没有厂商语义，约定按 `Authorization: Bearer` 发送；
+ * 用户自己配的 Authorization 会被它覆盖，因为令牌字段就是为该服务准备的。
+ *
+ * @param headers 用户在弹窗里配置的请求头
+ * @param token 令牌明文，可为空
+ * @returns 请求头键值对；名称为空的条目被忽略
+ */
+export const terrainRequestHeaders = (
+  headers: MapTileSourceHeader[],
+  token: string,
+): Record<string, string> => {
+  const result: Record<string, string> = {}
+  for (const header of headers) {
+    const name = header.name.trim()
+    if (!name) continue
+    result[name] = header.value
+  }
+  if (token) result.Authorization = `Bearer ${token}`
+  return result
+}
+
+/**
+ * 把地形源与令牌转成构造 provider 所需的输入。
+ *
+ * 三类来源都可能返回 undefined，此时调用方必须退回椭球并提示，绝不能拿着空令牌去构造：
+ * Cesium ion 的工厂方法收不到令牌会回落到 Cesium 内置的默认令牌，用户会以为地形已经按自己的账号加载。
+ *
+ * @param source 生效的地形源
+ * @param token 主进程回传的令牌明文，未保存令牌时为空串
+ * @returns 构造输入；来源不是地形、令牌为空或自建地址为空时返回 undefined
+ */
+export const terrainProviderOptions = (source: MapTileSource, token: string): TerrainProviderOptions | undefined => {
+  // 图层字段在草稿未定型时可能滞后，按 kind 判定
+  if (!isTerrainKind(source.kind)) return undefined
+
+  const trimmedToken = token.trim()
+  if (source.kind === 'terrain-ion') {
+    return trimmedToken ? { kind: 'ion', assetId: TERRAIN_ION_ASSET_ID, token: trimmedToken } : undefined
+  }
+  if (source.kind === 'terrain-arcgis') {
+    return trimmedToken ? { kind: 'arcgis', url: TERRAIN_ARCGIS_URL, token: trimmedToken } : undefined
+  }
+
+  const url = source.urlTemplate.trim()
+  if (!url) return undefined
+  return { kind: 'url', url, headers: terrainRequestHeaders(source.headers, trimmedToken) }
+}
+
+/**
+ * 给出地形源不可用的中文原因，用于顶部提示条。
+ *
+ * 只在 {@link terrainProviderOptions} 返回 undefined 时调用，因此不需要重复校验地址合法性，
+ * 但仍按来源类型给出各自缺什么字段的提示。
+ *
+ * @param source 生效的地形源
+ * @param token 主进程回传的令牌明文
+ * @returns 面向用户的中文原因
+ */
+export const terrainUnavailableReason = (source: MapTileSource, token: string): string => {
+  if (source.kind === 'terrain-url') return '地形服务地址为空'
+  if (source.kind === 'terrain-arcgis') return '未填写 ArcGIS API Key'
+  if (source.kind === 'terrain-ion') return '未填写 Cesium ion Access Token'
+  return NOT_TERRAIN_REASON
+}
+
+/**
+ * 生成地形加载失败的提示条文案。
+ *
+ * @param reason 失败原因，超时路径传 {@link TERRAIN_TIMEOUT_REASON} 以便与构造失败区分
+ * @returns 提示条文案
+ */
+export const terrainFailureMessage = (reason: string): string => `地形加载失败：${reason}，已回退椭球`
+
+/**
+ * 按决策结果构造地形 provider。
+ *
+ * ion 必须两步构造：`CesiumTerrainProvider.fromIonAssetId` 内部调用 `IonResource.fromAssetId` 时
+ * 不透传 options，直接传入的 accessToken 会被静默丢弃并回落到 Cesium 内置默认令牌，
+ * 所以先取资源再 `fromUrl`；也不设置 `Cesium.Ion.defaultAccessToken`，避免污染全局默认值。
+ *
+ * @param options 由 {@link terrainProviderOptions} 得出的构造输入
+ * @returns 构造完成的地形 provider；上游不可用时以 rejection 结束
+ */
+export const createTerrainProvider = async (options: TerrainProviderOptions): Promise<TerrainProvider> => {
+  if (options.kind === 'ion') {
+    const resource = await IonResource.fromAssetId(options.assetId ?? TERRAIN_ION_ASSET_ID, {
+      accessToken: options.token,
+    })
+    return CesiumTerrainProvider.fromUrl(resource, { requestVertexNormals: true, requestWaterMask: true })
+  }
+  if (options.kind === 'arcgis') {
+    // token 会作为查询参数附加到请求上，ArcGIS 的工厂方法确实会透传
+    return ArcGISTiledElevationTerrainProvider.fromUrl(options.url ?? TERRAIN_ARCGIS_URL, {
+      token: options.token,
+    })
+  }
+  // fromUrl 会自动 GET 根地址下的 layer.json；请求头经 getDerivedResource 继承到每个瓦片请求
+  // url 为 url 分支的必填字段，由 terrainProviderOptions 填好，这里的缺省值只用于类型收窄
+  return CesiumTerrainProvider.fromUrl(
+    new Resource({ url: options.url ?? '', headers: options.headers }),
+    { requestVertexNormals: true, requestWaterMask: true },
+  )
 }
 
 /**
@@ -292,6 +453,99 @@ export const useBasemapLayer = (handle: CesiumMapHandle, source: MapTileSource |
   }, [source, ready, widgetRef])
 }
 
+/** 地形层的当前状态 */
+export type TerrainLayerState = 'none' | 'loading' | 'ready' | 'failed'
+
+/** 地形层状态与失败原因，直接驱动顶部提示条 */
+export interface TerrainLayerStatus {
+  /** 地形层状态；none 表示没有配置地形源，failed 表示已回退椭球 */
+  state: TerrainLayerState
+  /** 失败时的中文提示文案 */
+  detail?: string
+}
+
+/**
+ * 把当前地形源挂到 Cesium 的 scene 上。
+ *
+ * 地形相比影像多两处麻烦，都在这里处理：
+ * 一是令牌只在主进程加密保存，渲染进程必须经 `map:get-terrain-token` 现取一次明文才能构造 provider；
+ * 二是 provider 构造要下载 layer.json，慢或不可达时不能一直吊着用户，因此与 {@link TERRAIN_LOAD_TIMEOUT_MS}
+ * 赛跑：超时先退回椭球并提示，构造若在超时之后才落地仍然补正（成功则换成地形并清掉提示，
+ * 失败则把超时文案换成真实错误）。所有赋值都受 cancelled 保护，控件销毁后不再触碰。
+ *
+ * @param handle 地图控件句柄
+ * @param source 当前生效的地形源；未配置时挂回椭球并清空提示
+ * @returns 当前地形层状态与失败原因
+ */
+export const useTerrainLayer = (
+  handle: CesiumMapHandle,
+  source: MapTileSource | undefined,
+): TerrainLayerStatus => {
+  const { widgetRef, ready } = handle
+  const [status, setStatus] = useState<TerrainLayerStatus>({ state: 'none' })
+
+  useEffect(() => {
+    const widget = widgetRef.current
+    if (!ready || !widget || widget.isDestroyed()) return
+
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    // 每次都重新取控件：超时后迟到的结果可能在控件已销毁之后才到
+    const apply = (provider: TerrainProvider): void => {
+      const current = widgetRef.current
+      if (cancelled || !current || current.isDestroyed()) return
+      current.scene.terrainProvider = provider
+      current.scene.requestRender()
+    }
+    const fail = (reason: string): void => {
+      apply(new EllipsoidTerrainProvider())
+      if (!cancelled) setStatus({ state: 'failed', detail: terrainFailureMessage(reason) })
+    }
+
+    if (!source) {
+      apply(new EllipsoidTerrainProvider())
+      setStatus({ state: 'none' })
+      return
+    }
+    setStatus({ state: 'loading' })
+
+    const load = async (): Promise<void> => {
+      let token = ''
+      try {
+        token = await window.djiApi.map.getTerrainToken(source.id)
+      } catch (error) {
+        fail(terrainErrorText(error))
+        return
+      }
+      if (cancelled) return
+      const options = terrainProviderOptions(source, token)
+      if (!options) {
+        fail(terrainUnavailableReason(source, token))
+        return
+      }
+      timer = setTimeout(() => fail(TERRAIN_TIMEOUT_REASON), TERRAIN_LOAD_TIMEOUT_MS)
+      try {
+        const provider = await createTerrainProvider(options)
+        clearTimeout(timer)
+        apply(provider)
+        if (!cancelled) setStatus({ state: 'ready' })
+      } catch (error) {
+        clearTimeout(timer)
+        fail(terrainErrorText(error))
+      }
+    }
+    void load()
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+    // updatedAt 一起作为依赖：用户改完地形源保存后必须重新构造 provider
+  }, [source?.id, source?.updatedAt, ready, widgetRef])
+
+  return status
+}
+
 /**
  * 按 SN 维护设备实体：新增、原地复用、移除。
  *
@@ -446,6 +700,7 @@ export function MapView({ sources, devices, onOpenSources }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const map = useCesiumMap(containerRef)
   const activeSource = useMemo(() => activeImagerySource(sources), [sources])
+  const terrainSource = useMemo(() => activeTerrainSource(sources), [sources])
   const positions = useMemo(() => devicePositions(devices), [devices])
   const missingFix = useMemo(
     () => devices.filter((device) => !positions.some((position) => position.sn === device.sn)),
@@ -454,6 +709,7 @@ export function MapView({ sources, devices, onOpenSources }: MapViewProps) {
   const system = activeSource?.coordinateSystem ?? 'wgs84'
 
   useBasemapLayer(map, activeSource)
+  const terrain = useTerrainLayer(map, terrainSource)
   useDeviceEntities(map, positions, system)
 
   const focusOnDevices = (): void => {
@@ -480,6 +736,9 @@ export function MapView({ sources, devices, onOpenSources }: MapViewProps) {
         </div>
       )}
       {map.runtimeError && <div className="map-banner error">{map.runtimeError}</div>}
+      {terrain.state === 'failed' && terrain.detail && (
+        <div className="map-banner error">{terrain.detail}</div>
+      )}
 
       <div ref={containerRef} className="map-canvas" />
 
