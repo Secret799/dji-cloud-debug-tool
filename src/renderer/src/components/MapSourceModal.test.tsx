@@ -131,6 +131,33 @@ describe('map tile source layers', () => {
     const draft = validSource()
     expect(mapTileSourceDraftForLayer(draft, 'imagery')).toBe(draft)
   })
+
+  it('drops the stored key of the other provider when a saved source changes layer', () => {
+    // 已保存的影像源存着天地图的 tk，切到地形后草稿仍带着同一个 id：
+    // 若不在保存时清掉，ion 请求会拿着天地图的凭据去访问 cesium.com
+    const imagery = validSource({ id: 'source-9', name: '我的底图', hasApiKey: true })
+    const terrain = mapTileSourceDraftForLayer(imagery, 'terrain', 'imagery')
+    expect(terrain.layer).toBe('terrain')
+    expect(terrain.id).toBe('source-9')
+    expect(terrain.name).toBe('我的底图')
+    expect(terrain.hasApiKey).toBeFalsy()
+    expect(terrain.clearApiKey).toBe(true)
+  })
+
+  it('keeps the credential of the saved source when the user switches back to its layer', () => {
+    // 切回原图层时凭据仍然对得上，不能误清；hasApiKey 跟着草稿走
+    const imagery = validSource({ id: 'source-10', name: '全球地形', hasApiKey: true })
+    const back = mapTileSourceDraftForLayer(imagery, 'terrain', 'terrain')
+    expect(back.hasApiKey).toBe(true)
+    expect(back.clearApiKey).toBe(false)
+  })
+
+  it('does not schedule a clear for a draft that was never saved', () => {
+    const unsaved = validSource({ kind: 'directory', path: '/data/tiles' })
+    const terrain = mapTileSourceDraftForLayer(unsaved, 'terrain')
+    expect(terrain.clearApiKey).toBeFalsy()
+    expect(terrain.id).toBe('')
+  })
 })
 
 describe('map tile presets', () => {
@@ -322,6 +349,20 @@ describe('map tile source save payload', () => {
     const draft = validSource({ id: 'source-1', maxZoom: 17 })
     const payload = buildMapTileSourcePayload(draft, '')
     expect(payload).toEqual({ ...draft })
+  })
+
+  it('lets a newly typed key win over the pending clear of the stored one', () => {
+    // 跨图层切换会在草稿上留下 clearApiKey：主进程先看 clearApiKey 再看 apiKey，
+    // 新填的密钥若不撤销该标记，就会被静默丢掉
+    const payload = buildMapTileSourcePayload(source({ clearApiKey: true }), 'ion-token')
+    expect(payload.apiKey).toBe('ion-token')
+    expect(payload.clearApiKey).toBe(false)
+  })
+
+  it('keeps the pending clear when no key is typed', () => {
+    const payload = buildMapTileSourcePayload(validSource({ clearApiKey: true }), '')
+    expect(payload.clearApiKey).toBe(true)
+    expect('apiKey' in payload).toBe(false)
   })
 })
 

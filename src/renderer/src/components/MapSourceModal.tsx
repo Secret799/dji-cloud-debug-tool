@@ -184,14 +184,33 @@ export const createMapTileSource = (): MapTileSource => ({
  * 保存时被当成地形源的字段写进存储。这里按目标图层重建草稿，只保留与图层无关的标识与名称，
  * 使右侧表单「始终在编辑左侧选中的那一条」的语义在切换图层后依然成立。
  *
+ * 重建时必须一并决定已存密钥的去留：API Key 按源 id 加密存储，切换图层不会丢掉 id，
+ * 于是新服务会自动继承上一家服务的凭据——存着天地图 tk 的影像源切到地形后，
+ * ion 请求会拿着别家的密钥去访问 cesium.com，而界面还提示「已保存，留空则不修改」。
+ * 因此跨图层改 kind 时用 clearApiKey 标记待清空；切回源记录原本所属的图层时凭据仍然对得上，
+ * 不能误清（clearApiKey 置 false），hasApiKey 则沿用草稿上已有的取值。
+ *
  * @param draft 当前草稿
  * @param layer 目标图层
+ * @param savedLayer 左侧选中的已保存源所属图层；表单在编辑尚未保存的草稿时为 undefined
  * @returns 切换后的草稿；目标图层与当前一致时原样返回
  */
-export const mapTileSourceDraftForLayer = (draft: MapTileSource, layer: MapLayerKind): MapTileSource => {
+export const mapTileSourceDraftForLayer = (
+  draft: MapTileSource,
+  layer: MapLayerKind,
+  savedLayer?: MapLayerKind,
+): MapTileSource => {
   if (draft.layer === layer) return draft
   const rebuilt = layer === 'terrain' ? createTerrainSource(DEFAULT_TERRAIN_KIND) : createMapTileSource()
-  return { ...rebuilt, id: draft.id, name: draft.name }
+  const keepsStoredKey = savedLayer === layer
+  return {
+    ...rebuilt,
+    id: draft.id,
+    name: draft.name,
+    hasApiKey: keepsStoredKey ? Boolean(draft.hasApiKey) : false,
+    // 草稿没对应任何已保存的源时没有凭据可清，savedLayer 为 undefined 必须落到 false
+    clearApiKey: keepsStoredKey ? false : Boolean(savedLayer),
+  }
 }
 
 /**
@@ -418,13 +437,17 @@ export const mapTileSourceIssues = (source: MapTileSource): string[] => {
  * API Key 只在用户真的填了内容时才带上：主进程把「不带 apiKey」当作「保留已存密钥」，
  * 因此留空必须是「键不存在」而不是空字符串，否则会静默清掉已保存的密钥。
  *
+ * 用户真的填了密钥时还必须撤销草稿上待清空的 clearApiKey：主进程先看 clearApiKey 再看 apiKey，
+ * 跨图层切换留下的清空标记若不同步撤销，新填的密钥会在保存时被静默丢掉。
+ * 即「显式新密钥优先于待清空标记，留空仍表示保留已存密钥」。
+ *
  * @param draft 当前草稿
  * @param apiKey 用户输入的 API Key 明文，两端空白会被去掉
- * @returns 提交用的底图源；API Key 为空时不含 `apiKey` 字段
+ * @returns 提交用的底图源；API Key 为空时不含 `apiKey` 字段，且保留草稿原有的 `clearApiKey`
  */
 export const buildMapTileSourcePayload = (draft: MapTileSource, apiKey: string): MapTileSource => {
   const trimmedApiKey = apiKey.trim()
-  return trimmedApiKey ? { ...draft, apiKey: trimmedApiKey } : { ...draft }
+  return trimmedApiKey ? { ...draft, apiKey: trimmedApiKey, clearApiKey: false } : { ...draft }
 }
 
 /**
@@ -618,7 +641,11 @@ export const useMapSourceDraft = (sources: MapTileSource[], selectedId: string):
     update: (patch: Partial<MapTileSource>) => setDraft((current) => ({ ...current, ...patch })),
     replaceApiKey: setApiKey,
     applyPreset: (option: MapSourcePresetOption) => setDraft((current) => option.apply(current)),
-    switchLayer: (layer: MapLayerKind) => setDraft((current) => mapTileSourceDraftForLayer(current, layer)),
+    switchLayer: (layer: MapLayerKind) => {
+      // 明文密钥只在图层真的变化时清空：为上一层输入的密钥绝不能跟着提交给新图层的来源
+      if (draft.layer !== layer) setApiKey('')
+      setDraft((current) => mapTileSourceDraftForLayer(current, layer, selected?.layer))
+    },
     applyPath: (path: string) => setDraft((current) => applyPickedPath(current, path)),
   }
 }
