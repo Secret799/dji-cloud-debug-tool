@@ -1,15 +1,18 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, net, protocol, shell } from 'electron'
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { IPC_CHANNELS } from '../shared/channels'
-import type { OperationResult } from '../shared/contracts'
+import type { MapTileProbeResult, MapTileSource, OperationResult } from '../shared/contracts'
+import { TERRAIN_SOURCE_KINDS } from '../shared/contracts'
 import { parseTelemetryLayoutConfig } from '../shared/telemetry-layout'
 import {
   validateConnectionProfile,
   validateDeviceArchives,
   validateExportMessageOptions,
   validateFirmwareUploadRequest,
+  validateMapTileSource,
+  validateMapTileSourceId,
   validateMediaServerProfile,
   validateObjectStorageProfile,
   validateProfileId,
@@ -29,6 +32,22 @@ import {
   validateWebDavVersionId,
   validateWhepOfferRequest,
 } from './ipc-validation'
+import { MapTileSourceStore } from './map-tile-source-store'
+import {
+  MAP_TILE_SCHEME,
+  MapTileProtocolHandler,
+  mapTileProtocolPrivileges,
+  registerMapTileProtocol,
+} from './map-tile-protocol'
+import {
+  buildTileHeaders,
+  buildTileUrl,
+  findLocalTileRequest,
+  resolveDirectoryTile,
+  resolveMbtilesTile,
+  type ResolvedTile,
+  type TileRequest,
+} from './map-tile-resolver'
 import { MqttConnectionManager } from './mqtt-manager'
 import { ProfileStore } from './profile-store'
 import { MediaServerStore } from './media-server-store'
@@ -51,6 +70,11 @@ import {
 
 const PRODUCT_NAME = 'DJI Cloud Studio'
 
+// 必须在 app ready 之前注册协议特权，否则 protocol.handle 会失败
+protocol.registerSchemesAsPrivileged([
+  { scheme: MAP_TILE_SCHEME, privileges: mapTileProtocolPrivileges },
+])
+
 app.setName(PRODUCT_NAME)
 
 let mainWindow: BrowserWindow | null = null
@@ -68,6 +92,8 @@ let remoteLogUploadManager: RemoteLogUploadManager
 let appUpdateManager: AppUpdateManager
 let webDavConfigStore: WebDavConfigStore
 let webDavBackupManager: WebDavBackupManager
+let mapTileSourceStore: MapTileSourceStore
+let mapTileProtocolHandler: MapTileProtocolHandler
 let trustedRendererUrl: string | null = null
 let quitCleanupStarted = false
 let quitCleanupComplete = false
@@ -101,6 +127,116 @@ const developmentIconPath = app.isPackaged ? undefined : join(__dirname, '../../
 
 const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error))
 const operationFailure = (error: unknown): OperationResult => ({ ok: false, error: errorMessage(error) })
+
+const PROBE_TIMEOUT_MS = 10_000
+
+/** 探测超时的中文提示，用于替换运行时抛出的英文原文 */
+const PROBE_TIMEOUT_MESSAGE = '探测超时，请检查地址与网络'
+
+/**
+ * 把探测过程中抛出的异常转成给用户看的文案。
+ *
+ * 只翻译「整体超时」：net.fetch 超时抛的是 DOMException（name 为 TimeoutError），
+ * 其英文原文 The operation was aborted due to timeout 与界面其余中文文案不一致；
+ * HTTP 401、DNS 失败等错误带有诊断价值，必须原样保留。
+ *
+ * @param error 探测过程中抛出的异常
+ * @returns 超时的中文提示，或原始的错误信息
+ */
+export const mapProbeErrorMessage = (error: unknown): string => {
+  if (error instanceof Error && error.name === 'TimeoutError') return PROBE_TIMEOUT_MESSAGE
+  return errorMessage(error)
+}
+
+/**
+ * 本地瓦片源里一张瓦片都找不到时的提示；路径填错与瓦片集为空合并成同一条。
+ */
+const PROBE_EMPTY_LOCAL_TILE_MESSAGE = '瓦片集为空或路径错误'
+
+/**
+ * 为探测挑一张瓦片坐标。
+ *
+ * 在线模板没有本地索引可查，且它本就能服务任意坐标，继续用最小缩放级的原点瓦片：
+ * 若被上游拒绝，用户得到的正是「模板或密钥有问题」这个有用信号。
+ * 本地源必须问数据源要一张真实存在的瓦片，否则城市级瓦片集会误报不可用。
+ *
+ * @param source 已校验的底图源配置
+ * @returns 探测用的瓦片坐标；本地源里没有瓦片时返回 undefined
+ * @throws TileRequestError 本地数据源不可读
+ */
+const probeTileRequest = async (source: MapTileSource): Promise<TileRequest | undefined> =>
+  source.kind === 'url-template' ? { z: source.minZoom, x: 0, y: 0 } : await findLocalTileRequest(source)
+
+/**
+ * 用一张真实存在的瓦片验证底图源是否可用。
+ *
+ * 刻意不复用 map-tile 协议处理器：协议层为了不把磁盘绝对路径透给渲染进程，任何失败都返回无响应体的 404，
+ * 而探测需要把失败原因回给用户。
+ *
+ * @param source 已校验的底图源配置
+ * @returns 探测结果，成功时带回瓦片字节数
+ */
+export const probeMapTileSource = async (source: MapTileSource): Promise<MapTileProbeResult> => {
+  try {
+    const request = await probeTileRequest(source)
+    if (!request) return { ok: false, error: PROBE_EMPTY_LOCAL_TILE_MESSAGE }
+    const tile = source.kind === 'url-template'
+      ? await fetchRemoteTileForProbe(source, request)
+      : source.kind === 'directory'
+        ? await resolveDirectoryTile(source, request)
+        : await resolveMbtilesTile(source, request)
+    return { ok: true, bytes: tile.body.byteLength }
+  } catch (error) {
+    // 超时要换成中文提示；其余错误（HTTP 状态、DNS 失败等）保留原始诊断信息
+    return { ok: false, error: mapProbeErrorMessage(error) }
+  }
+}
+
+/**
+ * 为探测直接向上游请求一张瓦片，绕过协议处理器，以便区分「上游拒绝」与「瓦片不存在」。
+ *
+ * @param source 已校验的底图源配置
+ * @param request 瓦片坐标
+ * @returns 瓦片字节与内容类型
+ * @throws Error 上游返回非成功状态，或请求超过 {@link PROBE_TIMEOUT_MS}
+ */
+const fetchRemoteTileForProbe = async (
+  source: MapTileSource,
+  request: { z: number; x: number; y: number },
+): Promise<ResolvedTile> => {
+  const apiKey = source.apiKey ?? ''
+  const url = buildTileUrl(source, request, apiKey, 0)
+  const response = await net.fetch(url, {
+    headers: buildTileHeaders(source, apiKey),
+    signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+  })
+  if (!response.ok) throw new Error(`上游返回 HTTP ${response.status}`)
+  return {
+    body: Buffer.from(await response.arrayBuffer()),
+    contentType: response.headers.get('content-type') ?? 'image/png',
+  }
+}
+
+/**
+ * 为探测解析出带 API Key 的底图源：渲染进程传来的 Key 优先，缺省时回退到已存密钥。
+ *
+ * Store 读回的底图源只带 hasApiKey，apiKey 永远为空；若直接用渲染进程入参探测，
+ * 「打开已保存的带密钥底图源后直接点测试」会被上游当成未授权，误报探测失败。
+ *
+ * @param source 已校验的底图源配置
+ * @param store 底图源存储，主进程中唯一能取到 API Key 明文的入口
+ * @returns 补好 API Key 的底图源；渲染进程已带 Key 或 id 为空时原样返回
+ */
+const resolveProbeMapTileSource = async (
+  source: MapTileSource,
+  store: MapTileSourceStore,
+): Promise<MapTileSource> => {
+  // 用户可能刚改了 Key 还没保存，此时以渲染进程传来的为准
+  if (source.apiKey || !source.id) return source
+  // id 未知视为「没有已存密钥」，不作为错误
+  const stored = await store.getWithApiKey(source.id)
+  return stored?.apiKey ? { ...source, apiKey: stored.apiKey } : source
+}
 
 const createWindow = (): void => {
   const window = new BrowserWindow({
@@ -372,6 +508,56 @@ const registerIpc = (): void => {
     }
   })
 
+  handleTrusted(IPC_CHANNELS.mapSourcesList, () => mapTileSourceStore.list())
+  handleTrusted(IPC_CHANNELS.mapSourcesSave, async (_event, rawSource: unknown) => {
+    const saved = await mapTileSourceStore.save(validateMapTileSource(rawSource))
+    // 底图源变化后缓存里的瓦片可能已失效
+    mapTileProtocolHandler.clearCache()
+    return saved
+  })
+  handleTrusted(IPC_CHANNELS.mapSourcesRemove, async (_event, rawSourceId: unknown) => {
+    try {
+      const removed = await mapTileSourceStore.remove(validateMapTileSourceId(rawSourceId))
+      mapTileProtocolHandler.clearCache()
+      return removed ? { ok: true } : { ok: false, error: '底图源不存在' }
+    } catch (error) {
+      return operationFailure(error)
+    }
+  })
+  handleTrusted(IPC_CHANNELS.mapSourcesProbe, async (_event, rawSource: unknown) => {
+    try {
+      const source = await resolveProbeMapTileSource(validateMapTileSource(rawSource), mapTileSourceStore)
+      return await probeMapTileSource(source)
+    } catch (error) {
+      return { ok: false, error: errorMessage(error) }
+    }
+  })
+  // 这是「已存凭据不回传渲染进程」不变量的唯一刻意例外，且只对地形源开口：
+  // Cesium 在渲染进程内构造地形 provider，厂商地形服务要求把 token 放进查询参数或
+  // Authorization 头，因此渲染进程必须拿到明文才能加载地形。影像 API Key 永不走此通道。
+  handleTrusted(IPC_CHANNELS.mapGetTerrainToken, async (_event, rawSourceId: unknown) => {
+    const sourceId = validateMapTileSourceId(rawSourceId)
+    const source = await mapTileSourceStore.getWithApiKey(sourceId)
+    // 来源不存在或不是 terrain-* 三类时一律返回空串，让渲染进程按「未填写 token」处理
+    if (!source || !TERRAIN_SOURCE_KINDS.includes(source.kind)) return ''
+    return source.apiKey ?? ''
+  })
+  handleTrusted(IPC_CHANNELS.mapPickDirectory, async () => {
+    const result = await dialog.showOpenDialog({
+      title: '选择瓦片目录',
+      properties: ['openDirectory'],
+    })
+    return result.canceled ? null : result.filePaths[0]
+  })
+  handleTrusted(IPC_CHANNELS.mapPickMbtiles, async () => {
+    const result = await dialog.showOpenDialog({
+      title: '选择 MBTiles 文件',
+      properties: ['openFile'],
+      filters: [{ name: 'MBTiles', extensions: ['mbtiles'] }],
+    })
+    return result.canceled ? null : result.filePaths[0]
+  })
+
   handleTrusted(IPC_CHANNELS.objectStorageList, () => objectStorageStore.list())
   handleTrusted(IPC_CHANNELS.objectStorageSave, async (_event, rawProfile: unknown) => {
     const saved = await objectStorageStore.save(validateObjectStorageProfile(rawProfile))
@@ -526,6 +712,10 @@ app.whenReady().then(() => {
   appUpdateManager = new AppUpdateManager((state) => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC_CHANNELS.appUpdateEvent, state)
   })
+  // 协议处理必须在 app ready 之后注册，且早于任何渲染进程请求
+  mapTileSourceStore = new MapTileSourceStore()
+  mapTileProtocolHandler = new MapTileProtocolHandler(mapTileSourceStore)
+  registerMapTileProtocol(mapTileProtocolHandler)
   registerIpc()
   createWindow()
   setTimeout(() => void appUpdateManager.check(), 5_000)

@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto'
 
 export interface CredentialContext {
-  store: 'mqtt' | 'media' | 'object-storage' | 'webdav'
+  store: 'mqtt' | 'media' | 'object-storage' | 'webdav' | 'map'
   recordId: string
   field: string
 }

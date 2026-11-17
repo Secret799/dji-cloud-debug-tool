@@ -8,6 +8,7 @@ import type {
   ExportMessageOptions,
   FirmwareUploadProgress,
   FirmwareUploadRequest,
+  MapTileSource,
   MediaServerProfile,
   MediaServerRuntime,
   MqttQos,
@@ -84,6 +85,15 @@ const api: DjiDesktopApi = {
       ipcRenderer.on(IPC_CHANNELS.mediaRuntimeEvent, handler)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.mediaRuntimeEvent, handler)
     },
+  },
+  map: {
+    listSources: () => ipcRenderer.invoke(IPC_CHANNELS.mapSourcesList),
+    saveSource: (source: MapTileSource) => ipcRenderer.invoke(IPC_CHANNELS.mapSourcesSave, source),
+    removeSource: (sourceId: string) => ipcRenderer.invoke(IPC_CHANNELS.mapSourcesRemove, sourceId),
+    probeSource: (source: MapTileSource) => ipcRenderer.invoke(IPC_CHANNELS.mapSourcesProbe, source),
+    pickDirectory: () => ipcRenderer.invoke(IPC_CHANNELS.mapPickDirectory),
+    pickMbtiles: () => ipcRenderer.invoke(IPC_CHANNELS.mapPickMbtiles),
+    getTerrainToken: (sourceId: string) => ipcRenderer.invoke(IPC_CHANNELS.mapGetTerrainToken, sourceId),
   },
   objectStorage: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.objectStorageList),

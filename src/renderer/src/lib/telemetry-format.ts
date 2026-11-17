@@ -147,3 +147,24 @@ export const formatTelemetryValue = (value: unknown, formatter: TelemetryValueFo
 
   return formatter === 'uppercase' ? raw.toLocaleUpperCase() : raw.toLocaleLowerCase()
 }
+
+const formatterSamples: Record<TelemetryValueFormatter, unknown> = {
+  datetime: 1_731_830_400,
+  date: 1_731_830_400,
+  time: 1_731_830_400,
+  number: 12_345.678,
+  fixed_2: 12.346,
+  percent: 0.2567,
+  seconds_to_minutes: 3_725,
+  seconds_to_hours: 3_725,
+  seconds_to_duration: 3_725,
+  meters_to_kilometers: 1_500,
+  kilobytes_to_megabytes: 2_048,
+  kilobytes_to_gigabytes: 2_097_152,
+  json: '{"state":1,"battery":87}',
+  uppercase: 'dji-cloud',
+  lowercase: 'DJI-CLOUD',
+}
+
+export const telemetryFormatterPreview = (formatter?: TelemetryValueFormatter): string =>
+  formatter ? formatTelemetryValue(formatterSamples[formatter], formatter) : '保持原始值'

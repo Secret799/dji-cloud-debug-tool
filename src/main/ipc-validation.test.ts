@@ -6,6 +6,8 @@ import {
   validateDeviceArchives,
   validateExportMessageOptions,
   validateFirmwareUploadRequest,
+  validateMapTileSource,
+  validateMapTileSourceId,
   validateMediaServerProfile,
   validateObjectStorageProfile,
   validatePublishRequest,
@@ -439,5 +441,130 @@ describe('IPC validation', () => {
       files: Array.from({ length: 1_001 }, () => ({ module: '3', bootIndex: 1 })),
       objectKeys: { '3': 'logs/dock.log' },
     })).toThrow('数量不能超过')
+  })
+})
+
+describe('map tile source validation', () => {
+  const base = {
+    id: 'source-1',
+    name: '自建瓦片',
+    layer: 'imagery',
+    kind: 'url-template',
+    urlTemplate: 'https://tiles.example.com/{z}/{x}/{y}.png',
+    path: '',
+    headers: [],
+    coordinateSystem: 'wgs84',
+    minZoom: 0,
+    maxZoom: 19,
+    tileSize: 256,
+    tileExtension: '',
+    attribution: '',
+    createdAt: 1,
+    updatedAt: 1,
+  }
+
+  it('accepts a well-formed url template source', () => {
+    expect(validateMapTileSource(base)).toMatchObject({ id: 'source-1', kind: 'url-template' })
+  })
+
+  it('requires the z, x and y placeholders in a url template', () => {
+    expect(() => validateMapTileSource({ ...base, urlTemplate: 'https://tiles.example.com/{x}/{y}.png' })).toThrow('{z}')
+    expect(() => validateMapTileSource({ ...base, urlTemplate: 'https://tiles.example.com/{z}/{y}.png' })).toThrow('{x}')
+    expect(() => validateMapTileSource({ ...base, urlTemplate: 'https://tiles.example.com/{z}/{x}.png' })).toThrow('{y}')
+  })
+
+  it('rejects non-http url templates', () => {
+    expect(() => validateMapTileSource({ ...base, urlTemplate: 'file:///etc/{z}/{x}/{y}.png' })).toThrow('URL 模板')
+    expect(() => validateMapTileSource({ ...base, urlTemplate: 'map-tile://tiles/a/{z}/{x}/{y}' })).toThrow('URL 模板')
+  })
+
+  it('requires an absolute path for local sources', () => {
+    expect(() => validateMapTileSource({ ...base, kind: 'directory', path: 'tiles' })).toThrow('绝对路径')
+    expect(() => validateMapTileSource({ ...base, kind: 'mbtiles', path: './tiles.mbtiles' })).toThrow('绝对路径')
+  })
+
+  it('requires a path to end with .mbtiles for the mbtiles kind', () => {
+    expect(() => validateMapTileSource({ ...base, kind: 'mbtiles', path: '/data/tiles.db' })).toThrow('.mbtiles')
+    expect(validateMapTileSource({ ...base, kind: 'mbtiles', path: '/data/tiles.mbtiles' }).kind).toBe('mbtiles')
+  })
+
+  it('validates the zoom range', () => {
+    expect(() => validateMapTileSource({ ...base, minZoom: -1 })).toThrow('最小缩放')
+    expect(() => validateMapTileSource({ ...base, maxZoom: 23 })).toThrow('最大缩放')
+    expect(() => validateMapTileSource({ ...base, minZoom: 10, maxZoom: 5 })).toThrow('最大缩放')
+  })
+
+  it('only accepts the 256 and 512 tile sizes', () => {
+    expect(validateMapTileSource({ ...base, tileSize: 512 }).tileSize).toBe(512)
+    expect(() => validateMapTileSource({ ...base, tileSize: 128 })).toThrow('瓦片边长')
+  })
+
+  it('validates the coordinate system and layer', () => {
+    expect(() => validateMapTileSource({ ...base, coordinateSystem: 'cgcs2000' })).toThrow('坐标系')
+    expect(() => validateMapTileSource({ ...base, layer: 'vector' })).toThrow('图层类型')
+  })
+
+  it('rejects header names that are not valid tokens', () => {
+    expect(() => validateMapTileSource({ ...base, headers: [{ name: 'X Key', value: 'a' }] })).toThrow('请求头')
+    expect(validateMapTileSource({ ...base, headers: [{ name: 'X-Key', value: 'a' }] }).headers).toEqual([{ name: 'X-Key', value: 'a' }])
+  })
+
+  it('rejects headers that would override the response encoding', () => {
+    expect(() => validateMapTileSource({ ...base, headers: [{ name: 'Host', value: 'evil' }] })).toThrow('保留')
+    expect(() => validateMapTileSource({ ...base, headers: [{ name: 'Content-Length', value: '1' }] })).toThrow('保留')
+  })
+
+  it('rejects header values containing a newline', () => {
+    expect(() => validateMapTileSource({ ...base, headers: [{ name: 'X-Key', value: 'a\nb' }] })).toThrow('换行')
+  })
+
+  it('validates the source id', () => {
+    expect(validateMapTileSourceId('source-1')).toBe('source-1')
+    expect(() => validateMapTileSourceId('../etc')).toThrow()
+    expect(() => validateMapTileSourceId('')).toThrow()
+  })
+
+  it('accepts an empty id so a new source can be saved without one', () => {
+    expect(validateMapTileSource({ ...base, id: '' }).id).toBe('')
+  })
+
+  it('passes the api key through for the write direction', () => {
+    expect(validateMapTileSource({ ...base, apiKey: 'token' }).apiKey).toBe('token')
+    expect(validateMapTileSource(base).apiKey).toBe('')
+  })
+
+  describe('terrain source kinds', () => {
+    const terrainBase = {
+      ...base,
+      layer: 'terrain',
+      kind: 'terrain-ion',
+      urlTemplate: '',
+      path: '',
+    }
+
+    it('accepts the three terrain kinds', () => {
+      expect(validateMapTileSource(terrainBase).kind).toBe('terrain-ion')
+      expect(validateMapTileSource({ ...terrainBase, kind: 'terrain-arcgis' }).kind).toBe('terrain-arcgis')
+      expect(validateMapTileSource({
+        ...terrainBase,
+        kind: 'terrain-url',
+        urlTemplate: 'https://terrain.example.com/myterrain/',
+      }).kind).toBe('terrain-url')
+    })
+
+    it('requires terrain kinds to pair with the terrain layer', () => {
+      expect(() => validateMapTileSource({ ...terrainBase, layer: 'imagery' })).toThrow('图层')
+      expect(() => validateMapTileSource({ ...base, kind: 'directory', path: '/data/tiles', layer: 'terrain' })).toThrow('地形')
+    })
+
+    it('requires terrain-url to carry an http(s) root url', () => {
+      expect(() => validateMapTileSource({ ...terrainBase, kind: 'terrain-url', urlTemplate: '' })).toThrow('地形')
+      expect(() => validateMapTileSource({ ...terrainBase, kind: 'terrain-url', urlTemplate: 'ftp://x/' })).toThrow('HTTP')
+    })
+
+    it('ignores imagery-only rules for terrain kinds', () => {
+      // minZoom=0 maxZoom=19 的默认值直接可用；tileSize 等字段不因 terrain 强制
+      expect(validateMapTileSource(terrainBase).layer).toBe('terrain')
+    })
   })
 })

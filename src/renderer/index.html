@@ -2,9 +2,11 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
+    <!-- 'wasm-unsafe-eval' 是 Cesium 必需的：其 worker 在模块加载时实例化内联 WebAssembly；不得放宽为 'unsafe-eval'，
+         那会重新打开 Cesium 自带 knockout 的 JS eval 路径 —— 正是它把地图视图逼到了 CesiumWidget 而不是 Viewer。 -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http: https: ws: wss:; media-src 'self' http: https: blob:; worker-src 'self' blob:"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: map-tile:; connect-src 'self' http: https: ws: wss: map-tile:; media-src 'self' http: https: blob:; worker-src 'self' blob:"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DJI Cloud Studio</title>

@@ -64,7 +64,7 @@ Windows 安装包只在 GitHub Actions 生成，本地不要尝试交叉打包�
 ### 渲染进程 `src/renderer/src`
 
 - `App.tsx`（约 1600 行）是唯一状态容器：连接配置、消息记录、遥测快照、设备档案、WebDAV 状态、更新状态都在这里，通过 props 逐层下发。**没有状态库、没有 Context**；新增页面状态沿用此模式，不要引入外部状态管理。
-- 顶层导航 `WorkspaceView`：`overview` / `media` / `dji-config` / `oss` / `versions` / `settings`，入口在 `.app-rail`。
+- 顶层导航 `WorkspaceView`（`src/renderer/src/App.tsx:99`）：`overview` / `map` / `media` / `dji-config` / `oss` / `versions` / `settings`，入口在 `.app-rail`。
 - `views/Overview.tsx` 是设备工作台，内部再按设备类型分页签；页签清单与可见性规则见其中的 `visibleTabs`。
 - 切页签会卸载组件；需要保留内部状态的部分（如 `persistent-command-center`）用 `hidden` 常驻挂载。
 - 目录约定：`views/` 页面级、`components/` 复用组件、`lib/` 纯逻辑（无 JSX，可直接单测）、`data/` 静态 JSON。
@@ -94,6 +94,23 @@ Windows 安装包只在 GitHub Actions 生成，本地不要尝试交叉打包�
 本地 ZLMediaKit 由 `MediaServerManager` 以子进程启动，二进制路径由 `media-server-path.ts` 解析：打包后取 `process.resourcesPath/zlmediakit`，开发态取 `vendor/zlmediakit/<platform-arch>`；可用性由 `media-server-probe.ts` 探测 HTTP API。默认端口见 `media-server-store.ts` 的本地 profile。
 
 SEI 解析链（`sei-parser.ts` / `sei-parser-manager.ts`）从本地 ZLMediaKit 的 RTSP 旁路或 SecretEMS 的 SSE 接口读取码流，只解析标准 H.264/H.265 SEI 语法，**不得把未公开 payload 推断为飞行遥测字段**。渲染侧播放用 `hls.js`（HLS）与 `mpegts.js`（WebRTC）。
+
+### 三维地图
+
+- **影像**瓦片统一走主进程特权协议 `map-tile://tiles/<源ID>/<z>/<x>/<y>`，由 `map-tile-protocol.ts` 处理（`MAP_TILE_SCHEME`）。三种来源（在线地址模板、本地目录、MBTiles）在 `map-tile-resolver.ts` 收敛。地形不走这条协议，理由见下文地形条目。协议只解析 `new URL(request.url).pathname`（`MapTileProtocolHandler.handle`），**只校验路径、不校验 host**：`map-tile://<任意 host>/…` 解析结果相同，`MAP_TILE_HOST` 是全仓库没有读取点的常量。任何失败（路径非法、来源不存在、上游异常、本地文件缺失）一律返回不带响应体的 404，避免把磁盘绝对路径透给渲染进程。
+- 渲染进程与底图凭据之间真正的不变量有两条：**影像**的已保存 API Key 从不回传渲染进程，只回传 `hasApiKey` 布尔值（`StoredMapTileSource` 与 `toPublicSource()` 都不含明文密钥字段：前者存的是 `storedApiKey` / `encryptedApiKey`，后者再把这两个字段丢弃）；**影像瓦片请求全部由主进程代发**，渲染进程不会直接请求上游影像瓦片域名。两条各有一个例外，都是地形造成的，见下文地形条目。注意渲染进程本来就持有可编辑的「URL 模板」字段，用户新填的 API Key 明文也会经 `SecretInput` 送进 `mapSourcesSave`。
+- `protocol.registerSchemesAsPrivileged` **必须在 `app.whenReady()` 之前调用**（`src/main/index.ts` 顶层），否则 `protocol.handle` 注册会失败；`privileges` 里真正支撑瓦片可用的是 `standard: true` 与 `secure: true`。`supportFetchAPI: true` **不是当前取图路径的依赖** —— A/B 实测（2026-09-16，真实 Electron 窗口 + 本地瓦片目录源）：去掉该项后 Cesium 的瓦片请求仍全部返回 200、地图正常渲染，因为 `Resource.fetchImage` 在本渲染进程中走 **XHR** 路径（`fetchImage` → `_Implementations.createImage` → `loadWithXhr` → `new XMLHttpRequest()`；只有 `XMLHttpRequest` 未定义时才退回 `loadWithHttpRequest` 的 fetch 路径），而 XHR 不受该权限影响；受影响的只有 `fetch('map-tile://…')`，它会以「URL scheme "map-tile" is not supported」直接失败。保留该项是为了不把 Cesium 当前的实现细节当成协议契约，删它之前必须重跑该 A/B。调试自定义 scheme 被拦截时应当查 XHR 而不是 `fetch`。协议处理函数本身在 ready 之后才注册。
+- CSP 已放行 `img-src map-tile:` 与 `connect-src map-tile:`（Cesium 的 XHR 路径与 `Image` 回退路径各需要一条），**不为用户自填的瓦片域名开口子**。`script-src` 为 `'self' 'wasm-unsafe-eval'`：Cesium 的 worker 在模块加载时即实例化内联 wasm，缺该关键字每次启动会报 5 条 pageerror。**必须是 `'wasm-unsafe-eval'` 而非 `'unsafe-eval'`** —— 前者只放开 WebAssembly 编译，后者会连带放开 JS 动态求值。渲染进程的地图视图因此用 `CesiumWidget` 而不是 `Viewer`：`Viewer` 会拉起 Cesium 自带的 knockout，其间接 `eval` 被 `script-src` 拦下后构造即抛错、整个视图白屏。
+- 地形层与影像层共用 `MapTileSource`，靠 `kind` 分流；三类地形 kind（`terrain-ion` / `terrain-arcgis` / `terrain-url`）只在 `src/shared/contracts.ts` 的 `TERRAIN_SOURCE_KINDS` 里声明一次，主进程的令牌分流与渲染进程 `lib/terrain-source.ts` 的 `isTerrainKind` 都从这一份清单构造，**不得另抄一份 Set**。**地形不走 `map-tile://` 代理，由渲染进程直连上游**：地形有自己的协议路径（先取服务根的 `layer.json`，再逐瓦片协商扩展名），代理等于把这条协议与缓存键设计重做一遍；上一条的「不为用户自填的瓦片域名开口子」指没有新增按域名的 CSP 条目，而 `connect-src` 的 `http:` / `https:` 本就放行（媒体播放等既有功能依赖），地形直连因此没有扩大可达域名范围。
+- `map:get-terrain-token`（`IPC_CHANNELS.mapGetTerrainToken`，`src/main/index.ts` 的 `registerIpc()`）是「已存凭据不回传渲染进程」**唯一刻意开的例外**，三个条件缺一不可：用 `handleTrusted` 注册（非受信页面直接抛错）、来源不存在或 `kind` 不在 `TERRAIN_SOURCE_KINDS` 时一律返回 `''`、只回传该来源的 `apiKey` 明文本体。开口的理由：Cesium 在渲染进程内构造地形 provider，厂商地形服务要求 token 出现在查询参数或 `Authorization` 头里，渲染进程拿不到明文就无法加载地形。影像不受影响 —— `mapSourcesList` 回给渲染进程的仍只有 `hasApiKey`。
+- ion 地形有两个 Cesium 1.145 的坑，都在 `MapView.tsx` 的 `createTerrainProvider` 里处理。其一：**`CesiumTerrainProvider.fromIonAssetId(assetId, options)` 内部调用 `IonResource.fromAssetId(assetId)` 时不透传 options**，传进去的 `accessToken` 会被静默丢弃、回落到 Cesium 内置默认令牌，所以必须两步构造 —— 先 `IonResource.fromAssetId(TERRAIN_ION_ASSET_ID, { accessToken })` 再 `CesiumTerrainProvider.fromUrl(resource, …)`；同时**不得**给 `Cesium.Ion.defaultAccessToken` 赋值，避免污染全局默认值。其二：正因为 Cesium 自带一个默认令牌，「用户没填令牌」不能交给工厂方法兜底 —— `terrainProviderOptions` 对空令牌的 `terrain-ion` / `terrain-arcgis` 一律返回 `undefined`，调用方回退椭球并提示，**绝不能拿空令牌去构造**。
+- 另两个构造分支：ArcGIS 走 `ArcGISTiledElevationTerrainProvider.fromUrl(TERRAIN_ARCGIS_URL, { token })`（该工厂方法确实会透传 token，token 作为查询参数附加）；自建 `terrain-url` 走 `new Resource({ url, headers })` + `CesiumTerrainProvider.fromUrl`，`headers` 由 `terrainRequestHeaders` 组装 —— 有令牌时以 `Authorization: Bearer <token>` 覆盖同名项。弹窗目前不为地形渲染请求头编辑器（`MapSourceModal` 的 `MapSourceKindFields` 只渲染地址与 API Key），所以 `headers` 实际恒为空，`Authorization` 是唯一会被真正发出的自定义头。
+- `useTerrainLayer` 用 `TERRAIN_LOAD_TIMEOUT_MS`（3 秒）给 provider 构造设上限：超时先挂回椭球并提示 `地形加载失败：地形加载超时（3 秒），已回退椭球`（其余失败路径同模板，原因来自 `terrainUnavailableReason` 或异常 message）；构造若在超时之后才落地**仍然补正** —— 成功则换成该地形并清掉提示，失败则把超时文案换成真实错误。每次赋值都重新取一次 `widgetRef.current` 并受 `cancelled` 保护，控件已销毁或组件已卸载后不再触碰。这条竞态 / 迟到 / 卸载路径**没有自动化覆盖**（node 环境不执行 `useEffect`，测试只覆盖 `terrainProviderOptions` / `terrainUnavailableReason` / `terrainFailureMessage` 等纯函数与静态渲染），与下面「三维行为没有自动化覆盖」是同一个缺口，改动前请真机复核。
+- 底图源的坐标系决定设备点位是否偏移：设备上报 WGS-84，高德/百度底图分别是 GCJ-02/BD-09。`lib/map-coord.ts` 只做单向转换（`wgs84ToGcj02` / `gcj02ToBd09` / `toCoordinateSystem`，按 `isInsideChina` 判定国境），境外坐标必须原样返回。**设备上报的原始 WGS-84 读数必须始终可见**，不能被转换结果掩盖。
+- `MapTileSourceStore` 刻意不接入 `WebDavBackupManager`：本地路径跨机器失效，URL 模板含密钥。
+- 瓦片读路径必须走内存快照入口 `getWithApiKeyForTile`，不得改回事务串行化的 `getWithApiKey` / `runExclusive`：底图源既然不参与备份，挤进全局配置事务队列换不到任何一致性，只会在 WebDAV 同步把整次上传包在同一个事务里时把取图顶住。
+- Cesium 静态资源由 `scripts/prepare-cesium.mjs` 拷贝到 `src/renderer/public/cesium/`（已在 `.gitignore` 中），不引入 `vite-plugin-cesium`；`CESIUM_BASE_URL` 通过副作用模块 `lib/cesium-base-url.ts` 设置，因为 CSP 禁止内联脚本，且该 import 必须排在 `cesium` 之前。
+- 地图相关逻辑必须保持可测：坐标转换、位置提取、瓦片解析、Store 都是不依赖 WebGL 的纯逻辑，`MapView` 自身也能在 node 环境用 `renderToStaticMarkup` 静态渲染（`useEffect` 不执行，不会构造 WebGL 上下文），静态渲染只覆盖标记与纯函数。**三维行为没有自动化覆盖**：相机、影像与地形切换、实体的增删改与 `requestRender` 时机只能靠真机复核 —— `smoke:ui` 只断言侧栏入口的 tooltip 与顺序，不进入地图视图。改动这些路径时不要以为有回归网。
 
 ### WebDAV 数据版本
 

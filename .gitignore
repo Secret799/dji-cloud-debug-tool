@@ -11,5 +11,9 @@ build/icon.iconset/
 !.env.example
 
 .idea
+.superpowers/
+.tmp/
+.worktrees/
 vendor/zlmediakit/
 vendor/ffmpeg/*/
+src/renderer/public/cesium/

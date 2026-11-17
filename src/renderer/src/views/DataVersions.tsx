@@ -272,7 +272,9 @@ export function DataVersions({ onNotify, onOverviewChange }: DataVersionsProps) 
     ? overview.connected ? 'WebDAV 已就绪' : 'WebDAV 连接异常'
     : '尚未配置云同步'
   const statusDetail = overview.configured
-    ? overview.connected ? '已连接 1 个云服务' : '配置已保存，等待服务恢复'
+    ? overview.connected
+      ? `已连接 1 个云服务 · ${overview.config?.endpoint || '未填写端点'} · 30 秒轮询远端更新`
+      : '配置已保存，等待服务恢复'
     : '添加 WebDAV 端点后开始加密同步'
   const currentStrategy = syncStrategyOptions.find(
     (option) => option.value === (overview.config?.syncStrategy ?? 'smart-merge'),
@@ -287,7 +289,7 @@ export function DataVersions({ onNotify, onOverviewChange }: DataVersionsProps) 
         </span>
         <div className="webdav-account-copy">
           <strong>{statusTitle}<i /></strong>
-          <small>{statusDetail}</small>
+          <small title={statusDetail}>{statusDetail}</small>
         </div>
         <button className="button secondary compact" disabled={Boolean(busy)} onClick={() => void openSettings()}>
           <Settings size={15} />{overview.configured ? '更改配置' : '配置 WebDAV'}
@@ -415,7 +417,7 @@ export function DataVersions({ onNotify, onOverviewChange }: DataVersionsProps) 
           </section>
 
           <div className="data-version-actions">
-            <div><strong>同步历史</strong><span>{overview.versions.length} 个云端数据版本</span></div>
+            <div><strong>同步历史</strong><span>{overview.versions.length} 个云端数据版本 · AES-256-GCM</span></div>
             <Tooltip label="刷新云端版本">
               <button className="icon-button" disabled={Boolean(busy) || !overview.configured} onClick={() => void refresh()}>
                 <RefreshCw size={16} className={busy === 'refresh' ? 'spin' : ''} />
@@ -426,6 +428,11 @@ export function DataVersions({ onNotify, onOverviewChange }: DataVersionsProps) 
               {busy === 'sync' ? '正在同步' : overview.configured ? '立即同步' : '配置 WebDAV'}
             </button>
           </div>
+
+          <p className="webdav-rotation-note">
+            <KeyRound size={14} />
+            <span>更换 WebDAV 凭据会更换备份加密密钥；旧凭据创建的历史版本将无法解密，恢复前请核对当前凭据。</span>
+          </p>
 
           <div className="data-version-layout">
             <section className="version-history-section">

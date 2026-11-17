@@ -86,6 +86,8 @@ describe('TelemetryManager property metadata', () => {
     expect(markup).toContain('<option value="datetime" selected="">')
     expect(markup).toContain('已格式化')
     expect(markup).toContain('自动识别')
+    expect(markup).toContain('上报来源')
+    expect(markup).toContain('预览使用示例值')
   })
 
   it('builds unit-aware suggestions across all DJI monitoring items', () => {

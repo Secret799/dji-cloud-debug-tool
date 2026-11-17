@@ -331,6 +331,78 @@ export interface ExportMessageOptions {
   records: MqttMessageRecord[]
 }
 
+export type MapLayerKind = 'imagery' | 'terrain'
+/** terrain-* 三类为地形层专用：terrain-ion / terrain-arcgis 由厂商服务承载，terrain-url 为自定义 quantized-mesh 根地址 */
+export type MapTileSourceKind =
+  | 'url-template'
+  | 'directory'
+  | 'mbtiles'
+  | 'terrain-ion'
+  | 'terrain-arcgis'
+  | 'terrain-url'
+export type MapCoordinateSystem = 'wgs84' | 'gcj02' | 'bd09'
+
+/**
+ * 地形层专用的三类来源类型。
+ *
+ * 主进程与渲染进程共用这一份清单：渲染进程的 `isTerrainKind` 与主进程的分流判断都据此建立，
+ * 新增地形类型时只需改这里，避免两处判断各写各的 Set 而逐渐漂移。
+ */
+export const TERRAIN_SOURCE_KINDS: readonly MapTileSourceKind[] = ['terrain-ion', 'terrain-arcgis', 'terrain-url']
+
+export interface MapTileSourceHeader {
+  /** 请求头名称 */
+  name: string
+  /** 请求头值，可含 {key} 占位符 */
+  value: string
+}
+
+export interface MapTileSource {
+  /** 唯一标识 */
+  id: string
+  /** 显示名称 */
+  name: string
+  /** 影像层或地形层 */
+  layer: MapLayerKind
+  /** 瓦片来源类型 */
+  kind: MapTileSourceKind
+  /** url-template：含 {z}/{x}/{y}/{s}/{key} 占位符的模板 */
+  urlTemplate: string
+  /** directory / mbtiles：本地绝对路径 */
+  path: string
+  /** 自定义请求头，值支持 {key} 占位符 */
+  headers: MapTileSourceHeader[]
+  /** 底图坐标系，决定设备点位是否偏移 */
+  coordinateSystem: MapCoordinateSystem
+  /** 最小缩放级别 */
+  minZoom: number
+  /** 最大缩放级别 */
+  maxZoom: number
+  /** 瓦片边长，256 或 512 */
+  tileSize: 256 | 512
+  /** directory 专用：瓦片扩展名，留空则自动探测 */
+  tileExtension: string
+  /** 版权署名，显示在地图右下角 */
+  attribution: string
+  /** 是否为默认底图 */
+  isDefault?: boolean
+  /** 待保存的 API Key 明文，仅写入方向使用，读取时永远为空 */
+  apiKey?: string
+  /** 是否已保存 API Key（只读回显） */
+  hasApiKey?: boolean
+  /** 显式清除已保存的 API Key */
+  clearApiKey?: boolean
+  /** 创建时间 */
+  createdAt: number
+  /** 更新时间 */
+  updatedAt: number
+}
+
+export interface MapTileProbeResult extends OperationResult {
+  /** 探测到的瓦片字节数 */
+  bytes?: number
+}
+
 export type ObjectStorageProvider = 'ali' | 'aws' | 'minio'
 
 export interface ObjectStorageProfile {
@@ -577,6 +649,15 @@ export interface DjiDesktopApi {
     getSeiMessageDetail: (request: SeiMessageDetailRequest) => Promise<SeiMessageDetailResult>
     onSeiParserEvent: (listener: (event: SeiParserEvent) => void) => () => void
     onRuntimeEvent: (listener: (runtime: MediaServerRuntime) => void) => () => void
+  }
+  map: {
+    listSources: () => Promise<MapTileSource[]>
+    saveSource: (source: MapTileSource) => Promise<MapTileSource>
+    removeSource: (sourceId: string) => Promise<OperationResult>
+    probeSource: (source: MapTileSource) => Promise<MapTileProbeResult>
+    pickDirectory: () => Promise<string | null>
+    pickMbtiles: () => Promise<string | null>
+    getTerrainToken: (sourceId: string) => Promise<string>
   }
   objectStorage: {
     list: () => Promise<ObjectStorageProfile[]>

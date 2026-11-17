@@ -31,7 +31,7 @@ try {
   const toast = window.locator('.toast')
   await toast.waitFor({ state: 'visible', timeout: 5_000 })
 
-  await window.getByRole('button', { name: '控制中心', exact: true }).click()
+  await window.getByRole('button', { name: '指令', exact: true }).click()
   await window.locator('.command-center').waitFor({ state: 'visible' })
   await window.waitForTimeout(250)
   const layout = await toast.evaluate((element) => {

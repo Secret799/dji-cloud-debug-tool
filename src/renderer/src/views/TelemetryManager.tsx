@@ -43,7 +43,7 @@ import {
   type TelemetryMetadataSource,
   updateTelemetryLayoutTimestamp,
 } from '../lib/telemetry-layout'
-import { TELEMETRY_FORMATTER_OPTIONS, telemetryFormatterRecommendations } from '../lib/telemetry-format'
+import { TELEMETRY_FORMATTER_OPTIONS, telemetryFormatterPreview, telemetryFormatterRecommendations } from '../lib/telemetry-format'
 
 interface TelemetryManagerProps {
   provider?: DeviceProvider
@@ -534,31 +534,38 @@ export function TelemetryManager({ provider = 'dji', config, onChange, onNotify 
               <div className="telemetry-field-editor-form">
                 <label><span>原始字段名</span><code>{selectedField.key}</code></label>
                 <label><span>显示名称</span><input value={fieldLabelForProvider(selectedField, selectedMetadata)} onChange={(event) => updateField(selectedField.key, (field) => ({ ...field, label: event.target.value }))} /></label>
-                <label><span>字段描述</span><textarea rows={8} value={fieldDescriptionForProvider(selectedField)} onChange={(event) => updateField(selectedField.key, (field) => ({ ...field, description: event.target.value }))} placeholder="输入悬浮提示中展示的字段说明" /></label>
-                <label><span>所属页签</span><select value={JSON.stringify([selectedTab?.id ?? '', selectedSection?.id ?? ''])} onChange={(event) => {
-                  const [tabId, sectionId] = JSON.parse(event.target.value) as [string, string]
-                  moveFieldTo(selectedField.key, tabId, sectionId)
-                }}>{layout.tabs.flatMap((tab) => tab.sections.map((section) => <option value={JSON.stringify([tab.id, section.id])} key={`${tab.id}:${section.id}`}>{tab.name || '未命名页签'} / {section.name || '未命名页签'}</option>))}</select></label>
+                <label><span>字段描述</span><textarea rows={5} value={fieldDescriptionForProvider(selectedField)} onChange={(event) => updateField(selectedField.key, (field) => ({ ...field, description: event.target.value }))} placeholder="输入悬浮提示中展示的字段说明" /></label>
+                <div className="field-grid two-columns">
+                  <label><span>所属页签</span><select value={JSON.stringify([selectedTab?.id ?? '', selectedSection?.id ?? ''])} onChange={(event) => {
+                    const [tabId, sectionId] = JSON.parse(event.target.value) as [string, string]
+                    moveFieldTo(selectedField.key, tabId, sectionId)
+                  }}>{layout.tabs.flatMap((tab) => tab.sections.map((section) => <option value={JSON.stringify([tab.id, section.id])} key={`${tab.id}:${section.id}`}>{tab.name || '未命名页签'} / {section.name || '未命名页签'}</option>))}</select></label>
+                  <label><span>上报来源</span><input readOnly value={selectedOfficialMetadata ? djiPushModeLabel(selectedOfficialMetadata.pushMode) ?? '未声明' : '未关联物模型'} /></label>
+                </div>
 
                 <section className="telemetry-formatter-editor">
                   <header><span><Braces size={15} />数据格式化</span></header>
-                  <label>
-                    <span>内置函数</span>
-                    <select
-                      value={selectedField.formatter ?? ''}
-                      onChange={(event) => updateField(selectedField.key, (field) => ({
-                        ...field,
-                        formatter: event.target.value
-                          ? event.target.value as TelemetryLayoutField['formatter']
-                          : undefined,
-                      }))}
-                    >
-                      <option value="">不格式化</option>
-                      {TELEMETRY_FORMATTER_OPTIONS.map((option) => (
-                        <option value={option.value} key={option.value}>{option.label}</option>
-                      ))}
-                    </select>
-                  </label>
+                  <div className="field-grid two-columns">
+                    <label>
+                      <span>内置函数</span>
+                      <select
+                        value={selectedField.formatter ?? ''}
+                        onChange={(event) => updateField(selectedField.key, (field) => ({
+                          ...field,
+                          formatter: event.target.value
+                            ? event.target.value as TelemetryLayoutField['formatter']
+                            : undefined,
+                        }))}
+                      >
+                        <option value="">不格式化</option>
+                        {TELEMETRY_FORMATTER_OPTIONS.map((option) => (
+                          <option value={option.value} key={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label><span>预览</span><input readOnly value={telemetryFormatterPreview(selectedField.formatter)} /></label>
+                  </div>
+                  <p className="telemetry-formatter-note">预览使用示例值；格式化只影响展示层，原始值仍保留在报文与字段路径中。</p>
                 </section>
 
                 <section className="telemetry-property-editor">

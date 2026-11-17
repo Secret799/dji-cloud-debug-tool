@@ -64,13 +64,14 @@ try {
 
   await assertTooltip('设备工作台')
   await assertTooltip('添加网关')
+  await assertTooltip('地图')
   await assertTooltip('云同步')
 
   const railOrder = await window.locator('.app-rail').evaluate((rail) => ({
     top: [...rail.querySelectorAll('.rail-top button')].map((button) => button.getAttribute('aria-label')),
     bottom: [...rail.querySelectorAll('.rail-bottom button')].map((button) => button.getAttribute('aria-label')),
   }))
-  if (railOrder.top.join('|') !== '设备工作台|媒体中心|OSS 管理|监测项配置') {
+  if (railOrder.top.join('|') !== '设备工作台|媒体中心|地图|OSS 管理|监测项配置') {
     errors.push(`navigation: unexpected top rail order (${railOrder.top.join(', ')})`)
   }
   if (railOrder.bottom.join('|') !== '云同步|设置|关于') {
@@ -1019,7 +1020,7 @@ try {
         && telemetryText.includes('31.2304')
     })
     const aircraftWorkbenchTabs = window.locator('.device-tabs')
-    for (const hiddenTab of ['事件', '最近指令', '控制中心', '负载']) {
+    for (const hiddenTab of ['事件', '历史', '指令', '负载', '远程日志', '固件升级']) {
       if (await aircraftWorkbenchTabs.locator('button').filter({ hasText: hiddenTab }).count()) {
         errors.push(`aircraft: should not display the ${hiddenTab} workbench tab`)
       }
@@ -1071,13 +1072,12 @@ try {
     errors.push('overview: recent commands should not remain inside the telemetry tab')
   }
   const deviceTabLabels = await window.locator('.device-tabs button span').allTextContents()
-  const messagesTabIndex = deviceTabLabels.indexOf('MQTT 消息')
-  const historyTabIndex = deviceTabLabels.indexOf('最近指令')
-  if (messagesTabIndex < 0 || historyTabIndex !== messagesTabIndex + 1) {
-    errors.push(`overview: recent commands should follow MQTT messages (${JSON.stringify(deviceTabLabels)})`)
+  const messagesTabIndex = deviceTabLabels.indexOf('消息')
+  const historyTabIndex = deviceTabLabels.indexOf('历史')
+  if (historyTabIndex < 0 || messagesTabIndex !== historyTabIndex + 1) {
+    errors.push(`overview: message console should follow command history (${JSON.stringify(deviceTabLabels)})`)
   }
-  await window.getByRole('button', { name: '控制中心', exact: true }).click()
-  await window.locator('.control-center-tabs').getByRole('tab', { name: '固件升级', exact: true }).click()
+  await window.getByRole('button', { name: '固件升级', exact: true }).click()
   await window.locator('.firmware-workspace').waitFor({ state: 'visible' })
   if (await window.locator('.firmware-file-picker').count() !== 1) {
     errors.push('firmware: local package picker was not rendered')
@@ -1148,7 +1148,7 @@ try {
       }
     }, commandMessages)
   }
-  await window.getByRole('button', { name: /最近指令/ }).click()
+  await window.getByRole('button', { name: /^历史/ }).click()
   await window.locator('.history-workspace .command-history-panel').waitFor({ state: 'visible' })
   if (profileId) {
     const commandHistoryItem = window.locator('.command-history-item').first()
@@ -1215,7 +1215,7 @@ try {
   ])
   await window.screenshot({ path: `${screenshotBase}-history.png` })
 
-  await window.getByRole('button', { name: 'MQTT 消息' }).click()
+  await window.getByRole('button', { name: /^消息/ }).click()
   await window.locator('.mqtt-console').waitFor({ state: 'visible' })
   await inspectLayout('messages', [
     'body',
@@ -1234,8 +1234,7 @@ try {
     undefined,
     { timeout: 5_000 },
   )
-  await window.getByRole('button', { name: '控制中心', exact: true }).click()
-  await window.locator('.control-center-tabs').getByRole('tab', { name: '设备控制', exact: true }).click()
+  await window.getByRole('button', { name: '指令', exact: true }).click()
   await window.locator('.command-center').waitFor({ state: 'visible' })
   if (await window.getByText('请求响应记录', { exact: true }).count()) {
     errors.push('commands: duplicated request and response history is still visible')
@@ -1513,8 +1512,7 @@ try {
 
   await window.getByRole('button', { name: '设备工作台' }).click()
   await window.locator('.overview-view').waitFor({ state: 'visible' })
-  await window.getByRole('button', { name: '控制中心', exact: true }).click()
-  await window.locator('.control-center-tabs').getByRole('tab', { name: '设备控制', exact: true }).click()
+  await window.getByRole('button', { name: '指令', exact: true }).click()
   await window.getByRole('button', { name: '相机与云台', exact: true }).click()
   const mediaServerOptions = await window.locator('.camera-stream-toolbar select').first().locator('option').allTextContents()
   if (!mediaServerOptions.some((option) => option.includes('冒烟测试流媒体 · 127.0.0.1'))) {

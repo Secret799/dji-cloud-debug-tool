@@ -524,11 +524,10 @@ describe('Overview DJI field presentation', () => {
     expect(markup).toContain('<span>设备厂商</span><strong>草莓创新</strong>')
     expect(markup).toContain('<span>设备型号</span><strong title="3-88105-0">S25M400</strong>')
     const deviceTabs = markup.match(/<nav class="device-tabs"[\s\S]*?<\/nav>/)?.[0] ?? ''
-    expect(deviceTabs).toContain('<span>控制中心</span>')
+    expect(deviceTabs).toContain('<span>指令</span>')
     expect(deviceTabs).toContain('<span>负载</span>')
-    const controlCenterTabs = markup.match(/<nav class="control-center-tabs"[\s\S]*?<\/nav>/)?.[0] ?? ''
-    expect(controlCenterTabs).not.toContain('<span>远程日志</span>')
-    expect(controlCenterTabs).not.toContain('<span>固件升级</span>')
+    expect(deviceTabs).not.toContain('<span>远程日志</span>')
+    expect(deviceTabs).not.toContain('<span>固件升级</span>')
     expect(markup).toContain('机场推杆')
     expect(markup).not.toContain('机场补光灯')
   })
@@ -689,10 +688,9 @@ describe('Overview DJI field presentation', () => {
     expect(markup).toContain('DJI Pilot')
     expect(markup).toContain('<span>固件版本</span><strong title="尚未上报">尚未上报</strong>')
     expect(markup).not.toContain('切换设备')
-    const controlCenterTabs = markup.match(/<nav class="control-center-tabs"[\s\S]*?<\/nav>/)?.[0] ?? ''
-    expect(controlCenterTabs).toContain('<span>设备控制</span>')
-    expect(controlCenterTabs).not.toContain('<span>远程日志</span>')
-    expect(controlCenterTabs).not.toContain('<span>固件升级</span>')
+    const pilotTabs = markup.match(/<nav class="device-tabs"[\s\S]*?<\/nav>/)?.[0] ?? ''
+    expect(pilotTabs).not.toContain('<span>远程日志</span>')
+    expect(pilotTabs).not.toContain('<span>固件升级</span>')
   })
 
   it('maps the aircraft model key instead of displaying a payload index', () => {
@@ -770,12 +768,12 @@ describe('Overview DJI field presentation', () => {
     const deviceTabs = markup.match(/<nav class="device-tabs"[\s\S]*?<\/nav>/)?.[0] ?? ''
     expect(deviceTabs).not.toContain('信息分类')
     expect(deviceTabs).toContain('<span>遥测</span>')
-    expect(deviceTabs).not.toContain('<span>控制中心</span>')
-    expect(deviceTabs).toContain('<span>MQTT 消息</span>')
+    expect(deviceTabs).not.toContain('<span>指令</span>')
+    expect(deviceTabs).toContain('<span>消息</span>')
     expect(deviceTabs).not.toContain('<span>负载</span>')
     expect(deviceTabs).not.toContain('<span>固件升级</span>')
     expect(deviceTabs).not.toContain('<span>事件</span>')
-    expect(deviceTabs).not.toContain('<span>最近指令</span>')
+    expect(deviceTabs).not.toContain('<span>历史</span>')
   })
 
   it('uses Dock 3 topology identity instead of stale configured Dock 2 metadata', () => {
@@ -991,17 +989,14 @@ describe('Overview DJI field presentation', () => {
     expect(markup).not.toContain('31.5 °C')
     expect(markup).toContain('机场在线')
     expect(markup).toContain('DJI Dock 2')
-    expect(markup).toContain('控制中心')
     const deviceTabs = markup.match(/<nav class="device-tabs"[\s\S]*?<\/nav>/)?.[0] ?? ''
-    expect(deviceTabs).not.toContain('<span>远程日志</span>')
-    expect(deviceTabs).not.toContain('<span>固件升级</span>')
+    expect(deviceTabs).toContain('<span>指令</span>')
+    expect(deviceTabs).toContain('<span>远程日志</span>')
+    expect(deviceTabs).toContain('<span>固件升级</span>')
     expect(deviceTabs).toContain('<span>负载</span><small>0</small>')
-    expect(deviceTabs.indexOf('<span>负载</span>')).toBeGreaterThan(deviceTabs.indexOf('<span>控制中心</span>'))
-    const controlCenterTabs = markup.match(/<nav class="control-center-tabs"[\s\S]*?<\/nav>/)?.[0] ?? ''
-    expect(controlCenterTabs).toContain('<span>设备控制</span>')
-    expect(controlCenterTabs).toContain('<span>远程日志</span>')
-    expect(controlCenterTabs).toContain('<span>固件升级</span>')
-    expect(markup.match(/最近指令/g)).toHaveLength(1)
+    expect(deviceTabs.indexOf('<span>负载</span>')).toBeGreaterThan(deviceTabs.indexOf('<span>指令</span>'))
+    expect(deviceTabs.indexOf('<span>远程日志</span>')).toBeGreaterThan(deviceTabs.indexOf('<span>消息</span>'))
+    expect(deviceTabs).toContain('<span>历史</span>')
     expect(markup).toContain('aria-label="舱盖状态字段详情"')
     expect(markup).toContain('aria-label="搜索遥测字段"')
     expect(markup).toContain('placeholder="搜索名称或原始字段名"')

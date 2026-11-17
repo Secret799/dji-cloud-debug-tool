@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { PanelLeft, RefreshCw, RotateCcw, Search, SlidersHorizontal } from 'lucide-react'
+import { DatabaseBackup, PanelLeft, RefreshCw, RotateCcw, Search, SlidersHorizontal } from 'lucide-react'
+import packageMetadata from '../../../../package.json'
 import { AppUpdatePanel } from '../components/AppUpdatePanel'
 
 type SettingsSection = 'general' | 'updates'
@@ -74,33 +75,61 @@ export function SettingsCenter({
         </header>
 
         {activeSection === 'general' ? (
-          <div className="settings-group">
-            <div className="settings-group-heading">
-              <PanelLeft size={16} />
-              <div><h3>设备侧栏</h3><p>调整设备工作台左侧连接与设备区域的宽度。</p></div>
-            </div>
-            <div className="settings-control-row">
-              <div><strong>侧栏宽度</strong><span>{sidebarWidth}px</span></div>
-              <div className="settings-range-control">
-                <input
-                  type="range"
-                  min={minSidebarWidth}
-                  max={maxSidebarWidth}
-                  step={10}
-                  value={sidebarWidth}
-                  aria-label="设备侧栏宽度"
-                  onChange={(event) => onSidebarWidthChange(Number(event.target.value))}
-                />
-                <button
-                  className="button secondary compact"
-                  disabled={sidebarWidth === defaultSidebarWidth}
-                  onClick={() => onSidebarWidthChange(defaultSidebarWidth)}
-                >
-                  <RotateCcw size={14} />恢复默认
-                </button>
+          <>
+            <div className="settings-group">
+              <div className="settings-group-heading">
+                <PanelLeft size={16} />
+                <div><h3>设备侧栏</h3><p>调整设备工作台左侧连接与设备区域的宽度。</p></div>
+              </div>
+              <div className="settings-control-row">
+                <div><strong>侧栏宽度</strong><span>{sidebarWidth}px</span></div>
+                <div className="settings-range-control">
+                  <input
+                    type="range"
+                    min={minSidebarWidth}
+                    max={maxSidebarWidth}
+                    step={10}
+                    value={sidebarWidth}
+                    aria-label="设备侧栏宽度"
+                    onChange={(event) => onSidebarWidthChange(Number(event.target.value))}
+                  />
+                  <button
+                    className="button secondary compact"
+                    disabled={sidebarWidth === defaultSidebarWidth}
+                    onClick={() => onSidebarWidthChange(defaultSidebarWidth)}
+                  >
+                    <RotateCcw size={14} />恢复默认
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+
+            <div className="settings-group">
+              <div className="settings-group-heading">
+                <DatabaseBackup size={16} />
+                <div><h3>本地数据</h3><p>界面状态只落本机，跨设备同步由云同步负责。</p></div>
+              </div>
+              <div className="settings-control-row">
+                <div><strong>渲染进程存储</strong><span>localStorage 键统一使用 dji-cloud-studio.*，并纳入 WebDAV 快照白名单。</span></div>
+                <span className="settings-status">自动保存</span>
+              </div>
+              <div className="settings-control-row">
+                <div><strong>云同步</strong><span>连接配置、设备档案、对象存储、媒体服务与界面设置聚合为可移植版本。</span></div>
+                <span className="settings-status neutral">在“云同步”页面管理</span>
+              </div>
+            </div>
+
+            <div className="settings-group">
+              <div className="settings-group-heading">
+                <RefreshCw size={16} />
+                <div><h3>软件更新</h3><p>检查 GitHub Releases，下载与当前平台匹配的安装包并校验 SHA-256。</p></div>
+              </div>
+              <div className="settings-control-row">
+                <div><strong>DJI Cloud Studio v{packageMetadata.version}</strong><span>启动 5 秒后静默检查一次；下载完成前使用 SHA256SUMS.txt 校验。</span></div>
+                <div className="footer-actions"><button className="button secondary compact" onClick={() => setActiveSection('updates')}>查看更新</button></div>
+              </div>
+            </div>
+          </>
         ) : (
           <div className="settings-group settings-update-group">
             <div className="settings-group-heading">
