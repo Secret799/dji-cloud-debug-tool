@@ -562,7 +562,6 @@ export function CommandHistory({
 }
 
 type WorkbenchTab = 'remote' | 'payload' | 'events' | 'logs' | 'firmware' | 'history' | 'commands' | 'messages'
-type ControlCenterTab = 'controls' | 'logs' | 'firmware'
 
 const deviceTypeCopy = {
   dock: { label: '机场', model: 'DJI Dock', icon: RadioTower },
@@ -1377,7 +1376,6 @@ export function Overview({
   mediaServers = [],
 }: OverviewProps) {
   const [activeTab, setActiveTab] = useState<WorkbenchTab>('remote')
-  const [activeControlCenterTab, setActiveControlCenterTab] = useState<ControlCenterTab>('controls')
   const [activeTelemetryTab, setActiveTelemetryTab] = useState<TelemetryTabId>('operation')
   const [activeTelemetrySection, setActiveTelemetrySection] = useState<TelemetrySectionId>()
   const [telemetrySearch, setTelemetrySearch] = useState('')
@@ -1613,32 +1611,32 @@ export function Overview({
   const firmwareVersion = typeof reportedFirmwareVersion === 'string' || typeof reportedFirmwareVersion === 'number'
     ? String(reportedFirmwareVersion)
     : '尚未上报'
+  const supportsRemoteLogs = deviceType === 'dock' && gatewayCapabilities.remoteLogs
+  const supportsFirmwareUpgrade = deviceType === 'dock' && gatewayCapabilities.firmwareUpgrade
   const tabs: { id: WorkbenchTab; label: string; icon: typeof Activity; count?: number }[] = [
     { id: 'remote', label: '遥测', icon: Activity },
     { id: 'events', label: '事件', icon: Bell, count: hmsActivities.length },
-    { id: 'commands', label: '控制中心', icon: Command },
+    { id: 'commands', label: '指令', icon: Command },
     { id: 'payload', label: '负载', icon: Box, count: payloadIndexes.length },
-    { id: 'messages', label: 'MQTT 消息', icon: MessagesSquare, count: deviceRecords.length },
-    { id: 'history', label: '最近指令', icon: Clock3, count: transactions.length },
+    { id: 'history', label: '历史', icon: Clock3, count: transactions.length },
+    { id: 'messages', label: '消息', icon: MessagesSquare, count: deviceRecords.length },
+    { id: 'logs', label: '远程日志', icon: FileArchive },
+    { id: 'firmware', label: '固件升级', icon: Package },
   ]
   const configuredTabs = configured
     ? tabs.filter((tab) => (
         (tab.id !== 'commands' || gatewayCapabilities.deviceControl)
         && (tab.id !== 'payload' || gatewayCapabilities.payload)
+        && (tab.id !== 'logs' || supportsRemoteLogs)
+        && (tab.id !== 'firmware' || supportsFirmwareUpgrade)
       ))
-    : tabs.filter((tab) => tab.id !== 'commands' && tab.id !== 'payload')
+    : tabs.filter((tab) => tab.id !== 'commands' && tab.id !== 'payload' && tab.id !== 'logs' && tab.id !== 'firmware')
   const visibleTabs = deviceType === 'aircraft'
     ? configuredTabs.filter((tab) => tab.id === 'remote' || tab.id === 'messages')
     : deviceType === 'dock'
       ? configuredTabs
       : configuredTabs.filter((tab) => tab.id !== 'payload')
   const activeWorkbenchTab = visibleTabs.some((tab) => tab.id === activeTab) ? activeTab : 'remote'
-  const supportsRemoteLogs = deviceType === 'dock' && gatewayCapabilities.remoteLogs
-  const supportsFirmwareUpgrade = deviceType === 'dock' && gatewayCapabilities.firmwareUpgrade
-  const effectiveControlCenterTab = (
-    (activeControlCenterTab === 'logs' && !supportsRemoteLogs)
-    || (activeControlCenterTab === 'firmware' && !supportsFirmwareUpgrade)
-  ) ? 'controls' : activeControlCenterTab
   const renderTelemetryTable = (categoryFields: typeof fields) => {
     type TelemetryField = (typeof fields)[number]
     type TelemetryTreeNode = {
@@ -1945,8 +1943,9 @@ export function Overview({
           </div>
           <span aria-live="polite">
             {telemetrySearchQuery
-              ? `${filteredTelemetryFields.length}/${searchableFields.length} 个字段`
-              : `${searchableFields.length} 个字段`}
+              ? `已筛选 ${filteredTelemetryFields.length}/${searchableFields.length} 个字段`
+              : `已展示 ${searchableFields.length} 个字段`}
+            {' · 来自 OSD / state 增量合并'}
           </span>
         </header>
       )}
@@ -2289,22 +2288,9 @@ export function Overview({
             <CommandHistory transactions={transactions} onNotify={onNotify} />
           )}
           {configured && gatewayCapabilities.deviceControl && <section className="control-center-workspace" hidden={activeWorkbenchTab !== 'commands'}>
-            <nav className="control-center-tabs" aria-label="控制中心功能" role="tablist">
-              <button className={effectiveControlCenterTab === 'controls' ? 'active' : ''} role="tab" aria-selected={effectiveControlCenterTab === 'controls'} onClick={() => setActiveControlCenterTab('controls')}><Command size={15} /><span>设备控制</span></button>
-              {(supportsRemoteLogs || supportsFirmwareUpgrade) && (
-                <>
-                  {supportsRemoteLogs && (
-                  <button className={effectiveControlCenterTab === 'logs' ? 'active' : ''} role="tab" aria-selected={effectiveControlCenterTab === 'logs'} onClick={() => setActiveControlCenterTab('logs')}><FileArchive size={15} /><span>远程日志</span></button>
-                  )}
-                  {supportsFirmwareUpgrade && (
-                  <button className={effectiveControlCenterTab === 'firmware' ? 'active' : ''} role="tab" aria-selected={effectiveControlCenterTab === 'firmware'} onClick={() => setActiveControlCenterTab('firmware')}><Package size={15} /><span>固件升级</span></button>
-                  )}
-                </>
-              )}
-            </nav>
-            <div className={`control-center-content ${effectiveControlCenterTab}`}>
+            <div className="control-center-content controls">
               {onPublish && configured && (
-                <div className="persistent-command-center" hidden={activeWorkbenchTab !== 'commands' || effectiveControlCenterTab !== 'controls'}>
+                <div className="persistent-command-center" hidden={activeWorkbenchTab !== 'commands'}>
                     <CommandCenter
                       profile={profile}
                       status={status}
@@ -2319,39 +2305,39 @@ export function Overview({
                     />
                 </div>
               )}
-              {supportsRemoteLogs && effectiveControlCenterTab === 'logs' && onPublish && onNotify && onOpenOssManager && onSelectObjectStorage && (
-                <RemoteLogCenter
-                  profileId={profile.id}
-                  gatewaySn={deviceSn}
-                  status={status}
-                  busy={busy}
-                  records={records}
-                  objectStorageProfiles={objectStorageProfiles}
-                  activeObjectStorageId={activeObjectStorageId}
-                  onSelectObjectStorage={onSelectObjectStorage}
-                  onPublish={onPublish}
-                  onNotify={onNotify}
-                  onOpenOssManager={onOpenOssManager}
-                />
-              )}
-              {supportsFirmwareUpgrade && effectiveControlCenterTab === 'firmware' && onService && onSelectObjectStorage && onOpenOssManager && (
-                <FirmwareUpgradeCenter
-                  profile={profile}
-                  gatewaySn={deviceSn}
-                  status={status}
-                  busy={busy}
-                  telemetry={telemetry}
-                  records={records}
-                  objectStorageProfiles={objectStorageProfiles}
-                  activeObjectStorageId={activeObjectStorageId}
-                  onSelectObjectStorage={onSelectObjectStorage}
-                  onOpenOssManager={onOpenOssManager}
-                  onService={onService}
-                  onNotify={onNotify}
-                />
-              )}
             </div>
           </section>}
+          {activeWorkbenchTab === 'logs' && supportsRemoteLogs && onPublish && onNotify && onOpenOssManager && onSelectObjectStorage && (
+            <RemoteLogCenter
+              profileId={profile.id}
+              gatewaySn={deviceSn}
+              status={status}
+              busy={busy}
+              records={records}
+              objectStorageProfiles={objectStorageProfiles}
+              activeObjectStorageId={activeObjectStorageId}
+              onSelectObjectStorage={onSelectObjectStorage}
+              onPublish={onPublish}
+              onNotify={onNotify}
+              onOpenOssManager={onOpenOssManager}
+            />
+          )}
+          {activeWorkbenchTab === 'firmware' && supportsFirmwareUpgrade && onService && onSelectObjectStorage && onOpenOssManager && (
+            <FirmwareUpgradeCenter
+              profile={profile}
+              gatewaySn={deviceSn}
+              status={status}
+              busy={busy}
+              telemetry={telemetry}
+              records={records}
+              objectStorageProfiles={objectStorageProfiles}
+              activeObjectStorageId={activeObjectStorageId}
+              onSelectObjectStorage={onSelectObjectStorage}
+              onOpenOssManager={onOpenOssManager}
+              onService={onService}
+              onNotify={onNotify}
+            />
+          )}
           {activeWorkbenchTab === 'messages' && onPublish && onExport && onClear && (
             <MqttConsole profile={profile} status={status} busy={busy} records={deviceRecords} selectedDeviceSn={deviceSn} onPublish={onPublish} onExport={onExport} onClear={onClear} />
           )}
