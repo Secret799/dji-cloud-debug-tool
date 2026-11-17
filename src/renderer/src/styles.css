@@ -5224,7 +5224,7 @@ textarea {
 
 .telemetry-manager-layout {
   display: grid;
-  grid-template-columns: 260px 360px minmax(0, 1fr);
+  grid-template-columns: 260px 340px minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -5610,6 +5610,13 @@ textarea {
   margin-top: 4px;
   padding-top: 16px;
   border-top: 1px solid var(--line-strong);
+}
+
+.telemetry-formatter-note {
+  margin: 0;
+  color: var(--muted-2);
+  font-size: 9px;
+  line-height: 1.5;
 }
 
 .telemetry-formatter-editor > header,

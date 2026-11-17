@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatTelemetryValue, rawTelemetryValue, telemetryFormatterRecommendations } from './telemetry-format'
+import { formatTelemetryValue, rawTelemetryValue, telemetryFormatterPreview, telemetryFormatterRecommendations } from './telemetry-format'
 
 describe('telemetry value formatting', () => {
   it('formats second and millisecond timestamps as local dates', () => {
@@ -45,5 +45,17 @@ describe('telemetry value formatting', () => {
     expect(formatTelemetryValue('not-a-number', 'fixed_2')).toBe('not-a-number')
     expect(formatTelemetryValue('not-a-number', 'seconds_to_hours')).toBe('not-a-number')
     expect(rawTelemetryValue({ value: 1 })).toBe('{"value":1}')
+  })
+
+  it('previews every built-in formatter with a sample value', () => {
+    expect(telemetryFormatterPreview()).toBe('保持原始值')
+    expect(telemetryFormatterPreview('number')).toBe('12,345.678')
+    expect(telemetryFormatterPreview('fixed_2')).toBe('12.35')
+    expect(telemetryFormatterPreview('percent')).toBe('25.67%')
+    expect(telemetryFormatterPreview('seconds_to_duration')).toBe('1 时 2 分 5 秒')
+    expect(telemetryFormatterPreview('meters_to_kilometers')).toBe('1.5 千米')
+    expect(telemetryFormatterPreview('kilobytes_to_megabytes')).toBe('2 MB')
+    expect(telemetryFormatterPreview('uppercase')).toBe('DJI-CLOUD')
+    expect(telemetryFormatterPreview('json')).toContain('"battery": 87')
   })
 })
