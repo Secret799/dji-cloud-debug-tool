@@ -42,7 +42,7 @@ jobs:
       matrix:
         include:
           - label: macOS Apple Silicon
-            os: macos-14
+            os: macos-15
             platform: mac
             ffmpeg_platform: darwin
             zlm_binary: vendor/zlmediakit/arm64/MediaServer
