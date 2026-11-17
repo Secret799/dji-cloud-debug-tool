@@ -3,7 +3,7 @@ import '../lib/cesium-base-url'
 // Cesium 控件样式（源文件只有内联 data URI，无外部图片引用，可安全交给 vite 打包）
 import 'cesium/Build/Cesium/Widgets/widgets.css'
 import { useEffect, useMemo, useRef, useState, type MutableRefObject, type RefObject } from 'react'
-import { Layers, Locate, MapPin } from 'lucide-react'
+import { Layers, Locate, Maximize2, Minimize2, Mountain } from 'lucide-react'
 import {
   ArcGISTiledElevationTerrainProvider,
   buildModuleUrl,
@@ -602,12 +602,20 @@ export const useDeviceEntities = (
 interface MapToolbarProps {
   /** 当前底图源名称，未配置时为空 */
   sourceName?: string
+  /** 当前地形源名称，未配置时为空 */
+  terrainName?: string
+  /** 地形是否已回退椭球 */
+  terrainFallback?: boolean
+  /** 全屏状态 */
+  fullscreen: boolean
   /** 已定位设备数量 */
   locatedCount: number
   /** 打开底图源配置弹窗 */
   onOpenSources: () => void
   /** 相机飞向全部设备 */
   onFocusDevices: () => void
+  /** 进入或退出全屏 */
+  onToggleFullscreen: () => void
 }
 
 /**
@@ -618,16 +626,30 @@ interface MapToolbarProps {
  * @param props 工具栏属性
  * @returns 工具栏元素
  */
-export const MapToolbar = ({ sourceName, locatedCount, onOpenSources, onFocusDevices }: MapToolbarProps) => (
+export const MapToolbar = ({
+  sourceName,
+  terrainName,
+  terrainFallback = false,
+  fullscreen,
+  locatedCount,
+  onOpenSources,
+  onFocusDevices,
+  onToggleFullscreen,
+}: MapToolbarProps) => (
   <div className="map-toolbar">
-    <button className="button secondary" onClick={onOpenSources}>
-      <Layers size={15} />{sourceName ?? '配置底图源'}
+    <button className="button secondary compact" onClick={onOpenSources}>
+      <Layers size={15} />配置底图源
     </button>
-    <button className="button secondary" disabled={locatedCount === 0} onClick={onFocusDevices}>
-      <Locate size={15} />定位
+    <button className="button secondary compact" disabled={locatedCount === 0} onClick={onFocusDevices}>
+      <Locate size={15} />定位设备
+    </button>
+    <button className="button ghost compact" onClick={onToggleFullscreen}>
+      {fullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}{fullscreen ? '退出全屏' : '全屏'}
     </button>
     <span className="map-toolbar-meta">
-      <MapPin size={14} />{locatedCount} 台设备已定位
+      <Mountain size={14} />地形：{terrainName ? `${terrainName}${terrainFallback ? '（已回退椭球）' : ''}` : '椭球'}
+      <span aria-hidden="true">·</span>
+      <Layers size={14} />影像：{sourceName ?? '未配置'}
     </span>
   </div>
 )
@@ -644,7 +666,10 @@ export const MissingFixPanel = ({ devices }: { devices: DeviceTelemetry[] }) => 
     <div className="map-missing-fix">
       <span className="eyebrow">无定位</span>
       {devices.map((device) => (
-        <span key={device.sn} className="map-missing-fix-item">{device.name}</span>
+        <span key={device.sn} className="map-missing-fix-item">
+          {device.name}
+          <small>未上报 position</small>
+        </span>
       ))}
     </div>
   )
@@ -665,7 +690,7 @@ export const DeviceDetailPanel = (
   if (positions.length === 0) return null
   return (
     <div className="map-device-detail">
-      <span className="eyebrow">已定位设备</span>
+      <span className="eyebrow">已定位设备<small className="map-detail-tag">原始 WGS-84 可见</small></span>
       {positions.map((position) => {
         const described = describeMapDevice(position, system)
         return (
@@ -720,13 +745,33 @@ export function MapView({ sources, devices, onOpenSources }: MapViewProps) {
     widget.camera.flyTo({ destination, duration: 1 })
   }
 
+  const viewRef = useRef<HTMLDivElement>(null)
+  const [fullscreen, setFullscreen] = useState(false)
+  useEffect(() => {
+    const onChange = (): void => setFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+
+  const toggleFullscreen = (): void => {
+    if (document.fullscreenElement) {
+      void document.exitFullscreen()
+      return
+    }
+    void viewRef.current?.requestFullscreen?.()
+  }
+
   return (
-    <div className="map-view">
+    <div className="map-view" ref={viewRef}>
       <MapToolbar
         sourceName={activeSource?.name}
+        terrainName={terrainSource?.name}
+        terrainFallback={terrain.state === 'failed'}
+        fullscreen={fullscreen}
         locatedCount={positions.length}
         onOpenSources={onOpenSources}
         onFocusDevices={focusOnDevices}
+        onToggleFullscreen={toggleFullscreen}
       />
 
       {!activeSource && (

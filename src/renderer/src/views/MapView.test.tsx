@@ -355,6 +355,10 @@ describe('MapView rendering', () => {
     expect(markup).toContain('原始上报（WGS-84） 纬度 39.900000  经度 116.400000')
     expect(markup).toContain('二号机场')
     expect(markup).toContain('无定位')
+    expect(markup).toContain('未上报 position')
+    expect(markup).toContain('原始 WGS-84 可见')
+    expect(markup).toContain('定位设备')
+    expect(markup).toContain('全屏')
   })
 
   it('still asks for an imagery source when only a terrain source is configured', () => {
@@ -365,9 +369,10 @@ describe('MapView rendering', () => {
         onOpenSources={vi.fn()}
       />,
     )
-    // 地形源不提供影像：只配地形时必须继续提示补影像底图，且工具栏不显示地形源名称
+    // 地形源不提供影像：只配地形时仍需提示补影像底图，但工具栏 Meta 要如实显示地形来源
     expect(markup).toContain('请配置底图源')
     expect(markup).toContain('配置底图源')
-    expect(markup).not.toContain('Cesium 世界地形')
+    expect(markup).toContain('地形：Cesium 世界地形')
+    expect(markup).toContain('影像：未配置')
   })
 })

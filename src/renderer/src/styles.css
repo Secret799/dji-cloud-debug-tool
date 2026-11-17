@@ -1121,6 +1121,17 @@ textarea {
   font-size: 11px;
 }
 
+.button.ghost {
+  border-color: transparent;
+  color: var(--muted);
+  background: transparent;
+}
+
+.button.ghost:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-soft);
+}
+
 .connection-button {
   min-width: 78px;
   min-height: 30px;
@@ -12932,11 +12943,16 @@ textarea {
 
 .map-toolbar-meta {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   margin-left: auto;
-  font-size: 13px;
   color: var(--muted);
+  font-size: 10px;
+}
+
+.map-toolbar-meta svg {
+  color: var(--muted-2);
 }
 
 .map-canvas {
@@ -12975,11 +12991,19 @@ textarea {
   padding: 8px 10px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.92);
-  font-size: 12px;
+  font-size: 10px;
 }
 
 .map-missing-fix-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
   color: var(--muted);
+}
+
+.map-missing-fix-item small {
+  color: var(--muted-2);
+  font-size: 9px;
 }
 
 .map-device-detail {
@@ -12998,6 +13022,21 @@ textarea {
   font-size: 12px;
 }
 
+.map-device-detail .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.map-detail-tag {
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--green);
+  background: var(--green-soft);
+  font-size: 8px;
+  font-weight: 650;
+}
+
 .map-device-detail-item {
   display: flex;
   flex-direction: column;
@@ -13005,9 +13044,13 @@ textarea {
 }
 
 .map-device-detail-title {
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 650;
 }
 
 .map-device-detail-line {
   color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 9px;
+  line-height: 1.6;
 }
