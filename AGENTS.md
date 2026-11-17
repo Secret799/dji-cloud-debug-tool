@@ -21,7 +21,7 @@ chore(git): 补齐仓库级别声明与 Git 基础配置
 ## 常用命令
 
 ```bash
-npm ci                 # 按 package-lock.json 安装；Node >= 22.12.0
+npm ci                 # 按 package-lock.json 安装；Node >= 24.0.0
 npm run dev            # electron-vite dev
 npm run typecheck      # tsc --noEmit
 npm test               # vitest run
@@ -30,7 +30,7 @@ npm run release:verify # npm test + npm run build（发布门禁）
 npm run smoke:ui       # Electron 冒烟（需要先构建）
 ```
 
-Node 22.12 以下缺少 `node:sqlite`，三个 main 套件会失败，属于环境限制。
+仓库与 CI 使用 Node 24。Node 20 / 22.12 缺少可用的 `node:sqlite`，三个 main 套件会失败；本地开发请 `nvm use 24`。
 
 ## 禁止改动的目录与文件
 
