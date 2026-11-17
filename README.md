@@ -50,6 +50,7 @@ DJI Cloud Studio 是一款面向 macOS 和 Windows 的机场上云 API、MQTT、
 - 核对目标设备、版本、下载 URL 和文件信息后发送 `ota_create`。
 - 处理 `ota_progress` 升级进度，并自动发送 `events_reply`。
 - 远程日志中心可查询机场/飞行器日志、选择文件、上传到 OSS/S3/MinIO、查看进度或取消任务。
+- OSS 配置详情展示远程日志与固件升级的常用对象 Key 示例，方便新增配置时核对命名。
 
 ### 三维地图与设备定位
 
@@ -73,6 +74,7 @@ DJI Cloud Studio 是一款面向 macOS 和 Windows 的机场上云 API、MQTT、
 - 根据应用名和流 ID 生成 RTMP、RTSP、HLS、WHIP 和 WHEP 地址。
 - 本地 ZLMediaKit 和 SecretEMS 支持 DJI 推流的实时 SEI 诊断。
 - 支持使用 HLS.js 直接预览 HLS 流。
+- 媒体中心右侧提供当前服务的码流预览：ZLM 可选 HLS / WebRTC，SRS 使用 HLS，SecretEMS 使用 HTTP-TS；本地 ZLMediaKit 与 SecretEMS 在预览时同步启动 SEI 诊断，展示编码、视频 NAL、SEI 消息数、解析异常和最近消息，点击消息可查看 payloadType、长度、UUID、文本与 HEX。
 
 ### 错误码与诊断
 
@@ -101,6 +103,7 @@ DJI Cloud Studio 是一款面向 macOS 和 Windows 的机场上云 API、MQTT、
 - GitHub API 返回 403/429 时，自动改用公开 Release 地址和 `SHA256SUMS.txt` 检查版本，无需配置 Token；两条路径都失败时可通过发布页面手动下载。
 - 自动选择当前系统与架构对应的 DMG 或 Windows 安装包并显示下载进度。
 - 下载完成前使用发布页的 `SHA256SUMS.txt` 校验文件完整性；校验通过后才允许打开安装包。
+- 设置页的“常规”分区汇总本地数据与软件更新状态，可直接跳转到更新分类。
 
 ## 安装与运行
 
@@ -228,6 +231,7 @@ npm run dev
 3. 需要远程服务时，添加 ZLMediaKit、SRS 或 SecretEMS 地址和认证信息。
 4. 选择媒体服务，输入应用名和流 ID，复制生成的推流/播放地址。
 5. 将推流地址填入 DJI 直播配置，再使用 HLS 地址预览。
+6. 在媒体中心右侧“码流预览”选择 HLS / WebRTC（SecretEMS 固定 HTTP-TS）后点击“预览”；本地 ZLMediaKit 与 SecretEMS 会同时启动 SEI 诊断，点击最近消息可查看详情。
 
 在相机监看中选择“本地 ZLMediaKit”和“WebRTC”后，应用会同时从本地 RTSP 轨道旁路读取原始视频码流。选择 SecretEMS 时，应用会自动订阅 `/easyMedia/api/sei/events?app=live&stream={streamId}` SSE 诊断接口；设备事件接口 `/easyMedia/api/sei/devices/{deviceId}/events` 的 `sei` 数据格式也受支持。SecretEMS 的 RTMP 与 WebRTC 推流都会启用该订阅。
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Cloud, Database, KeyRound, Plus, Save, Settings2, ShieldCheck, Trash2, X } from 'lucide-react'
+import { Cloud, Database, FileArchive, KeyRound, Package, Plus, Save, Settings2, ShieldCheck, Trash2, X } from 'lucide-react'
 import type { ObjectStorageProfile, ObjectStorageProvider, OperationResult } from '../../../shared/contracts'
 import { createObjectStorageProfile, objectStorageProfileIssues } from '../lib/object-storage'
 import { SecretInput } from '../components/SecretInput'
@@ -170,6 +170,21 @@ export function OssManager({ profiles, selectedId, onSelect, onSave, onRemove, o
                 <div><dt>Access Key ID</dt><dd>{selected.accessKeyId || '未设置'}</dd></div>
                 <div><dt>Security Token</dt><dd>{selected.hasStoredSecurityToken ? '已加密保存' : '未设置'}</dd></div>
               </dl>
+
+              <section className="oss-usage">
+                <header><div><ShieldCheck size={15} /><span>使用入口</span></div><span>2 个功能</span></header>
+                <div className="oss-usage-row">
+                  <FileArchive size={15} />
+                  <div><strong>远程日志上传</strong><span>机场 / 飞行器日志上传到该配置</span></div>
+                  <code>{'log/{sn}/{module}/{bootIndex}.log'}</code>
+                </div>
+                <div className="oss-usage-row">
+                  <Package size={15} />
+                  <div><strong>固件升级包</strong><span>升级前先上传固件包到该配置</span></div>
+                  <code>{'firmware/{model}/{version}.bin'}</code>
+                </div>
+                <div className="oss-usage-note">对象 Key 由发起上传时填写，以上为常用命名示例。</div>
+              </section>
             </div>
           </section>
         </div>
