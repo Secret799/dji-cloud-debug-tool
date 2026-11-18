@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -53,6 +53,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 })
 
 import { MapTileSourceStore } from './map-tile-source-store'
+import { buildTileUrl } from './map-tile-resolver'
 import { runConfigurationTransaction } from './configuration-transaction'
 import type { MapTileSource } from '../shared/contracts'
 
@@ -87,8 +88,54 @@ describe('MapTileSourceStore', () => {
     await rm(userDataPath, { recursive: true, force: true })
   })
 
-  it('starts empty so the first launch shows an unconfigured globe', async () => {
+  it('seeds a key-free OpenStreetMap basemap on first launch', async () => {
+    const sources = await new MapTileSourceStore().list()
+    expect(sources).toHaveLength(1)
+    expect(sources[0]).toMatchObject({
+      id: 'openstreetmap',
+      name: 'OpenStreetMap',
+      layer: 'imagery',
+      kind: 'url-template',
+      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      coordinateSystem: 'wgs84',
+      attribution: '© OpenStreetMap contributors',
+      isDefault: true,
+      hasApiKey: false,
+    })
+    // 预置源必须零 Key：模板里没有 {key} 占位，也不能悄悄带一份凭据
+    expect(sources[0]?.urlTemplate).not.toContain('{key}')
+    expect(sources[0]?.apiKey).toBeUndefined()
+    // 主进程按同一模板拼出的上游地址必须就是可直连的 OSM 瓦片（无需 key 参数）
+    expect(buildTileUrl(sources[0]!, { z: 0, x: 0, y: 0 }, '', 0))
+      .toBe('https://tile.openstreetmap.org/0/0/0.png')
+  })
+
+  it('serves the seeded basemap on the tile path before the first list', async () => {
+    const store = new MapTileSourceStore()
+    expect(await store.getWithApiKeyForTile('openstreetmap')).toMatchObject({
+      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      apiKey: '',
+    })
+  })
+
+  it('does not revive the default after the user removes every source', async () => {
+    const store = new MapTileSourceStore()
+    expect(await store.remove('openstreetmap')).toBe(true)
+    expect(await store.list()).toEqual([])
+    // 配置已落盘为空，新实例也读这份空配置，不能再自动预置一次
     expect(await new MapTileSourceStore().list()).toEqual([])
+  })
+
+  it('fills the default basemap into an empty config written by an older version', async () => {
+    // 旧版本只要打开过地图就会写下这样一份空配置，且没有 defaultSeeded 标记
+    await writeFile(join(userDataPath, 'map-tile-sources.json'), JSON.stringify({ version: 1, sources: [] }))
+    const sources = await new MapTileSourceStore().list()
+    expect(sources.map((entry) => entry.id)).toEqual(['openstreetmap'])
+    const stored = JSON.parse(await readFile(join(userDataPath, 'map-tile-sources.json'), 'utf8')) as {
+      defaultSeeded?: boolean
+    }
+    // 补齐后必须落标记，避免下次启动重复预置
+    expect(stored.defaultSeeded).toBe(true)
   })
 
   it('saves and lists a source', async () => {
@@ -97,13 +144,14 @@ describe('MapTileSourceStore', () => {
     expect(saved.id).toBe('source-1')
     expect(saved.hasApiKey).toBe(true)
     expect(saved.apiKey).toBeUndefined()
-    expect((await store.list())[0]?.hasApiKey).toBe(true)
+    expect((await store.list()).find((entry) => entry.id === 'source-1')?.hasApiKey).toBe(true)
   })
 
   it('never returns the plaintext api key from list', async () => {
     const store = new MapTileSourceStore()
     await store.save(source({ apiKey: 'secret-token' } as Partial<MapTileSource>))
-    const listed = (await store.list())[0] as unknown as Record<string, unknown>
+    const listed = (await store.list())
+      .find((entry) => entry.id === 'source-1') as unknown as Record<string, unknown>
     expect(JSON.stringify(listed)).not.toContain('secret-token')
   })
 
@@ -147,14 +195,15 @@ describe('MapTileSourceStore', () => {
     expect(sources.filter((entry) => entry.isDefault).map((entry) => entry.id)).toEqual(['source-2'])
   })
 
-  it('promotes another source to default when the default is removed', async () => {
+  it('promotes the first remaining source when the default is removed', async () => {
     const store = new MapTileSourceStore()
     await store.save(source({ id: 'source-1', isDefault: true }))
     await store.save(source({ id: 'source-2' }))
     expect(await store.remove('source-1')).toBe(true)
     const sources = await store.list()
-    expect(sources.map((entry) => entry.id)).toEqual(['source-2'])
-    expect(sources[0]?.isDefault).toBe(true)
+    // 预置的 OpenStreetMap 先于用户来源入列，删掉默认源后由它接任默认
+    expect(sources.map((entry) => entry.id)).toEqual(['openstreetmap', 'source-2'])
+    expect(sources.find((entry) => entry.isDefault)?.id).toBe('openstreetmap')
   })
 
   it('reports a missing source on removal', async () => {
@@ -165,7 +214,8 @@ describe('MapTileSourceStore', () => {
     const store = new MapTileSourceStore()
     const saved = await store.save(source({ id: '' }))
     expect(saved.id).toMatch(/^[0-9a-f-]{36}$/)
-    expect((await store.list())[0]?.id).toBe(saved.id)
+    // 预置的 OpenStreetMap 仍在列表里，新来源必须能按自己的 id 找到
+    expect((await store.list()).some((entry) => entry.id === saved.id)).toBe(true)
   })
 })
 

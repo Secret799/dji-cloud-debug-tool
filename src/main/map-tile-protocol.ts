@@ -11,6 +11,7 @@ import {
   type ResolvedTile,
   type TileRequest,
 } from './map-tile-resolver'
+import { mapTileUserAgent } from './map-tile-user-agent'
 import type { MapTileSourceStore } from './map-tile-source-store'
 
 export const MAP_TILE_SCHEME = 'map-tile'
@@ -106,7 +107,7 @@ export class MapTileProtocolHandler {
   ): Promise<ResolvedTile> {
     const url = buildTileUrl(source, request, apiKey, this.subdomainCounter++)
     const response = await net.fetch(url, {
-      headers: buildTileHeaders(source, apiKey),
+      headers: buildTileHeaders(source, apiKey, mapTileUserAgent()),
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     })
     if (!response.ok) throw new TileRequestError(`上游返回 ${response.status}`)

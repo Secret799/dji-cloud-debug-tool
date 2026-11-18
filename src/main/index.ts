@@ -48,6 +48,7 @@ import {
   type ResolvedTile,
   type TileRequest,
 } from './map-tile-resolver'
+import { mapTileUserAgent } from './map-tile-user-agent'
 import { LEGACY_APP_NAME, migrateLegacyUserData } from './legacy-user-data'
 import { MqttConnectionManager } from './mqtt-manager'
 import { ProfileStore } from './profile-store'
@@ -211,7 +212,7 @@ const fetchRemoteTileForProbe = async (
   const apiKey = source.apiKey ?? ''
   const url = buildTileUrl(source, request, apiKey, 0)
   const response = await net.fetch(url, {
-    headers: buildTileHeaders(source, apiKey),
+    headers: buildTileHeaders(source, apiKey, mapTileUserAgent()),
     signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
   })
   if (!response.ok) throw new Error(`上游返回 HTTP ${response.status}`)

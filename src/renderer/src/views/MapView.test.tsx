@@ -10,6 +10,7 @@ import {
   describeMapDevice,
   deviceCartesian,
   focusDestination,
+  imageryCredit,
   imageryProviderUrl,
   MapView,
   markerEntityOptions,
@@ -72,6 +73,18 @@ describe('imageryProviderUrl', () => {
   it('never leaks the upstream template into the renderer url', () => {
     expect(imageryProviderUrl(source())).not.toContain('autonavi')
     expect(imageryProviderUrl(source())).not.toContain('{s}')
+  })
+})
+
+describe('imageryCredit', () => {
+  it('shows the attribution on screen instead of hiding it in the data attribution popover', () => {
+    const credit = imageryCredit('© OpenStreetMap contributors')
+    expect(credit?.html).toBe('© OpenStreetMap contributors')
+    expect(credit?.showOnScreen).toBe(true)
+  })
+
+  it('has no credit when the source sets no attribution', () => {
+    expect(imageryCredit('')).toBeUndefined()
   })
 })
 
@@ -374,5 +387,42 @@ describe('MapView rendering', () => {
     expect(markup).toContain('配置底图源')
     expect(markup).toContain('地形：Cesium 世界地形')
     expect(markup).toContain('影像：未配置')
+  })
+
+  it('summarizes the zero-key OpenStreetMap basemap with the ellipsoid terrain', () => {
+    const markup = renderToStaticMarkup(
+      <MapView
+        sources={[source({
+          id: 'openstreetmap',
+          name: 'OpenStreetMap',
+          coordinateSystem: 'wgs84',
+          attribution: '© OpenStreetMap contributors',
+        })]}
+        devices={[]}
+        onOpenSources={vi.fn()}
+      />,
+    )
+    // 首次启动的默认状态：零 Key 的 OSM 影像出图，未配置地形时摘要如实写椭球
+    expect(markup).toContain('地形：椭球')
+    expect(markup).toContain('影像：OpenStreetMap')
+    expect(markup).not.toContain('请配置底图源')
+  })
+
+  it('keeps the Cesium credit bar outside the map canvas and its overlays', () => {
+    const markup = renderToStaticMarkup(
+      <MapView
+        sources={[source({ attribution: '© OpenStreetMap contributors' })]}
+        devices={[]}
+        onOpenSources={vi.fn()}
+      />,
+    )
+    // 署名容器必须排在画布与浮层之外：留在画布内会被左下角的「已定位设备」面板遮住
+    const stageIndex = markup.indexOf('class="map-stage"')
+    const canvasIndex = markup.indexOf('class="map-canvas"')
+    const creditIndex = markup.indexOf('class="map-credit-bar"')
+    expect(stageIndex).toBeGreaterThanOrEqual(0)
+    expect(canvasIndex).toBeGreaterThan(stageIndex)
+    expect(creditIndex).toBeGreaterThan(canvasIndex)
+    expect(markup).toContain('aria-label="地图版权署名"')
   })
 })

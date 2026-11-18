@@ -276,6 +276,21 @@ export const terrainTokenPlaceholder = (source: MapTileSource): string => {
   return '地形服务访问令牌，不需要则留空'
 }
 
+/**
+ * 计算地形源令牌输入框的字段名。
+ *
+ * Cesium ion 的产品文案是 Access Token、ArcGIS 是 API Key，统一叫「API Key」会让拿着 ion token
+ * 的用户不知道往哪个框填；自建地形服务没有厂商语义，用「访问令牌」并标注可选。
+ *
+ * @param source 地形源草稿
+ * @returns 字段名
+ */
+export const terrainTokenLabel = (source: MapTileSource): string => {
+  if (source.kind === 'terrain-arcgis') return 'ArcGIS API Key'
+  if (source.kind === 'terrain-ion') return 'Cesium ion Access Token'
+  return '访问令牌（可选）'
+}
+
 /** 预设按钮的展示与写入数据 */
 export interface MapSourcePresetOption {
   /** 预设名称，同时用作按钮文案与列表 key */
@@ -971,7 +986,7 @@ export function MapSourceKindFields({
           </label>
         )}
         <SecretInput
-          label="API Key"
+          label={terrainTokenLabel(draft)}
           value={apiKey}
           placeholder={terrainTokenPlaceholder(draft)}
           onChange={onApiKeyChange}
@@ -1261,13 +1276,13 @@ export function MapSourceForm({
         <>
           <MapSourceCoordinateField draft={draft} onDraftChange={onDraftChange} />
           <MapSourceRangeFields draft={draft} onDraftChange={onDraftChange} />
+          <label className="field">
+            <span>版权署名</span>
+            <input value={draft.attribution} onChange={(event) => onDraftChange({ attribution: event.target.value })} />
+          </label>
+          <p className="map-source-hint">署名显示在地图底部；使用公开底图时请保留来源要求的署名。</p>
         </>
       )}
-
-      <label className="field">
-        <span>版权署名</span>
-        <input value={draft.attribution} onChange={(event) => onDraftChange({ attribution: event.target.value })} />
-      </label>
 
       <MapSourceIssueList issues={issues} />
       <MapSourceActions
