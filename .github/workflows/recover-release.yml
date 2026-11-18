@@ -1,0 +1,75 @@
+name: Recover GitHub Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    name: Recover v1.5.1 GitHub Release
+    if: github.event.head_commit.message == '恢复 v1.5.1 发布'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG_NAME: v1.5.1
+      SOURCE_RUN_ID: '44285073554'
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Download package artifacts
+        shell: bash
+        run: |
+          mkdir -p release
+          for artifact in mac-arm64 mac-x64 win-arm64 win-x64; do
+            gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$artifact" --dir release
+          done
+
+      - name: Require update signing key
+        shell: bash
+        env:
+          SIGNING_KEY_PRESENT: ${{ secrets.UPDATE_SIGNING_KEY != '' }}
+        run: |
+          if [ "$SIGNING_KEY_PRESENT" != "true" ]; then
+            echo "::error::Configure the UPDATE_SIGNING_KEY Actions secret before releasing." >&2
+            exit 1
+          fi
+
+      - name: Generate release files
+        shell: bash
+        run: |
+          (cd release && sha256sum -- HangarLab.Studio-* > SHA256SUMS.txt)
+          node scripts/release-notes.mjs "$TAG_NAME" > release-notes.md
+
+      - name: Prepare draft GitHub Release
+        shell: bash
+        run: |
+          state="$(gh release view "$TAG_NAME" --json isDraft --jq '.isDraft' 2>/dev/null || true)"
+          if [ "$state" = "false" ]; then
+            echo "::error::Release $TAG_NAME is already published; published releases are immutable." >&2
+            exit 1
+          fi
+          if [ -z "$state" ]; then
+            gh release create "$TAG_NAME" --draft --verify-tag --title "航坞联调台 $TAG_NAME" --notes-file release-notes.md
+          fi
+          mapfile -d '' release_assets < <(find release -maxdepth 1 -type f -print0)
+          gh release upload "$TAG_NAME" "${release_assets[@]}" --clobber
+
+      - name: Sign update manifest
+        shell: bash
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: node scripts/create-update-manifest.mjs "$TAG_NAME" release release-notes.md
+
+      - name: Upload signed update manifest
+        shell: bash
+        run: gh release upload "$TAG_NAME" release/latest.json release/latest.json.sig --clobber
+
+      - name: Publish GitHub Release
+        shell: bash
+        run: gh release edit "$TAG_NAME" --draft=false
