@@ -189,6 +189,7 @@ export default function App() {
   const deviceArchivesRef = useRef<DeviceArchive[]>([])
   const [selectedDeviceSn, setSelectedDeviceSn] = useState('')
   const [activeView, setActiveView] = useState<WorkspaceView>('overview')
+  const [errorCodeFocus, setErrorCodeFocus] = useState('')
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('general')
   const [connectionMenuOpen, setConnectionMenuOpen] = useState(false)
   const connectionMenuRef = useRef<HTMLDivElement>(null)
@@ -857,6 +858,11 @@ export default function App() {
     [telemetryLayout, telemetryByKey],
   )
   const transactions = useMemo(() => commandTransactions(activeRecords, clock), [activeRecords, clock])
+
+  const openErrorCode = (code: string): void => {
+    setErrorCodeFocus(code)
+    setActiveView('errors')
+  }
 
   useEffect(() => {
     if (effectiveTelemetryLayout === telemetryLayout) return
@@ -1640,6 +1646,7 @@ export default function App() {
                   setActiveView('settings')
                   setSettingsSection('oss')
                 }}
+                onOpenErrorCode={openErrorCode}
                 objectStorageProfiles={objectStorageProfiles}
                 activeObjectStorageId={activeObjectStorageId}
                 onSelectObjectStorage={setActiveObjectStorageId}
@@ -1651,6 +1658,10 @@ export default function App() {
                 sources={mapSources}
                 devices={activeTelemetry}
                 onOpenSources={() => setMapSourceModalOpen(true)}
+                onSelectDevice={(sn) => {
+                  setSelectedDeviceSn(sn)
+                  setActiveView('overview')
+                }}
               />
             )}
             {activeView === 'media' && (
@@ -1663,7 +1674,7 @@ export default function App() {
                 onNotify={showToast}
               />
             )}
-            {activeView === 'errors' && <ErrorCodeManager />}
+            {activeView === 'errors' && <ErrorCodeManager initialCode={errorCodeFocus} />}
             {activeView === 'settings' && (
               <SettingsCenter
                 sidebarWidth={sidebarWidth}

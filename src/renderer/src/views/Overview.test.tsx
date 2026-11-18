@@ -271,6 +271,26 @@ describe('device event workspace', () => {
     expect(detailMarkup).toContain('处理建议')
     expect(detailMarkup).toContain('原始 MQTT 报文')
   })
+
+  it('offers error-code and trace navigation from an HMS alarm detail', () => {
+    const payload = JSON.stringify({
+      tid: 'hms-tid',
+      bid: 'hms-bid',
+      method: 'hms',
+      data: { list: [{ code: '0x16100016', level: 2 }] },
+    })
+    const markup = renderToStaticMarkup(
+      <HmsPayloadDetails
+        payload={payload}
+        onOpenTrace={() => undefined}
+        onOpenErrorCode={() => undefined}
+      />,
+    )
+
+    expect(markup).toContain('查错误码')
+    expect(markup).toContain('在报文中查看')
+    expect(markup).not.toContain('在错误码中查看全部说明')
+  })
 })
 
 describe('Overview DJI field presentation', () => {
@@ -294,6 +314,32 @@ describe('Overview DJI field presentation', () => {
 
     expect(markup).toContain('class="persistent-command-center" hidden=""')
     expect(markup).toContain('class="persistent-camera-center" hidden=""')
+  })
+
+  it('keeps remote logs and firmware centers mounted behind other workbench tabs', () => {
+    const profile = {
+      id: 'profile',
+      name: 'Persistent upload',
+      devices: [{ id: 'dock', name: '测试机场', sn: 'DOCK-1', type: 'dock' }],
+    } as ConnectionProfile
+    const markup = renderToStaticMarkup(
+      <Overview
+        profile={profile}
+        status="connected"
+        telemetry={[]}
+        selectedDeviceSn="DOCK-1"
+        records={[]}
+        transactions={[]}
+        onPublish={async () => ({ ok: true })}
+        onService={async () => ({ ok: true, tid: 'tid' })}
+        onNotify={() => undefined}
+        onOpenOssManager={() => undefined}
+        onSelectObjectStorage={() => undefined}
+      />,
+    )
+
+    expect(markup).toContain('class="persistent-remote-log-center" hidden=""')
+    expect(markup).toContain('class="persistent-firmware-center" hidden=""')
   })
 
   it('does not restore a reported live state while MQTT is disconnected', () => {

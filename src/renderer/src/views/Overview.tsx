@@ -107,6 +107,7 @@ import { CommandCenter } from './CommandCenter'
 import { DeviceTrace, type TraceFocus } from './DeviceTrace'
 import { RemoteLogCenter } from './RemoteLogCenter'
 import { FirmwareUpgradeCenter } from './FirmwareUpgradeCenter'
+import { ErrorCodeCard } from '../components/ErrorCodeCard'
 import { PropertySetModal, type PropertySetTarget } from '../components/PropertySetModal'
 import { SpeakerControl } from '../components/SpeakerControl'
 import { Tooltip } from '../components/Tooltip'
@@ -142,6 +143,7 @@ interface OverviewProps {
   onClear?: () => void
   onNotify?: (text: string, tone?: 'info' | 'success' | 'error') => void
   onOpenOssManager?: () => void
+  onOpenErrorCode?: (code: string) => void
   objectStorageProfiles?: ObjectStorageProfile[]
   activeObjectStorageId?: string
   onSelectObjectStorage?: (profileId: string) => void
@@ -1000,8 +1002,17 @@ function FieldHelp({ path, metadata, sourceLabel, displayLabel, description }: F
   )
 }
 
-export function HmsPayloadDetails({ payload }: { payload: string }) {
+export function HmsPayloadDetails({
+  payload,
+  onOpenTrace,
+  onOpenErrorCode,
+}: {
+  payload: string
+  onOpenTrace?: (focus: TraceFocus) => void
+  onOpenErrorCode?: (code: string) => void
+}) {
   const parsed = useMemo(() => parseHmsPayload(payload), [payload])
+  const [expandedErrorCode, setExpandedErrorCode] = useState('')
 
   if (!parsed) {
     return (
@@ -1092,6 +1103,31 @@ export function HmsPayloadDetails({ payload }: { payload: string }) {
                       )}
                     </div>
                   )}
+                  <div className="hms-alarm-actions">
+                    <button
+                      type="button"
+                      className="hms-alarm-action"
+                      onClick={() => setExpandedErrorCode((current) => current === displayCode ? '' : displayCode)}
+                    >
+                      {expandedErrorCode === displayCode ? '收起错误码' : '查错误码'}
+                    </button>
+                    {parsed.bid && onOpenTrace && (
+                      <button
+                        type="button"
+                        className="hms-alarm-action"
+                        onClick={() => onOpenTrace({ view: 'tx', bid: parsed.bid })}
+                      >
+                        在报文中查看 <span aria-hidden="true">›</span>
+                      </button>
+                    )}
+                  </div>
+                  {expandedErrorCode === displayCode && (
+                    <ErrorCodeCard
+                      result={displayCode}
+                      className="hms-error-card"
+                      onOpenErrorCode={onOpenErrorCode ? () => onOpenErrorCode(displayCode) : undefined}
+                    />
+                  )}
                 </div>
               </section>
             )
@@ -1112,9 +1148,13 @@ export function HmsPayloadDetails({ payload }: { payload: string }) {
 export function DeviceEventWorkspace({
   activities,
   onNotify,
+  onOpenTrace,
+  onOpenErrorCode,
 }: {
   activities: DeviceActivity[]
   onNotify?: (text: string, tone?: 'info' | 'success' | 'error') => void
+  onOpenTrace?: (focus: TraceFocus) => void
+  onOpenErrorCode?: (code: string) => void
 }) {
   const [selectedMethod, setSelectedMethod] = useState<string>(EVENT_TYPE_OPTIONS[0].method)
   const [selectedMessageId, setSelectedMessageId] = useState('')
@@ -1222,7 +1262,11 @@ export function DeviceEventWorkspace({
                     <div><dt>QoS</dt><dd>{selectedActivity.record.qos}</dd></div>
                     <div><dt>大小</dt><dd>{selectedActivity.record.size} B</dd></div>
                   </dl>
-                  <HmsPayloadDetails payload={selectedActivity.record.payload} />
+                  <HmsPayloadDetails
+                    payload={selectedActivity.record.payload}
+                    onOpenTrace={onOpenTrace}
+                    onOpenErrorCode={onOpenErrorCode}
+                  />
               </article>
             </div>
           </div>
@@ -1370,6 +1414,7 @@ export function Overview({
   onClear,
   onNotify,
   onOpenOssManager,
+  onOpenErrorCode,
   objectStorageProfiles = [],
   activeObjectStorageId = '',
   onSelectObjectStorage,
@@ -1393,6 +1438,10 @@ export function Overview({
   const deviceSn = requestedConfigured || requestedTelemetry ? selectedDeviceSn : fallbackSn
   const selected = telemetry.find((device) => device.sn === deviceSn)
   const configured = profile.devices.find((device) => device.sn === deviceSn)
+
+  useEffect(() => {
+    setActiveTab('remote')
+  }, [deviceSn])
   const deviceType = configured?.type ?? selected?.type
   const topologyProductKey = selected?.identity ? djiProductKey(selected.identity) : undefined
   const selectedProvider = resolveGatewayProvider(configured, selected)
@@ -2289,7 +2338,12 @@ export function Overview({
             </section>
           )}
           {activeWorkbenchTab === 'events' && (
-            <DeviceEventWorkspace activities={generalActivities} onNotify={onNotify} />
+            <DeviceEventWorkspace
+              activities={generalActivities}
+              onNotify={onNotify}
+              onOpenTrace={openTrace}
+              onOpenErrorCode={onOpenErrorCode}
+            />
           )}
           {activeWorkbenchTab === 'trace' && onPublish && onExport && onClear && (
             <DeviceTrace
@@ -2328,36 +2382,40 @@ export function Overview({
               )}
             </div>
           </section>}
-          {activeWorkbenchTab === 'logs' && supportsRemoteLogs && onPublish && onNotify && onOpenOssManager && onSelectObjectStorage && (
-            <RemoteLogCenter
-              profileId={profile.id}
-              gatewaySn={deviceSn}
-              status={status}
-              busy={busy}
-              records={records}
-              objectStorageProfiles={objectStorageProfiles}
-              activeObjectStorageId={activeObjectStorageId}
-              onSelectObjectStorage={onSelectObjectStorage}
-              onPublish={onPublish}
-              onNotify={onNotify}
-              onOpenOssManager={onOpenOssManager}
-            />
+          {supportsRemoteLogs && onPublish && onNotify && onOpenOssManager && onSelectObjectStorage && (
+            <div className="persistent-remote-log-center" hidden={activeWorkbenchTab !== 'logs'}>
+              <RemoteLogCenter
+                profileId={profile.id}
+                gatewaySn={deviceSn}
+                status={status}
+                busy={busy}
+                records={records}
+                objectStorageProfiles={objectStorageProfiles}
+                activeObjectStorageId={activeObjectStorageId}
+                onSelectObjectStorage={onSelectObjectStorage}
+                onPublish={onPublish}
+                onNotify={onNotify}
+                onOpenOssManager={onOpenOssManager}
+              />
+            </div>
           )}
-          {activeWorkbenchTab === 'firmware' && supportsFirmwareUpgrade && onService && onSelectObjectStorage && onOpenOssManager && (
-            <FirmwareUpgradeCenter
-              profile={profile}
-              gatewaySn={deviceSn}
-              status={status}
-              busy={busy}
-              telemetry={telemetry}
-              records={records}
-              objectStorageProfiles={objectStorageProfiles}
-              activeObjectStorageId={activeObjectStorageId}
-              onSelectObjectStorage={onSelectObjectStorage}
-              onOpenOssManager={onOpenOssManager}
-              onService={onService}
-              onNotify={onNotify}
-            />
+          {supportsFirmwareUpgrade && onService && onSelectObjectStorage && onOpenOssManager && (
+            <div className="persistent-firmware-center" hidden={activeWorkbenchTab !== 'firmware'}>
+              <FirmwareUpgradeCenter
+                profile={profile}
+                gatewaySn={deviceSn}
+                status={status}
+                busy={busy}
+                telemetry={telemetry}
+                records={records}
+                objectStorageProfiles={objectStorageProfiles}
+                activeObjectStorageId={activeObjectStorageId}
+                onSelectObjectStorage={onSelectObjectStorage}
+                onOpenOssManager={onOpenOssManager}
+                onService={onService}
+                onNotify={onNotify}
+              />
+            </div>
           )}
         </div>
       </section>

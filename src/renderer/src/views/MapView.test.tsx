@@ -14,6 +14,7 @@ import {
   imageryProviderUrl,
   MapView,
   markerEntityOptions,
+  pickedDeviceSn,
   TERRAIN_ARCGIS_URL,
   TERRAIN_LOAD_TIMEOUT_MS,
   TERRAIN_TIMEOUT_REASON,
@@ -424,5 +425,20 @@ describe('MapView rendering', () => {
     expect(canvasIndex).toBeGreaterThan(stageIndex)
     expect(creditIndex).toBeGreaterThan(canvasIndex)
     expect(markup).toContain('aria-label="地图版权署名"')
+  })
+})
+
+describe('pickedDeviceSn', () => {
+  it('reads a device SN from Cesium entity and primitive pick shapes', () => {
+    expect(pickedDeviceSn({ id: 'DOCK-1' })).toBe('DOCK-1')
+    expect(pickedDeviceSn({ id: { id: 'DOCK-2' } })).toBe('DOCK-2')
+  })
+
+  it('ignores empty, primitive and unrelated pick results', () => {
+    expect(pickedDeviceSn(undefined)).toBeUndefined()
+    expect(pickedDeviceSn(null)).toBeUndefined()
+    expect(pickedDeviceSn('DOCK-1')).toBeUndefined()
+    expect(pickedDeviceSn({ id: '' })).toBeUndefined()
+    expect(pickedDeviceSn({ id: { name: '一号机场' } })).toBeUndefined()
   })
 })

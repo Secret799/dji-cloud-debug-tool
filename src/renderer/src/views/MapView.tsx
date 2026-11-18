@@ -21,6 +21,8 @@ import {
   IonResource,
   LabelStyle,
   Resource,
+  ScreenSpaceEventHandler,
+  ScreenSpaceEventType,
   SceneMode,
   TileMapServiceImageryProvider,
   type TerrainProvider,
@@ -362,6 +364,21 @@ export const markerEntityOptions = (
   }
 }
 
+/**
+ * 从 Cesium 的拾取结果中提取设备 SN。
+ *
+ * 点实体时 Cesium 可能返回 `picked.id` 为 Entity，也可能由封装直接返回带
+ * `id` 的对象；两种形态都只读取实体 ID，不把名称或任意对象字段当作设备 SN。
+ */
+export const pickedDeviceSn = (picked: unknown): string | undefined => {
+  if (!picked || typeof picked !== 'object') return undefined
+  const candidate = 'id' in picked ? picked.id : undefined
+  if (typeof candidate === 'string' && candidate.trim()) return candidate.trim()
+  if (!candidate || typeof candidate !== 'object' || !('id' in candidate)) return undefined
+  const id = candidate.id
+  return typeof id === 'string' && id.trim() ? id.trim() : undefined
+}
+
 export interface CesiumMapHandle {
   /** CesiumWidget 引用，未初始化或被销毁时为 null */
   widgetRef: MutableRefObject<CesiumWidget | null>
@@ -583,6 +600,7 @@ export const useDeviceEntities = (
   handle: CesiumMapHandle,
   positions: DevicePosition[],
   system: MapCoordinateSystem,
+  onSelectDevice?: (sn: string) => void,
 ): void => {
   const { widgetRef, entitiesRef, ready } = handle
   const trackedRef = useRef(new Map<string, Entity>())
@@ -591,6 +609,8 @@ export const useDeviceEntities = (
   positionsRef.current = new Map(positions.map((position) => [position.sn, position]))
   systemRef.current = system
   const access: PositionAccess = { positions: positionsRef, system: systemRef }
+  const onSelectDeviceRef = useRef(onSelectDevice)
+  onSelectDeviceRef.current = onSelectDevice
   // 只在设备集合变化时增删实体，位置刷新走上面的 ref
   const deviceKey = positions.map((position) => position.sn).join('|')
 
@@ -620,6 +640,23 @@ export const useDeviceEntities = (
     // requestRenderMode 下必须显式请求重绘，否则新位置不会出现在画面上
     widget.scene.requestRender()
   }, [positions, ready, widgetRef])
+
+  useEffect(() => {
+    const widget = widgetRef.current
+    if (!ready || !widget || widget.isDestroyed()) return
+
+    const handler = new ScreenSpaceEventHandler(widget.scene.canvas)
+    handler.setInputAction((movement: { position: Cartesian2 }) => {
+      const picked = widget.scene.pick(movement.position)
+      const sn = pickedDeviceSn(picked)
+      if (!sn || !trackedRef.current.has(sn)) return
+      onSelectDeviceRef.current?.(sn)
+    }, ScreenSpaceEventType.LEFT_CLICK)
+
+    return () => {
+      if (!handler.isDestroyed()) handler.destroy()
+    }
+  }, [ready, widgetRef])
 }
 
 interface MapToolbarProps {
@@ -736,6 +773,8 @@ interface MapViewProps {
   devices: DeviceTelemetry[]
   /** 打开底图源配置弹窗 */
   onOpenSources: () => void
+  /** 点击设备标记后返回设备 SN */
+  onSelectDevice?: (sn: string) => void
 }
 
 /**
@@ -744,7 +783,7 @@ interface MapViewProps {
  * @param props 视图属性
  * @returns 地图视图元素
  */
-export function MapView({ sources, devices, onOpenSources }: MapViewProps) {
+export function MapView({ sources, devices, onOpenSources, onSelectDevice }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const creditRef = useRef<HTMLDivElement>(null)
   const map = useCesiumMap(containerRef, creditRef)
@@ -759,7 +798,7 @@ export function MapView({ sources, devices, onOpenSources }: MapViewProps) {
 
   useBasemapLayer(map, activeSource)
   const terrain = useTerrainLayer(map, terrainSource)
-  useDeviceEntities(map, positions, system)
+  useDeviceEntities(map, positions, system, onSelectDevice)
 
   const focusOnDevices = (): void => {
     const widget = map.widgetRef.current

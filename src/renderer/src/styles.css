@@ -2113,6 +2113,38 @@ textarea {
   border-top: 1px solid var(--line);
 }
 
+.hms-alarm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.hms-alarm-action,
+.remote-log-config-link,
+.firmware-config-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.hms-alarm-action:hover,
+.remote-log-config-link:hover,
+.firmware-config-link:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+.hms-error-card {
+  margin-top: 10px;
+}
+
 .hms-level-badge,
 .hms-imminent-badge {
   display: inline-flex;
@@ -10597,7 +10629,7 @@ textarea {
 
 .remote-log-oss-summary {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) 32px;
+  grid-template-columns: 28px minmax(0, 1fr) auto 32px;
   align-items: center;
   gap: 8px;
   min-height: 54px;
@@ -10653,6 +10685,10 @@ textarea {
   padding: 0 7px;
   background: var(--surface);
   font-size: 9px;
+}
+
+.remote-log-config-link {
+  white-space: nowrap;
 }
 
 .remote-log-oss-summary.ready {
@@ -12177,6 +12213,11 @@ textarea {
   display: grid;
   grid-template-columns: minmax(180px, 0.75fr) minmax(260px, 1.25fr);
   gap: 10px;
+}
+
+.firmware-config-link {
+  justify-self: start;
+  margin-top: -2px;
 }
 
 .firmware-upload-fields > label,
