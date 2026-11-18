@@ -1236,6 +1236,10 @@ try {
   )
   await window.getByRole('button', { name: '指令', exact: true }).click()
   await window.locator('.command-center').waitFor({ state: 'visible' })
+  const commandContentHeight = await window.locator('.control-center-content').evaluate((element) => element.getBoundingClientRect().height)
+  if (commandContentHeight < 300) {
+    errors.push(`commands: control-center content is collapsed (${commandContentHeight}px)`)
+  }
   if (await window.getByText('请求响应记录', { exact: true }).count()) {
     errors.push('commands: duplicated request and response history is still visible')
   }
