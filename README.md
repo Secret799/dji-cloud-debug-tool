@@ -102,9 +102,10 @@ DJI Cloud Studio 是一款面向 macOS 和 Windows 的机场上云 API、MQTT、
 ### 应用更新
 
 - 启动后静默检查 GitHub Releases，也可在“关于”窗口手动检查。
+- 优先读取发布的签名更新清单 `latest.json`（Ed25519 签名、免 GitHub API 限流）：先验清单签名，再按清单中的 SHA-256 校验安装包；清单缺失的旧版本自动回退到 GitHub API + `SHA256SUMS.txt`。
 - GitHub API 返回 403/429 时，自动改用公开 Release 地址和 `SHA256SUMS.txt` 检查版本，无需配置 Token；两条路径都失败时可通过发布页面手动下载。
 - 自动选择当前系统与架构对应的 DMG 或 Windows 安装包并显示下载进度。
-- 下载完成前使用发布页的 `SHA256SUMS.txt` 校验文件完整性；校验通过后才允许打开安装包。
+- 下载完成前校验安装包完整性；校验通过后才允许打开安装包。
 - 设置页的“常规”分区汇总本地数据与软件更新状态，可直接跳转到更新分类。
 
 ## 安装与运行
@@ -340,7 +341,7 @@ ZLMediaKit 不作为二进制资源提交到代码仓库。GitHub Actions 会为
 
 ## GitHub Actions Tag 自动发布
 
-发布工作流位于 `.github/workflows/release.yml`。推送符合以下格式的 tag 后会自动执行：
+发布工作流位于 `.github/workflows/release.yml`。仓库需配置 Actions Secret `UPDATE_SIGNING_KEY`（Ed25519 私钥 PEM），用于签发更新清单；缺少该 Secret 时发布会失败。推送符合以下格式的 tag 后会自动执行：
 
 - 正式版：`v1.0.1`
 - 预发布版：`v1.0.1-beta.1`
@@ -382,7 +383,8 @@ git push origin v1.0.1
 6. 对 macOS 应用执行 ad-hoc 签名，并使用 `codesign` 验证签名完整性。
 7. 确认 macOS 应用使用的是 ad-hoc 签名。
 8. 生成 `SHA256SUMS.txt`。
-9. 自动创建或更新 GitHub Release，并上传所有产物。
+9. 创建草稿 Release，上传所有产物后生成并签名 `latest.json`，再发布 Release。
+10. 已发布的 Release 不可覆盖；需要重发时提升版本号并推送新的 tag。
 
 在 GitHub Actions 页面手工执行 `workflow_dispatch` 可用于验证构建；只有 tag 触发的工作流会自动创建 GitHub Release。工作流会使用 tag 中的版本号更新安装包版本，无需为每次发布手工修改 `package.json`。
 

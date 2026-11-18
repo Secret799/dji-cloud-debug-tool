@@ -1,5 +1,14 @@
 # 更新记录
 
+## v1.3.0
+
+### 更新机制
+
+- 新增签名更新清单：发布流程生成 `latest.json` 并用 Ed25519 私钥签名，应用内置公钥验签，再按清单中的 SHA-256 校验安装包。
+- 更新检查优先走 `releases/latest/download/latest.json`，不再受 GitHub API 限流影响；清单缺失的旧版本自动回退 API + `SHA256SUMS.txt`。
+- 发布改为草稿 → 校验 → 发布的流程：已发布的 Release 不可覆盖，缺少 `UPDATE_SIGNING_KEY` Secret 时发布直接失败。
+- 新增更新清单验签、字段校验与安装包选择的单元测试。
+
 ## v1.2.2
 
 - 修复 macOS Apple Silicon 打包：`macos-14` 运行器镜像已退役，改用 arm64 的 `macos-15`。

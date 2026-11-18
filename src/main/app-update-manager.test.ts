@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { createHash, generateKeyPairSync, sign } from 'node:crypto'
 import { Writable } from 'node:stream'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { AppUpdateManager } from './app-update-manager'
@@ -21,7 +21,8 @@ afterEach(() => { Object.defineProperty(process, 'platform', platform) })
 
 async function available(body: ReadableStream<Uint8Array>) {
   const manager = new AppUpdateManager(() => {})
-  mocks.fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ tag_name: 'v1.0.0', assets: [
+  mocks.fetch.mockResolvedValueOnce(new Response('', { status: 404 }))
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ tag_name: 'v1.0.0', assets: [
     { name, size: payload.length, browser_download_url: 'installer' },
     { name: 'SHA256SUMS.txt', browser_download_url: 'sums' },
   ] }) }).mockResolvedValueOnce({ ok: true, text: async () => `${hash}  ${name}` })
@@ -75,6 +76,7 @@ function publicRelease(status: number, options: { tagUrl?: string; sums?: string
     if (url.startsWith('https://api.github.com/')) return new Response('{"message":"API rate limit exceeded"}', {
       status, headers: { 'x-ratelimit-remaining': '0' },
     })
+    if (url === `${releasesUrl}/latest/download/latest.json`) return new Response('', { status: 404 })
     if (url === `${releasesUrl}/latest`) {
       const response = new Response(null)
       Object.defineProperty(response, 'url', { value: options.tagUrl ?? tagUrl })
@@ -85,6 +87,49 @@ function publicRelease(status: number, options: { tagUrl?: string; sums?: string
     throw new Error(`Unexpected URL: ${url}`)
   })
 }
+
+it('prefers the signed manifest and verifies the installer hash without the REST API', async () => {
+  const { publicKey, privateKey } = generateKeyPairSync('ed25519')
+  const manifestText = `${JSON.stringify({
+    version: '1.0.0', tag: 'v1.0.0', publishedAt: '2026-11-18T00:00:00Z', notes: '- 签名清单更新',
+    assets: [{ name, size: payload.length, sha256: hash }],
+  }, null, 2)}\n`
+  const signature = sign(null, Buffer.from(manifestText, 'utf8'), privateKey).toString('base64')
+  const chunks: Buffer[] = []
+  mocks.output.mockReturnValue(new Writable({ write(chunk, _encoding, callback) { chunks.push(chunk); callback() } }))
+  mocks.fetch.mockImplementation(async (url: string) => {
+    if (url === `${releasesUrl}/latest/download/latest.json`) return new Response(manifestText)
+    if (url === `${releasesUrl}/latest/download/latest.json.sig`) return new Response(signature)
+    if (url === `${releasesUrl}/download/v1.0.0/${name}`) return new Response(payload)
+    throw new Error(`Unexpected URL: ${url}`)
+  })
+  const manager = new AppUpdateManager(() => {}, publicKey.export({ type: 'spki', format: 'pem' }).toString())
+
+  expect(await manager.check()).toMatchObject({ status: 'available', availableVersion: '1.0.0', releaseNotes: '- 签名清单更新' })
+  expect(await manager.download()).toEqual({ ok: true })
+  expect(Buffer.concat(chunks)).toEqual(payload)
+  expect(manager.getState().status).toBe('downloaded')
+  expect(mocks.fetch.mock.calls.every(([url]) => !String(url).startsWith('https://api.github.com/'))).toBe(true)
+})
+
+it('rejects a manifest whose signature does not verify instead of falling back', async () => {
+  const { publicKey } = generateKeyPairSync('ed25519')
+  const manifestText = JSON.stringify({
+    version: '1.0.0', tag: 'v1.0.0', publishedAt: '2026-11-18T00:00:00Z', notes: '',
+    assets: [{ name, size: payload.length, sha256: hash }],
+  })
+  mocks.fetch.mockImplementation(async (url: string) => {
+    if (url === `${releasesUrl}/latest/download/latest.json`) return new Response(manifestText)
+    if (url === `${releasesUrl}/latest/download/latest.json.sig`) return new Response('dGFtcGVyZWQ=')
+    throw new Error(`Unexpected URL: ${url}`)
+  })
+  const manager = new AppUpdateManager(() => {}, publicKey.export({ type: 'spki', format: 'pem' }).toString())
+
+  const state = await manager.check()
+  expect(state.status).toBe('error')
+  expect(state.error).toContain('签名')
+  expect(mocks.fetch.mock.calls.every(([url]) => !String(url).startsWith('https://api.github.com/'))).toBe(true)
+})
 
 it.each([403, 429])('checks and downloads the verified public release when the API returns %s', async (status) => {
   publicRelease(status)
@@ -124,5 +169,6 @@ it('keeps a manual release link for API errors that are not rate limits', async 
   expect(state.status).toBe('error')
   expect(state.error).toContain('404')
   expect(state.releaseUrl).toBe(`${releasesUrl}/latest`)
-  expect(mocks.fetch).toHaveBeenCalledTimes(1)
+  // 第一次是签名清单探测（该测试里返回 404），第二次才是 GitHub API
+  expect(mocks.fetch).toHaveBeenCalledTimes(2)
 })
