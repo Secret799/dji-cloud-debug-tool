@@ -219,8 +219,8 @@ const run = async () => {
       window.localStorage.setItem(extraKey, extraValue)
       return {
         ok: true,
-        stored: window.localStorage.getItem(key),
-        extra: window.localStorage.getItem(extraKey),
+        stored: window.localStorage.getItem(params.key),
+        extra: window.localStorage.getItem(params.extraKey),
       }
     }, {
       seed: SEED,
@@ -255,7 +255,7 @@ const run = async () => {
     record('新版应用名', runtime.name === 'HangarLab Studio', runtime.name)
     record('新版 userData 指向新目录', runtime.userData === NEW_USER_DATA, runtime.userData)
 
-    const view = await window.evaluate(async ({ key }) => {
+    const view = await window.evaluate(async (params) => {
       const [profiles, servers, sources, webdav] = await Promise.all([
         window.djiApi.profiles.list(),
         window.djiApi.media.listServers(),
