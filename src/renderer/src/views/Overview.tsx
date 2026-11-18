@@ -104,7 +104,7 @@ import {
   parseHmsPayload,
 } from '../lib/dji-hms'
 import { CommandCenter } from './CommandCenter'
-import { MqttConsole } from './MqttConsole'
+import { DeviceTrace, type TraceFocus } from './DeviceTrace'
 import { RemoteLogCenter } from './RemoteLogCenter'
 import { FirmwareUpgradeCenter } from './FirmwareUpgradeCenter'
 import { PropertySetModal, type PropertySetTarget } from '../components/PropertySetModal'
@@ -147,6 +147,7 @@ interface OverviewProps {
   onSelectObjectStorage?: (profileId: string) => void
   telemetryLayout?: TelemetryLayoutConfig
   mediaServers?: MediaServerProfile[]
+  traceFocus?: TraceFocus
 }
 
 const MAX_TELEMETRY_FIELDS = 500
@@ -561,7 +562,7 @@ export function CommandHistory({
   )
 }
 
-type WorkbenchTab = 'remote' | 'payload' | 'events' | 'logs' | 'firmware' | 'history' | 'commands' | 'messages'
+type WorkbenchTab = 'remote' | 'payload' | 'events' | 'logs' | 'firmware' | 'trace' | 'commands'
 
 const deviceTypeCopy = {
   dock: { label: '机场', model: 'DJI Dock', icon: RadioTower },
@@ -1374,6 +1375,7 @@ export function Overview({
   onSelectObjectStorage,
   telemetryLayout = DEFAULT_TELEMETRY_LAYOUT,
   mediaServers = [],
+  traceFocus,
 }: OverviewProps) {
   const [activeTab, setActiveTab] = useState<WorkbenchTab>('remote')
   const [activeTelemetryTab, setActiveTelemetryTab] = useState<TelemetryTabId>('operation')
@@ -1618,8 +1620,7 @@ export function Overview({
     { id: 'events', label: '事件', icon: Bell, count: hmsActivities.length },
     { id: 'commands', label: '指令', icon: Command },
     { id: 'payload', label: '负载', icon: Box, count: payloadIndexes.length },
-    { id: 'history', label: '历史', icon: Clock3, count: transactions.length },
-    { id: 'messages', label: '消息', icon: MessagesSquare, count: deviceRecords.length },
+    { id: 'trace', label: '报文', icon: MessagesSquare, count: deviceRecords.length },
     { id: 'logs', label: '远程日志', icon: FileArchive },
     { id: 'firmware', label: '固件升级', icon: Package },
   ]
@@ -1632,7 +1633,7 @@ export function Overview({
       ))
     : tabs.filter((tab) => tab.id !== 'commands' && tab.id !== 'payload' && tab.id !== 'logs' && tab.id !== 'firmware')
   const visibleTabs = deviceType === 'aircraft'
-    ? configuredTabs.filter((tab) => tab.id === 'remote' || tab.id === 'messages')
+    ? configuredTabs.filter((tab) => tab.id === 'remote' || tab.id === 'trace')
     : deviceType === 'dock'
       ? configuredTabs
       : configuredTabs.filter((tab) => tab.id !== 'payload')
@@ -2284,8 +2285,20 @@ export function Overview({
           {activeWorkbenchTab === 'events' && (
             <DeviceEventWorkspace activities={generalActivities} onNotify={onNotify} />
           )}
-          {activeWorkbenchTab === 'history' && (
-            <CommandHistory transactions={transactions} onNotify={onNotify} />
+          {activeWorkbenchTab === 'trace' && onPublish && onExport && onClear && (
+            <DeviceTrace
+              profile={profile}
+              status={status}
+              busy={busy}
+              records={records}
+              transactions={transactions}
+              selectedDeviceSn={deviceSn}
+              onPublish={onPublish}
+              onExport={onExport}
+              onClear={onClear}
+              onNotify={onNotify}
+              focus={traceFocus}
+            />
           )}
           {configured && gatewayCapabilities.deviceControl && <section className="control-center-workspace" hidden={activeWorkbenchTab !== 'commands'}>
             <div className="control-center-content controls">
@@ -2337,9 +2350,6 @@ export function Overview({
               onService={onService}
               onNotify={onNotify}
             />
-          )}
-          {activeWorkbenchTab === 'messages' && onPublish && onExport && onClear && (
-            <MqttConsole profile={profile} status={status} busy={busy} records={deviceRecords} selectedDeviceSn={deviceSn} onPublish={onPublish} onExport={onExport} onClear={onClear} />
           )}
         </div>
       </section>

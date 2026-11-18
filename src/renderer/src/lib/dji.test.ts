@@ -908,4 +908,15 @@ describe('DJI protocol helpers', () => {
 
     expect(commandTransactions(records, 200)[0]).toMatchObject({ gatewaySn: 'D1', status: 'pending' })
   })
+
+  it('keeps a service transaction pending until the 20 second timeout', () => {
+    const record = {
+      id: 'out-timeout', profileId: 'p', direction: 'out', topic: 'thing/product/D1/services',
+      payload: JSON.stringify({ tid: 'tid-timeout', method: 'cover_open', data: {} }),
+      qos: 1, retain: false, timestamp: 100, size: 1,
+    } as MqttMessageRecord
+
+    expect(commandTransactions([record], 20_099)[0].status).toBe('pending')
+    expect(commandTransactions([record], 20_101)[0].status).toBe('timeout')
+  })
 })

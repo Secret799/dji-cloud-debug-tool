@@ -1078,10 +1078,9 @@ try {
     errors.push('overview: recent commands should not remain inside the telemetry tab')
   }
   const deviceTabLabels = await window.locator('.device-tabs button span').allTextContents()
-  const messagesTabIndex = deviceTabLabels.indexOf('消息')
-  const historyTabIndex = deviceTabLabels.indexOf('历史')
-  if (historyTabIndex < 0 || messagesTabIndex !== historyTabIndex + 1) {
-    errors.push(`overview: message console should follow command history (${JSON.stringify(deviceTabLabels)})`)
+  const traceTabIndex = deviceTabLabels.indexOf('报文')
+  if (traceTabIndex < 0 || deviceTabLabels.includes('历史') || deviceTabLabels.includes('消息')) {
+    errors.push(`overview: device workbench should expose only the trace tab (${JSON.stringify(deviceTabLabels)})`)
   }
   await window.getByRole('button', { name: '固件升级', exact: true }).click()
   await window.locator('.firmware-workspace').waitFor({ state: 'visible' })
@@ -1154,85 +1153,47 @@ try {
       }
     }, commandMessages)
   }
-  await window.getByRole('button', { name: /^历史/ }).click()
-  await window.locator('.history-workspace .command-history-panel').waitFor({ state: 'visible' })
-  if (profileId) {
-    const commandHistoryItem = window.locator('.command-history-item').first()
-    await commandHistoryItem.waitFor({ state: 'visible' })
-    if (await commandHistoryItem.getAttribute('open') !== null) {
-      errors.push('history: command details should be collapsed by default')
-    }
-    await commandHistoryItem.locator('summary').click()
-    await window.waitForFunction(() => document.querySelector('.command-history-item')?.hasAttribute('open'))
-    const commandHistoryText = await commandHistoryItem.innerText()
-    for (const expected of [
-      '发送信息',
-      '返回信息',
-      'thing/product/DOCK-SMOKE-001/services',
-      'thing/product/DOCK-SMOKE-001/services_reply',
-      'smoke-request-value',
-      'smoke-response-value',
-      '45 ms',
-    ]) {
-      if (!commandHistoryText.includes(expected)) errors.push(`history: missing ${expected}`)
-    }
-    if (commandHistoryText.includes('设置返航模式失败')) {
-      errors.push('history: result-code guidance should not be expanded inline')
-    }
-
-    await commandHistoryItem.getByRole('button', { name: '核查', exact: true }).click()
-    const resultCheckPage = window.locator('.command-result-check-page')
-    await resultCheckPage.waitFor({ state: 'visible' })
-    if (await window.locator('.command-history-panel').isVisible()) {
-      errors.push('history: command list should be hidden while the result-code page is open')
-    }
-    const resultCheckText = await resultCheckPage.innerText()
-    for (const expected of [
-      '结果码 316031 核查结果',
-      '设置返航模式失败',
-      '2代机库下发任务需指定返航模式',
-      '机场日志、飞机日志',
-    ]) {
-      if (!resultCheckText.includes(expected)) errors.push(`history check page: missing ${expected}`)
-    }
-    await inspectLayout('history-result-check', [
-      '.history-workspace',
-      '.command-result-check-page',
-      '.command-result-check-header',
-      '.command-result-check-content',
-      '.command-result-check-context',
-      '.command-error-guidance',
-    ])
-    await window.screenshot({ path: `${screenshotBase}-history-result-check.png` })
-    await resultCheckPage.getByRole('button', { name: '返回最近指令', exact: true }).click()
-    await window.locator('.command-history-panel').waitFor({ state: 'visible' })
-    if (await commandHistoryItem.getAttribute('open') === null) {
-      errors.push('history: command details should remain open after returning from the result-code page')
-    }
+  await window.getByRole('button', { name: /^报文/ }).click()
+  await window.locator('.device-trace').waitFor({ state: 'visible' })
+  await window.locator('.trace-record-row').first().waitFor({ state: 'visible' })
+  const traceText = await window.locator('.device-trace').innerText()
+  for (const expected of [
+    '报文流',
+    '事务',
+    '本设备',
+    'services',
+    'smoke-request-value',
+    'smoke-response-value',
+  ]) {
+    if (!traceText.includes(expected)) errors.push(`trace: missing ${expected}`)
   }
-  await inspectLayout('history', [
+  await window.getByRole('button', { name: '事务', exact: true }).click()
+  await window.locator('.trace-transaction-item').first().waitFor({ state: 'visible' })
+  const transactionItem = window.locator('.trace-transaction-item').first()
+  await transactionItem.locator('summary').click()
+  await window.waitForFunction(() => document.querySelector('.trace-transaction-item')?.hasAttribute('open'))
+  const transactionText = await transactionItem.innerText()
+  for (const expected of [
+    'flighttask_prepare',
+    '失败',
+    '请求',
+    '回执',
+    '316031',
+  ]) {
+    if (!transactionText.includes(expected)) errors.push(`trace transaction: missing ${expected}`)
+  }
+  await inspectLayout('trace', [
     'body',
     '.app-shell',
     '.workspace-content',
-    '.history-workspace',
-    '.command-history-panel',
-    '.command-history-item',
-    '.command-message-pair',
+    '.device-trace',
+    '.trace-toolbar',
+    '.trace-content',
+    '.trace-list',
+    '.trace-inspector',
+    '.trace-publisher',
   ])
-  await window.screenshot({ path: `${screenshotBase}-history.png` })
-
-  await window.getByRole('button', { name: /^消息/ }).click()
-  await window.locator('.mqtt-console').waitFor({ state: 'visible' })
-  await inspectLayout('messages', [
-    'body',
-    '.app-shell',
-    '.workspace-content',
-    '.mqtt-console',
-    '.console-toolbar',
-    '.console-content',
-    '.publish-composer',
-  ])
-  await window.screenshot({ path: `${screenshotBase}-messages.png` })
+  await window.screenshot({ path: `${screenshotBase}-trace.png` })
 
   await browserWindow.evaluate((instance) => instance.setContentSize(1440, 800))
   await window.waitForFunction(
