@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { ConnectionProfile, ConnectionStatus, MediaServerProfile } from '../../../shared/contracts'
-import { DJI_COMMANDS, type DeviceTelemetry } from '../lib/dji'
+import { DJI_COMMANDS, type CommandTransaction, type DeviceTelemetry } from '../lib/dji'
 import { buildMediaEndpoints } from '../lib/media'
 import { parseTelemetryCache, serializeTelemetryCache } from '../lib/telemetry-cache'
 import {
@@ -9,13 +9,15 @@ import {
   isValidSuperDockLteVerificationCode,
 } from '../lib/superdock'
 import { isCameraLiveQualityLocked, selectCameraPushEndpoint } from './CameraCenter'
-import { CommandCenter, superDockLteAuthenticationStatus } from './CommandCenter'
+import { CommandCenter, commandReceiptSource, superDockLteAuthenticationStatus } from './CommandCenter'
+import { ErrorCodeCard } from '../components/ErrorCodeCard'
 
 const renderCommandCenter = (
   profile: ConnectionProfile,
   selectedDeviceSn: string,
   telemetry: DeviceTelemetry[] = [],
   status: ConnectionStatus = 'connected',
+  transactions: CommandTransaction[] = [],
 ): string =>
   renderToStaticMarkup(
     <CommandCenter
@@ -24,7 +26,9 @@ const renderCommandCenter = (
       busy={false}
       selectedDeviceSn={selectedDeviceSn}
       telemetry={telemetry}
+      transactions={transactions}
       onPublish={async () => ({ ok: true })}
+      onOpenTrace={() => undefined}
     />,
   )
 
@@ -121,6 +125,58 @@ describe('CommandCenter gateway context', () => {
     expect(markup).toContain('网关设备')
     expect(markup).toContain('一号机场 · DOCK-1')
     expect(markup).toContain('二号机场 · DOCK-2')
+  })
+})
+
+describe('CommandCenter receipt column', () => {
+  const profile = {
+    id: 'profile',
+    devices: [{ id: 'dock', name: '二代机场', sn: 'DOCK-1', type: 'dock' }],
+  } as ConnectionProfile
+  const request = {
+    id: 'request', profileId: 'profile', direction: 'out', topic: 'thing/product/DOCK-1/services',
+    payload: JSON.stringify({ tid: 'tid-receipt', method: 'flighttask_prepare' }), qos: 1, retain: false, timestamp: 100, size: 80,
+  } as const
+  const response = {
+    id: 'response', profileId: 'profile', direction: 'in', topic: 'thing/product/DOCK-1/services_reply',
+    payload: JSON.stringify({ tid: 'tid-receipt', method: 'flighttask_prepare', data: { result: 316031 } }), qos: 1, retain: false, timestamp: 145, size: 90,
+  } as const
+  const transactions = [
+    { tid: 'tid-receipt', method: 'flighttask_prepare', gatewaySn: 'DOCK-1', startedAt: 100, finishedAt: 145, status: 'failed', result: 316031, request, response },
+    { tid: 'tid-ota', method: 'ota_create', gatewaySn: 'DOCK-1', startedAt: 90, status: 'timeout', request },
+    { tid: 'tid-log', method: 'fileupload_start', gatewaySn: 'DOCK-1', startedAt: 80, status: 'success', finishedAt: 100, request, response },
+  ] satisfies CommandTransaction[]
+
+  it('shows failed, timeout, and source labels with trace actions', () => {
+    const markup = renderCommandCenter(profile, 'DOCK-1', [], 'connected', transactions)
+
+    expect(markup).toContain('指令回执')
+    expect(markup).toContain('失败')
+    expect(markup).toContain('超时')
+    expect(markup).toContain('来自 固件升级')
+    expect(markup).toContain('来自 远程日志')
+    expect(markup).toContain('查错误码')
+    expect(markup).toContain('在报文中查看')
+  })
+
+  it('renders the shared error code guidance card', () => {
+    const markup = renderToStaticMarkup(<ErrorCodeCard result={316031} />)
+
+    expect(markup).toContain('错误码 316031')
+    expect(markup).toContain('设置返航模式失败')
+  })
+
+  it('marks pending receipts interrupted when disconnected', () => {
+    const pending = [{ tid: 'tid-pending', method: 'cover_open', gatewaySn: 'DOCK-1', startedAt: Date.now() - 2_000, status: 'pending', request } satisfies CommandTransaction]
+    const markup = renderCommandCenter(profile, 'DOCK-1', [], 'disconnected', pending)
+
+    expect(markup).toContain('中断')
+  })
+
+  it('labels service sources by originating workbench', () => {
+    expect(commandReceiptSource('fileupload_list')).toBe('远程日志')
+    expect(commandReceiptSource('ota_create')).toBe('固件升级')
+    expect(commandReceiptSource('cover_open')).toBe('指令')
   })
 })
 

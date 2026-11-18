@@ -35,6 +35,7 @@ import {
   telemetryValue,
   type CommandTemplate,
   type DeviceTelemetry,
+  type CommandTransaction,
   type ServicePayloadOptions,
   type ServiceCaller,
 } from '../lib/dji'
@@ -44,6 +45,7 @@ import {
   isValidSuperDockLteVerificationCode,
 } from '../lib/superdock'
 import { CameraCenter } from './CameraCenter'
+import { ErrorCodeCard } from '../components/ErrorCodeCard'
 
 interface CommandCenterProps {
   profile: ConnectionProfile
@@ -58,6 +60,8 @@ interface CommandCenterProps {
   defaultPsdkIndex?: number
   showCategoryBar?: boolean
   mediaServers?: MediaServerProfile[]
+  transactions?: CommandTransaction[]
+  onOpenTrace?: (focus: { view: 'tx'; tid: string }) => void
 }
 
 const categories: { id: CommandTemplate['category']; label: string; icon: typeof Gamepad2 }[] = [
@@ -77,6 +81,80 @@ const recordArray = (value: unknown): Record<string, unknown>[] =>
   Array.isArray(value)
     ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object' && !Array.isArray(item))
     : []
+
+export const commandReceiptSource = (method: string): string => method.startsWith('fileupload_')
+  ? '远程日志'
+  : method === 'ota_create'
+    ? '固件升级'
+    : '指令'
+
+const shortReceiptTid = (tid: string): string => tid.length > 14 ? `${tid.slice(0, 14)}…` : tid
+
+type ReceiptState = 'waiting' | 'success' | 'failed' | 'timeout' | 'interrupted'
+
+const receiptStateLabel: Record<ReceiptState, string> = {
+  waiting: '等待中',
+  success: '成功',
+  failed: '失败',
+  timeout: '超时',
+  interrupted: '中断',
+}
+
+const receiptStateClass = (transaction: CommandTransaction, connected: boolean, interrupted: Set<string>): ReceiptState => {
+  if (transaction.status === 'timeout') return 'timeout'
+  if (transaction.status === 'failed') return 'failed'
+  if (transaction.status === 'success') return 'success'
+  return !connected || interrupted.has(transaction.tid) ? 'interrupted' : 'waiting'
+}
+
+interface CommandReceiptColumnProps {
+  transactions: CommandTransaction[]
+  status: ConnectionStatus
+  interruptedTids: Set<string>
+  onOpenTrace?: (focus: { view: 'tx'; tid: string }) => void
+}
+
+function CommandReceiptColumn({ transactions, status, interruptedTids, onOpenTrace }: CommandReceiptColumnProps) {
+  const [expandedErrorTid, setExpandedErrorTid] = useState('')
+  const connected = status === 'connected'
+  const visibleTransactions = transactions.slice(0, 50)
+
+  return (
+    <aside className="command-receipt-column" aria-label="指令回执">
+      <header className="command-receipt-header">
+        <div><span className="eyebrow">SERVICE RECEIPTS</span><h3>指令回执</h3></div>
+        <span>{visibleTransactions.length} / 50</span>
+      </header>
+      <div className="command-receipt-list">
+        {visibleTransactions.length ? visibleTransactions.map((transaction) => {
+          const state = receiptStateClass(transaction, connected, interruptedTids)
+          const waitingSeconds = Math.max(0, Math.floor((Date.now() - transaction.startedAt) / 1_000))
+          const duration = transaction.finishedAt === undefined
+            ? state === 'waiting' ? `已等 ${waitingSeconds}s` : state === 'interrupted' ? '无回执' : '无回执'
+            : `${transaction.finishedAt - transaction.startedAt} ms`
+          const isFailed = state === 'failed' && transaction.result !== undefined && transaction.result !== 0
+          const errorExpanded = expandedErrorTid === transaction.tid
+          return (
+            <article className={`command-receipt-item ${state}`} key={`${transaction.gatewaySn}:${transaction.tid}`}>
+              <div className="command-receipt-item-main">
+                <div className="command-receipt-title"><strong>{transaction.method}</strong><span className={`command-receipt-status ${state}`}>{receiptStateLabel[state]}</span></div>
+                <div className="command-receipt-meta"><span>来自 {commandReceiptSource(transaction.method)}</span><time>{new Date(transaction.startedAt).toLocaleTimeString()}</time></div>
+                <div className="command-receipt-meta"><code title={transaction.tid}>TID {shortReceiptTid(transaction.tid)}</code><span>{duration}</span></div>
+              </div>
+              {(isFailed || state === 'timeout') && (
+                <div className="command-receipt-actions">
+                  {isFailed && <button type="button" onClick={() => setExpandedErrorTid(errorExpanded ? '' : transaction.tid)}>{errorExpanded ? '收起错误码' : '查错误码'}</button>}
+                  {onOpenTrace && <button type="button" onClick={() => onOpenTrace({ view: 'tx', tid: transaction.tid })}>在报文中查看 <span aria-hidden="true">›</span></button>}
+                </div>
+              )}
+              {errorExpanded && transaction.result !== undefined && <ErrorCodeCard result={transaction.result} className="command-receipt-error" />}
+            </article>
+          )
+        }) : <div className="command-receipt-empty"><span>暂无 services 回执</span><small>发送指令后，回执会在这里按时间倒序显示</small></div>}
+      </div>
+    </aside>
+  )
+}
 
 export const superDockLteAuthenticationStatus = (
   authenticationAvailable: boolean | undefined,
@@ -144,6 +222,8 @@ export function CommandCenter({
   defaultPsdkIndex,
   showCategoryBar = true,
   mediaServers = [],
+  transactions = [],
+  onOpenTrace,
 }: CommandCenterProps) {
   const gatewayDevices = useMemo(
     () => profile.devices.filter((device) => device.type === 'dock' || device.type === 'pilot'),
@@ -161,10 +241,20 @@ export function CommandCenter({
   const contextualGateway = gatewayDevices.find((device) => device.sn === gatewaySn) ?? gatewayDevices[0]
   const gatewayTelemetry = telemetry.find((device) => device.sn === gatewaySn && device.profileId === profile.id)
   const [, setAuthorityClock] = useState(0)
+  const [interruptedTids, setInterruptedTids] = useState<Set<string>>(() => new Set())
   useEffect(() => {
     const timer = window.setInterval(() => setAuthorityClock((clock) => clock + 1), 1_000)
     return () => window.clearInterval(timer)
   }, [])
+
+  useEffect(() => {
+    if (status === 'connected') return
+    setInterruptedTids((current) => {
+      const next = new Set(current)
+      transactions.filter((transaction) => transaction.status === 'pending').forEach((transaction) => next.add(transaction.tid))
+      return next.size === current.size ? current : next
+    })
+  }, [status, transactions])
   const hasCurrentGatewayTelemetry = (): boolean => {
     const age = Date.now() - (gatewayTelemetry?.lastSeenAt ?? 0)
     return status === 'connected' && gatewayTelemetry?.online === true && age >= 0 && age < 20_000
@@ -411,6 +501,10 @@ export function CommandCenter({
   const selectedMediaServer = mediaServers.find((server) => server.id === selectedMediaServerId)
     ?? mediaServers.find((server) => server.isDefault)
     ?? mediaServers[0]
+  const receiptTransactions = useMemo(
+    () => transactions.filter((transaction) => transaction.gatewaySn === gatewaySn).slice(0, 50),
+    [gatewaySn, transactions],
+  )
 
   useEffect(() => {
     setGatewaySn(contextualGatewaySn || gatewayDevices[0]?.sn || '')
@@ -643,6 +737,8 @@ export function CommandCenter({
         </div>
       )}
 
+      <div className={`command-center-main-layout ${category === 'payload' ? 'without-receipts' : ''}`}>
+      <div className="command-main-content">
       {category === 'flight' && (
         <section className={`flight-authority-console ${flightAuthorityActive ? 'active' : ''}`}>
           <header className="flight-authority-gate">
@@ -1171,6 +1267,17 @@ export function CommandCenter({
           </div>
         </section>
       </div>}
+      </div>
+      </div>
+
+      {category !== 'payload' && (
+        <CommandReceiptColumn
+          transactions={receiptTransactions}
+          status={status}
+          interruptedTids={interruptedTids}
+          onOpenTrace={onOpenTrace}
+        />
+      )}
 
     </div>
   )

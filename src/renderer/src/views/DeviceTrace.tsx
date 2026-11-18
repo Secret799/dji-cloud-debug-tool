@@ -13,7 +13,6 @@ import {
   Play,
   Search,
   Send,
-  SquareArrowOutUpRight,
   WrapText,
 } from 'lucide-react'
 import type {
@@ -25,7 +24,7 @@ import type {
 } from '../../../shared/contracts'
 import type { CommandTransaction } from '../lib/dji'
 import { prettyPayload } from '../lib/dji'
-import { lookupServiceError } from '../lib/dji-error-codes'
+import { ErrorCodeCard } from '../components/ErrorCodeCard'
 import { Tooltip } from '../components/Tooltip'
 
 export type TraceFocus = { view: 'tx'; tid?: string; bid?: string }
@@ -303,7 +302,6 @@ export function DeviceTrace({
           ) : (
             filteredTransactions.map((transaction) => {
               const transactionKey = traceTransactionKey(transaction)
-              const error = transaction.result !== undefined && transaction.result !== 0 ? lookupServiceError(transaction.result) : undefined
               const open = selectedTransaction?.tid === transaction.tid
               return (
                 <details className={`trace-transaction-item ${transaction.status}`} key={transactionKey} open={open}>
@@ -319,7 +317,7 @@ export function DeviceTrace({
                     <div className="trace-direction-line" />
                     <section className="trace-message-card request"><header><span><ArrowUpRight size={14} />请求</span><time>{new Date(transaction.request.timestamp).toLocaleTimeString()}</time></header><code>{transaction.request.topic}</code><pre>{prettyPayload(transaction.request.payload)}</pre><button type="button" className="trace-fill-button" onClick={() => fillPublisher(transaction.request)}><Send size={12} />填入发布器</button></section>
                     {transaction.response ? <section className="trace-message-card response"><header><span><ArrowDownLeft size={14} />回执</span><time>{new Date(transaction.response.timestamp).toLocaleTimeString()}</time></header><code>{transaction.response.topic}</code><pre>{prettyPayload(transaction.response.payload)}</pre><button type="button" className="trace-fill-button" onClick={() => fillPublisher(transaction.response!)}><Send size={12} />填入发布器</button></section> : <div className="trace-response-empty">{transaction.status === 'timeout' ? '20 秒内未收到回执' : '等待设备回执'}</div>}
-                    {error && <section className="trace-error-card"><header><SquareArrowOutUpRight size={14} /><strong>错误码 {transaction.result}</strong></header><p>{error.message ?? '错误码库暂未收录该错误的详细说明。'}</p>{error.cause && <small>可能原因：{error.cause}</small>}{error.solution && <small>处理措施：{error.solution}</small>}</section>}
+                    {transaction.result !== undefined && transaction.result !== 0 && <ErrorCodeCard result={transaction.result} className="trace-error-card" />}
                   </div>
                 </details>
               )

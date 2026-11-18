@@ -1378,6 +1378,7 @@ export function Overview({
   traceFocus,
 }: OverviewProps) {
   const [activeTab, setActiveTab] = useState<WorkbenchTab>('remote')
+  const [localTraceFocus, setLocalTraceFocus] = useState<TraceFocus>()
   const [activeTelemetryTab, setActiveTelemetryTab] = useState<TelemetryTabId>('operation')
   const [activeTelemetrySection, setActiveTelemetrySection] = useState<TelemetrySectionId>()
   const [telemetrySearch, setTelemetrySearch] = useState('')
@@ -1638,6 +1639,11 @@ export function Overview({
       ? configuredTabs
       : configuredTabs.filter((tab) => tab.id !== 'payload')
   const activeWorkbenchTab = visibleTabs.some((tab) => tab.id === activeTab) ? activeTab : 'remote'
+  const activeTraceFocus = traceFocus ?? localTraceFocus
+  const openTrace = (focus: TraceFocus): void => {
+    setLocalTraceFocus(focus)
+    setActiveTab('trace')
+  }
   const renderTelemetryTable = (categoryFields: typeof fields) => {
     type TelemetryField = (typeof fields)[number]
     type TelemetryTreeNode = {
@@ -2297,7 +2303,7 @@ export function Overview({
               onExport={onExport}
               onClear={onClear}
               onNotify={onNotify}
-              focus={traceFocus}
+              focus={activeTraceFocus}
             />
           )}
           {configured && gatewayCapabilities.deviceControl && <section className="control-center-workspace" hidden={activeWorkbenchTab !== 'commands'}>
@@ -2315,6 +2321,8 @@ export function Overview({
                       onNotify={onNotify}
                       allowedCategories={['debug', 'flight', 'payload']}
                       mediaServers={mediaServers}
+                      transactions={transactions.filter((transaction) => transaction.gatewaySn === gatewaySn)}
+                      onOpenTrace={openTrace}
                     />
                 </div>
               )}

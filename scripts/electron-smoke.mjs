@@ -1210,6 +1210,24 @@ try {
   if (await window.getByText('请求响应记录', { exact: true }).count()) {
     errors.push('commands: duplicated request and response history is still visible')
   }
+  await window.locator('.command-receipt-column').waitFor({ state: 'visible' })
+  const receiptText = await window.locator('.command-receipt-column').innerText()
+  for (const expected of ['指令回执', '失败', '来自 指令', '查错误码', '在报文中查看']) {
+    if (!receiptText.includes(expected)) errors.push(`commands receipt: missing ${expected}`)
+  }
+  await window.getByRole('button', { name: '查错误码', exact: true }).click()
+  await window.locator('.command-receipt-error').waitFor({ state: 'visible' })
+  if (!(await window.locator('.command-receipt-error').innerText()).includes('设置返航模式失败')) {
+    errors.push('commands receipt: error guidance did not expand')
+  }
+  await window.getByRole('button', { name: /在报文中查看/ }).first().click()
+  await window.locator('.device-trace').waitFor({ state: 'visible' })
+  await window.locator('.trace-transaction-item[open]').waitFor({ state: 'visible' })
+  if (!(await window.locator('.trace-transaction-item[open]').first().innerText()).includes('flighttask_prepare')) {
+    errors.push('commands receipt: trace focus did not select the failed transaction')
+  }
+  await window.getByRole('button', { name: '指令', exact: true }).click()
+  await window.locator('.command-center').waitFor({ state: 'visible' })
   await window.locator('.remote-debug-console').waitFor({ state: 'visible' })
   const lockedDebugText = await window.locator('.remote-debug-console').innerText()
   if (!lockedDebugText.includes('状态未知') || !lockedDebugText.includes('请先进入远程调试模式')) {
