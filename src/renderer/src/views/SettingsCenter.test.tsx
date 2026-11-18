@@ -4,7 +4,7 @@ import packageMetadata from '../../../../package.json'
 import { SettingsCenter } from './SettingsCenter'
 
 describe('SettingsCenter general section', () => {
-  it('summarizes local data and software update next to the sidebar control', () => {
+  it('shows all five settings categories', () => {
     const markup = renderToStaticMarkup(
       <SettingsCenter
         sidebarWidth={240}
@@ -13,6 +13,23 @@ describe('SettingsCenter general section', () => {
         maxSidebarWidth={420}
         onSidebarWidthChange={vi.fn()}
       />,
+    )
+
+    expect(markup).toContain('对象存储')
+    expect(markup).toContain('云同步')
+    expect(markup).toContain('监测布局')
+    expect(markup.match(/class="settings-navigation.*?active/g)?.length).toBeGreaterThan(0)
+  })
+
+  it('summarizes local data and software update next to the sidebar control', () => {
+    const markup = renderToStaticMarkup(
+      <SettingsCenter
+        sidebarWidth={240}
+        defaultSidebarWidth={240}
+        minSidebarWidth={210}
+        maxSidebarWidth={420}
+        onSidebarWidthChange={vi.fn()}
+      />
     )
 
     expect(markup).toContain('设备侧栏')

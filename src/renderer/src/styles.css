@@ -229,8 +229,24 @@ textarea {
   justify-content: center;
   gap: 8px;
   min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
   color: var(--muted);
+  background: transparent;
   font-size: 12px;
+  cursor: pointer;
+}
+
+.titlebar-profile-menu {
+  position: relative;
+  min-width: 0;
+}
+
+.titlebar-context:hover,
+.titlebar-context[aria-expanded='true'] {
+  border-color: var(--line-strong);
+  background: var(--surface-soft);
 }
 
 .titlebar-context strong {
@@ -246,6 +262,73 @@ textarea {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.titlebar-profile-list {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 50%;
+  display: flex;
+  width: min(360px, calc(100vw - 32px));
+  max-height: min(320px, calc(100vh - 88px));
+  padding: 5px;
+  overflow: auto;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--surface);
+  box-shadow: 0 12px 28px rgba(41, 37, 36, 0.18);
+  transform: translateX(-50%);
+}
+
+.titlebar-profile-option {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) 16px;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 9px;
+  border-radius: 5px;
+  color: var(--text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.titlebar-profile-option:hover,
+.titlebar-profile-option.selected {
+  background: var(--accent-soft);
+}
+
+.titlebar-profile-option.selected {
+  color: var(--accent);
+}
+
+.titlebar-profile-option-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.titlebar-profile-option-copy strong,
+.titlebar-profile-option-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.titlebar-profile-option-copy strong {
+  color: inherit;
+  font-size: 11px;
+}
+
+.titlebar-profile-option-copy small {
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 9px;
 }
 
 .titlebar-actions {
@@ -4926,6 +5009,14 @@ textarea {
   background: var(--surface);
 }
 
+.error-provider-segmented {
+  flex: 0 0 auto;
+}
+
+.error-provider-segmented button {
+  min-width: 48px;
+}
+
 .error-code-segmented button {
   display: inline-flex;
   min-width: 116px;
@@ -9118,6 +9209,23 @@ textarea {
   min-width: 0;
   overflow: auto;
   padding: 22px 26px 36px;
+}
+
+.settings-embedded-page {
+  width: calc(100% + 52px);
+  min-height: calc(100% - 62px);
+  margin: 0 -26px -36px;
+  overflow: auto;
+}
+
+.settings-embedded-page.settings-telemetry-page {
+  height: calc(100% - 62px);
+  overflow: hidden;
+}
+
+.settings-embedded-page > .oss-center,
+.settings-embedded-page > .data-versions-page {
+  min-height: 100%;
 }
 
 .settings-detail-header,

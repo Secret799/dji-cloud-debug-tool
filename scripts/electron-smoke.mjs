@@ -63,19 +63,19 @@ try {
     await tooltip.waitFor({ state: 'hidden' })
   }
 
-  await assertTooltip('设备工作台')
+  await assertTooltip('设备')
   await assertTooltip('添加网关')
   await assertTooltip('地图')
-  await assertTooltip('云同步')
+  await assertTooltip('错误码')
 
   const railOrder = await window.locator('.app-rail').evaluate((rail) => ({
     top: [...rail.querySelectorAll('.rail-top button')].map((button) => button.getAttribute('aria-label')),
     bottom: [...rail.querySelectorAll('.rail-bottom button')].map((button) => button.getAttribute('aria-label')),
   }))
-  if (railOrder.top.join('|') !== '设备工作台|媒体中心|地图|OSS 管理|监测项配置') {
+  if (railOrder.top.join('|') !== '设备|媒体|地图|错误码') {
     errors.push(`navigation: unexpected top rail order (${railOrder.top.join(', ')})`)
   }
-  if (railOrder.bottom.join('|') !== '云同步|设置|关于') {
+  if (railOrder.bottom.join('|') !== '设置|关于') {
     errors.push(`navigation: unexpected bottom rail order (${railOrder.bottom.join(', ')})`)
   }
 
@@ -130,8 +130,13 @@ try {
   if (!(await settingsPage.getByText('在线版本更新', { exact: true }).isVisible())) {
     errors.push('settings: update section did not render')
   }
+  for (const section of ['常规', '对象存储', '云同步', '监测布局', '软件更新']) {
+    if (!await settingsPage.getByRole('button', { name: new RegExp(section) }).count()) {
+      errors.push(`settings: missing ${section} category`)
+    }
+  }
   await window.screenshot({ path: `${screenshotBase}-settings.png` })
-  await window.getByRole('button', { name: '设备工作台', exact: true }).click()
+  await window.getByRole('button', { name: '设备', exact: true }).click()
   await settingsPage.waitFor({ state: 'hidden' })
 
   await window.getByRole('button', { name: '关于', exact: true }).click()
@@ -1432,9 +1437,7 @@ try {
     { timeout: 5_000 },
   )
 
-  await window.getByRole('button', { name: '监测项配置', exact: true }).click()
-  await window.locator('.dji-config-center').waitFor({ state: 'visible' })
-  await window.getByRole('button', { name: /错误码管理/ }).click()
+  await window.getByRole('button', { name: '错误码', exact: true }).click()
   await window.locator('.error-code-manager').waitFor({ state: 'visible' })
   if (await window.locator('.error-code-row').count() !== 551) {
     errors.push('error-codes: cloud error rows were not loaded')
@@ -1465,7 +1468,8 @@ try {
   ])
   await window.screenshot({ path: `${screenshotBase}-error-codes.png` })
 
-  await window.getByRole('button', { name: /监测项管理/ }).click()
+  await window.getByRole('button', { name: '设置', exact: true }).click()
+  await window.locator('.settings-center').getByRole('button', { name: /监测布局/ }).click()
   await window.locator('.telemetry-manager').waitFor({ state: 'visible' })
   await window.locator('.telemetry-field-editor-form').waitFor({ state: 'visible' })
   await inspectLayout('telemetry-manager', [
@@ -1483,7 +1487,7 @@ try {
   ])
   await window.screenshot({ path: `${screenshotBase}-telemetry-manager.png` })
 
-  await window.getByRole('button', { name: '媒体中心' }).click()
+  await window.getByRole('button', { name: '媒体', exact: true }).click()
   await window.locator('.media-center').waitFor({ state: 'visible' })
   await inspectLayout('media', [
     'body',
@@ -1515,7 +1519,7 @@ try {
   await window.screenshot({ path: `${screenshotBase}-media.png` })
   if (!skipLocalMediaServerStart) await window.getByRole('button', { name: '停止服务' }).click()
 
-  await window.getByRole('button', { name: '设备工作台' }).click()
+  await window.getByRole('button', { name: '设备', exact: true }).click()
   await window.locator('.overview-view').waitFor({ state: 'visible' })
   await window.getByRole('button', { name: '指令', exact: true }).click()
   await window.getByRole('button', { name: '相机与云台', exact: true }).click()
@@ -1753,7 +1757,7 @@ try {
   await seiDetailModal.getByRole('button', { name: '关闭 SEI 详情' }).click()
   await seiDetailModal.waitFor({ state: 'hidden' })
 
-  await window.getByRole('button', { name: '媒体中心' }).click()
+  await window.getByRole('button', { name: '媒体', exact: true }).click()
   await window.locator('.media-center').waitFor({ state: 'visible' })
   const savedServerState = await window.locator('.media-server-row')
     .filter({ hasText: '冒烟测试流媒体' })
