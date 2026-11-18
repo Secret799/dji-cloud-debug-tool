@@ -16,7 +16,10 @@ import { _electron as electron } from 'playwright-core'
 const projectRoot = resolve(import.meta.dirname, '..')
 const dryRun = process.env.UPGRADE_SMOKE_DRY_RUN === '1'
 const oldVersion = process.env.UPGRADE_SMOKE_OLD_VERSION ?? 'v1.3.1'
-const expectedNewVersion = process.env.UPGRADE_SMOKE_NEW_VERSION ?? '1.4.0'
+const packageMetadata = JSON.parse(await readFile(join(projectRoot, 'package.json'), 'utf8'))
+const expectedNewVersion = process.env.UPGRADE_SMOKE_NEW_VERSION
+  ?? process.env.GITHUB_REF_NAME?.replace(/^v/, '')
+  ?? packageMetadata.version
 const oldPackageDir = resolve(projectRoot, process.env.UPGRADE_SMOKE_OLD_DIR ?? 'old-package')
 const newPackageDir = resolve(projectRoot, process.env.UPGRADE_SMOKE_NEW_DIR ?? 'new-package')
 const installRoot = resolve(process.env.UPGRADE_SMOKE_INSTALL_ROOT ?? join(homedir(), 'Applications'))
