@@ -10,7 +10,7 @@ const version = tag.replace(/^v/, '')
 const lines = readFileSync('CHANGELOG.md', 'utf8').split('\n')
 const start = lines.findIndex((line) => line.trim() === `## v${version}`)
 if (start === -1) {
-  console.log(`DJI Cloud Studio ${tag}`)
+  console.log(`航坞联调台 ${tag}`)
   process.exit(0)
 }
 
@@ -22,4 +22,4 @@ for (let index = start + 1; index < lines.length; index += 1) {
   }
 }
 const body = lines.slice(start + 1, end).join('\n').trim()
-console.log(body || `DJI Cloud Studio ${tag}`)
+console.log(body || `航坞联调台 ${tag}`)

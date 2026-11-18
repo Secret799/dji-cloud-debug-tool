@@ -13,7 +13,7 @@ const electronApp = await electron.launch({
   executablePath: electronPath,
   args: [projectRoot, `--user-data-dir=${userData}`],
   cwd: projectRoot,
-  env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: 'true' },
+  env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: 'true', DJI_STUDIO_SKIP_LEGACY_MIGRATION: 'true' },
 })
 
 try {

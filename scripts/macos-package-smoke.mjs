@@ -9,14 +9,14 @@ const userData = await mkdtemp(join(tmpdir(), 'dji-packaged-startup-'))
 let application
 try {
   application = await electron.launch({
-    executablePath: join(resolve(bundle), 'Contents/MacOS/DJI Cloud Studio'),
+    executablePath: join(resolve(bundle), 'Contents/MacOS/HangarLab Studio'),
     args: [`--user-data-dir=${userData}`],
     timeout: 30_000,
   })
   const window = await application.firstWindow({ timeout: 15_000 })
   await window.locator('.app-shell').waitFor({ state: 'visible', timeout: 15_000 })
   const version = await application.evaluate(({ app }) => app.getVersion())
-  console.log(`Packaged DJI Cloud Studio ${version}: main process and renderer started successfully.`)
+  console.log(`Packaged HangarLab Studio ${version}: main process and renderer started successfully.`)
 } finally {
   try {
     await application?.close()

@@ -36,13 +36,13 @@ export function AboutModal({ onClose }: AboutModalProps) {
           <div className="about-product">
             <BrandLogo className="about-product-mark" />
             <div>
-              <h3>大疆云调试台</h3>
-              <p>DJI Cloud Studio</p>
+              <h3>航坞联调台</h3>
+              <p>HangarLab Studio</p>
             </div>
           </div>
 
           <p className="about-description">
-            一款面向 macOS 和 Windows 的机场上云 API 与 MQTT 调试工具，支持 DJI 与草莓 SuperDock，提供多连接管理、设备遥测、指令调试和媒体流预览能力。
+            一款面向 macOS 和 Windows 的机场上云 API 与 MQTT 调试工具，支持大疆（DJI）机场与草莓创新 SuperDock，提供多连接管理、设备遥测、指令调试和媒体流预览能力。
           </p>
 
           <dl className="about-details">

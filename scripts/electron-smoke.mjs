@@ -23,6 +23,7 @@ const electronApp = await electron.launch({
   env: {
     ...process.env,
     ELECTRON_DISABLE_SECURITY_WARNINGS: 'true',
+    DJI_STUDIO_SKIP_LEGACY_MIGRATION: 'true',
   },
 })
 
@@ -136,7 +137,7 @@ try {
   await window.getByRole('button', { name: '关于', exact: true }).click()
   const aboutDialog = window.getByRole('dialog', { name: '关于' })
   await aboutDialog.waitFor({ state: 'visible' })
-  if (!(await aboutDialog.getByText('DJI Cloud Studio', { exact: true }).isVisible())) {
+  if (!(await aboutDialog.getByText('航坞联调台', { exact: true }).isVisible())) {
     errors.push('about: missing project name')
   }
   const authorLink = aboutDialog.getByRole('link', { name: 'Secret799' })

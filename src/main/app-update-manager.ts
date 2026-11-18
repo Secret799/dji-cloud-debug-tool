@@ -35,7 +35,7 @@ const LATEST_RELEASE_URL = `${RELEASES_URL}/latest`
 const LATEST_DOWNLOAD_URL = `${RELEASES_URL}/latest/download`
 const MANIFEST_URL = `${LATEST_DOWNLOAD_URL}/latest.json`
 const MANIFEST_SIGNATURE_URL = `${LATEST_DOWNLOAD_URL}/latest.json.sig`
-const USER_AGENT = 'DJI-Cloud-Studio-Updater'
+const USER_AGENT = 'HangarLab-Studio-Updater'
 const CHECK_TIMEOUT_MS = 15_000
 
 const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error))
@@ -194,7 +194,7 @@ export class AppUpdateManager {
         this.setState({
           status: 'available',
           availableVersion,
-          releaseName: `DJI Cloud Studio v${availableVersion}`,
+          releaseName: `航坞联调台 v${availableVersion}`,
           releaseNotes: plainTextReleaseNotes(manifest.notes),
           releaseUrl: `${RELEASES_URL}/tag/${manifest.tag}`,
         })
@@ -215,7 +215,7 @@ export class AppUpdateManager {
       this.setState({
         status: 'available',
         availableVersion,
-        releaseName: release.name ?? `DJI Cloud Studio v${availableVersion}`,
+        releaseName: release.name ?? `航坞联调台 v${availableVersion}`,
         releaseNotes: plainTextReleaseNotes(release.body),
         releaseUrl: release.html_url,
       })

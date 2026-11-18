@@ -20,7 +20,7 @@ describe('SettingsCenter general section', () => {
     expect(markup).toContain('自动保存')
     expect(markup).toContain('云同步')
     expect(markup).toContain('软件更新')
-    expect(markup).toContain(`DJI Cloud Studio v${packageMetadata.version}`)
+    expect(markup).toContain(`HangarLab Studio v${packageMetadata.version}`)
     expect(markup).toContain('查看更新')
   })
 })
