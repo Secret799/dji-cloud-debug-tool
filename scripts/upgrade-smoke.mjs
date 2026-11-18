@@ -33,6 +33,7 @@ const SEED = {
   map: '升级冒烟底图',
   webdavUser: 'upgrade-smoke',
   sidebarWidth: '321',
+  whitelistValue: '{"smoke":"ok"}',
 }
 /** 迁移后 marker.copied 必须覆盖这四项配置与渲染进程快照；其余 store 的空文档可有可无 */
 const REQUIRED_COPIED = ['connection-profiles.json', 'media-servers.json', 'map-tile-sources.json', 'webdav-config.json', 'Local Storage']
@@ -92,11 +93,24 @@ const installApp = async (appPath, label) => {
   return target
 }
 
-const launch = (appPath) => electron.launch({
-  executablePath: join(appPath, 'Contents', 'MacOS', plist(appPath, 'CFBundleExecutable')),
-  timeout: 30_000,
-  env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: 'true' },
-})
+const appLogs = []
+
+const launch = async (appPath) => {
+  const application = await electron.launch({
+    executablePath: join(appPath, 'Contents', 'MacOS', plist(appPath, 'CFBundleExecutable')),
+    timeout: 30_000,
+    env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: 'true' },
+  })
+  const child = application.process()
+  for (const stream of [child.stdout, child.stderr]) {
+    stream?.on('data', (chunk) => {
+      for (const line of String(chunk).split(/\r?\n/)) {
+        if (line.trim()) appLogs.push(`[${plist(appPath, 'CFBundleName')}] ${line.trim()}`)
+      }
+    })
+  }
+  return application
+}
 
 const attachErrorListeners = (window) => {
   window.on('pageerror', (error) => consoleErrors.push(error.message))
@@ -112,6 +126,14 @@ const run = async () => {
   const appSource = await readFile(join(projectRoot, 'src/renderer/src/App.tsx'), 'utf8')
   const sidebarKey = appSource.match(/const SIDEBAR_WIDTH_STORAGE_KEY = '([^']+)'/)?.[1]
   if (!sidebarKey) throw new Error('未能从 App.tsx 解析侧栏宽度存储键')
+
+  // 再取一个 WebDAV 快照白名单键，验证 localStorage 整体迁移而不是单个键碰巧还在
+  const validationSource = await readFile(join(projectRoot, 'src/main/ipc-validation.ts'), 'utf8')
+  const whitelistBlock = validationSource.match(/ALLOWED_RENDERER_STORAGE_KEYS = new Set\(\[([\s\S]*?)\]\)/)?.[1] ?? ''
+  const whitelistKey = [...whitelistBlock.matchAll(/'([^']+)'/g)]
+    .map((match) => match[1])
+    .find((key) => key !== sidebarKey)
+  if (!whitelistKey) throw new Error('未能从 ipc-validation.ts 解析 localStorage 白名单键')
 
   const oldDmg = await pickPackage(oldPackageDir, 'mac-arm64.dmg')
   const newDmg = await pickPackage(newPackageDir, 'mac-arm64.dmg')
@@ -144,7 +166,7 @@ const run = async () => {
     const window = await oldApp.firstWindow({ timeout: 20_000 })
     attachErrorListeners(window)
     await window.locator('.app-shell').waitFor({ state: 'visible', timeout: 20_000 })
-    const seeded = await window.evaluate(async ({ seed, ids, key, width }) => {
+    const seeded = await window.evaluate(async ({ seed, ids, key, width, extraKey, extraValue }) => {
       const [profile] = await window.djiApi.profiles.list()
       if (!profile) return { ok: false, reason: '旧版没有默认连接配置' }
       await window.djiApi.profiles.save({ ...profile, name: seed.profile, host: 'upgrade.smoke.local' })
@@ -194,11 +216,18 @@ const run = async () => {
         updatedAt: now,
       })
       window.localStorage.setItem(key, width)
-      return { ok: true, stored: window.localStorage.getItem(key) }
+      window.localStorage.setItem(extraKey, extraValue)
+      return {
+        ok: true,
+        stored: window.localStorage.getItem(key),
+        extra: window.localStorage.getItem(extraKey),
+      }
     }, {
       seed: SEED,
       key: sidebarKey,
       width: SEED.sidebarWidth,
+      extraKey: whitelistKey,
+      extraValue: SEED.whitelistValue,
       ids: { media: 'upgrade-smoke-media', map: 'upgrade-smoke-map' },
     })
     record('旧版经 djiApi 写入 4 项配置与 localStorage', seeded.ok && seeded.stored === SEED.sidebarWidth, seeded.reason ?? seeded.stored)
@@ -239,16 +268,18 @@ const run = async () => {
         sourceNames: sources.map((item) => item.name),
         webdavUser: webdav?.username ?? '',
         stored: window.localStorage.getItem(key),
+        extra: window.localStorage.getItem(extraKey),
         brand: document.querySelector('.brand-block strong')?.textContent ?? '',
         title: document.title,
       }
-    }, { key: sidebarKey })
+    }, { key: sidebarKey, extraKey: whitelistKey })
 
     record('连接配置已迁移', view.profileNames.includes(SEED.profile), view.profileNames.join('、'))
     record('媒体服务配置已迁移', view.serverNames.includes(SEED.media), view.serverNames.join('、'))
     record('底图源配置已迁移', view.sourceNames.includes(SEED.map), view.sourceNames.join('、'))
     record('WebDAV 配置已迁移', view.webdavUser === SEED.webdavUser, view.webdavUser)
-    record('localStorage 已迁移', view.stored === SEED.sidebarWidth, String(view.stored))
+    record('localStorage 侧栏宽度已迁移', view.stored === SEED.sidebarWidth, String(view.stored))
+    record('localStorage 白名单键已迁移', view.extra === SEED.whitelistValue, String(view.extra))
     record('界面标题为新品牌', view.brand === '航坞联调台' && view.title.includes('航坞联调台'), `${view.brand} / ${view.title}`)
 
     const marker = await readMarker(NEW_USER_DATA)
@@ -291,5 +322,11 @@ if (consoleErrors.length > 0) {
 const failed = checks.filter((check) => !check.ok)
 const report = { oldVersion, expectedNewVersion, dryRun, failed: failed.length, installRoot, checks, consoleErrors }
 await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8').catch(() => {})
+// 主进程 stdout/stderr 单独落盘：失败时这是判断环境问题还是产品问题的关键证据
+await writeFile(
+  reportPath.replace(/\.json$/i, '') + '-stderr.log',
+  `${appLogs.join('\n')}\n`,
+  'utf8',
+).catch(() => {})
 console.log(JSON.stringify(report, null, 2))
 if (failed.length > 0) process.exitCode = 1

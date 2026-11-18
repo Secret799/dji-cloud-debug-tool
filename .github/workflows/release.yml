@@ -246,7 +246,7 @@ jobs:
           UPGRADE_SMOKE_OLD_DIR: old-package
           UPGRADE_SMOKE_NEW_DIR: new-package
           UPGRADE_SMOKE_SCREENSHOT: ${{ runner.temp }}/upgrade-smoke.png
-          UPGRADE_SMOKE_REPORT: ${{ runner.temp }}/upgrade-smoke-report.json
+          UPGRADE_SMOKE_REPORT: ${{ runner.temp }}/upgrade-smoke-report.json  # 同目录生成 -stderr.log
         run: node scripts/upgrade-smoke.mjs
 
       - name: Collect upgrade evidence
@@ -254,7 +254,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/evidence"
-          cp "$RUNNER_TEMP"/upgrade-smoke-report.json "$RUNNER_TEMP"/upgrade-smoke.png "$RUNNER_TEMP/evidence/" 2>/dev/null || true
+          cp "$RUNNER_TEMP"/upgrade-smoke-report.json "$RUNNER_TEMP"/upgrade-smoke.png "$RUNNER_TEMP"/upgrade-smoke-stderr.log "$RUNNER_TEMP/evidence/" 2>/dev/null || true
           for dir in "HangarLab Studio" "DJI Cloud Studio"; do
             target="$HOME/Library/Application Support/$dir"
             if [ -d "$target" ]; then
