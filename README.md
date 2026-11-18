@@ -395,6 +395,26 @@ git push origin v1.0.1
 
 在 GitHub Actions 页面手工执行 `workflow_dispatch` 可用于验证构建；只有 tag 触发的工作流会自动创建 GitHub Release。工作流会使用 tag 中的版本号更新安装包版本，无需为每次发布手工修改 `package.json`。
 
+### CI 覆盖升级冒烟
+
+`release.yml` 的 `upgrade-smoke` 作业在隔离的 macOS Runner 上验证「旧版 → 新版」覆盖升级，它是发布门禁：`release` 作业 `needs: [package, upgrade-smoke]`，冒烟不过不会创建 Release。
+
+流程：下载上一个正式版（默认 `v1.3.1`）的 DMG 与本次 `mac-arm64` 产物 → 安装旧版 → 启动旧版并通过 `window.djiApi` 写入可识别的连接配置、媒体服务、底图源、WebDAV 配置与 `localStorage` → 关闭旧版 → 安装新版 → 启动并校验：
+
+- 版本号、应用名 `HangarLab Studio`、`userData` 指向新目录；
+- 四类配置与 `localStorage` 在界面/API 中仍然可读，标题显示「航坞联调台」；
+- `.user-data-migrated.json` 的 `copied` 覆盖四类配置与 `Local Storage`，旧 `DJI Cloud Studio` 目录保留；
+- 两个 bundle 的 `CFBundleIdentifier` 都是 `com.dji-cloud-studio.desktop`；
+- 二次启动不重复迁移（`migratedAt` 不变）。
+
+Runner 是干净的临时环境，因此**不要**给这个作业传 `--user-data-dir` 或 `DJI_STUDIO_SKIP_LEGACY_MIGRATION`，否则测到的不是真实迁移路径。手工触发（分支上验证时同样只打包、不发布）：
+
+```bash
+gh workflow run release.yml --ref <分支名>
+```
+
+本地只做脚本级检查时可加 `UPGRADE_SMOKE_DRY_RUN=1`，跳过两版启动，仅验证安装包解析与 appId；不要在本机默认用户目录下跑完整流程。
+
 ## 错误码数据
 
 结构化错误码数据位于 `src/renderer/src/data/dji-error-codes.json`，来源工作簿包含“上云错误码”、“机场 HMS 告警”和“上云常见问题解决”三类数据。对 `328XXX` 类回复码，程序会按数据规则转换为 HMS 错误码进行二次查询。

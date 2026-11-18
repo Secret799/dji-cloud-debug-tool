@@ -205,10 +205,77 @@ jobs:
             release/*.zip
             release/*.blockmap
 
+  upgrade-smoke:
+    name: Upgrade smoke (old to new)
+    # 只在隔离的 runner 上跑：装旧版、写测试数据、装新版、校验迁移；不碰任何真实用户目录
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    needs: package
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      UPGRADE_SMOKE_OLD_VERSION: v1.3.1
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download new package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: mac-arm64
+          path: new-package
+
+      - name: Download previous release package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p old-package
+          gh release download "$UPGRADE_SMOKE_OLD_VERSION" --repo "$GITHUB_REPOSITORY" --pattern "*mac-arm64.dmg" --dir old-package
+          ls -lh old-package
+
+      - name: Run upgrade smoke
+        env:
+          UPGRADE_SMOKE_OLD_DIR: old-package
+          UPGRADE_SMOKE_NEW_DIR: new-package
+          UPGRADE_SMOKE_SCREENSHOT: ${{ runner.temp }}/upgrade-smoke.png
+          UPGRADE_SMOKE_REPORT: ${{ runner.temp }}/upgrade-smoke-report.json  # 同目录生成 -stderr.log
+        run: node scripts/upgrade-smoke.mjs
+
+      - name: Collect upgrade evidence
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/evidence"
+          cp "$RUNNER_TEMP"/upgrade-smoke-report.json "$RUNNER_TEMP"/upgrade-smoke.png "$RUNNER_TEMP"/upgrade-smoke-stderr.log "$RUNNER_TEMP/evidence/" 2>/dev/null || true
+          for dir in "HangarLab Studio" "DJI Cloud Studio"; do
+            target="$HOME/Library/Application Support/$dir"
+            if [ -d "$target" ]; then
+              mkdir -p "$RUNNER_TEMP/evidence/$dir"
+              cp "$target"/*.json "$target"/.user-data-migrated.json "$RUNNER_TEMP/evidence/$dir/" 2>/dev/null || true
+            fi
+          done
+          find "$RUNNER_TEMP/evidence" -type f | sort
+
+      - name: Upload upgrade evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upgrade-smoke-evidence
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/evidence
+
   release:
     name: Publish GitHub Release
     if: startsWith(github.ref, 'refs/tags/')
-    needs: package
+    needs: [package, upgrade-smoke]
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
