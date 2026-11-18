@@ -36,6 +36,23 @@ const pathExists = (path: string): Promise<boolean> => stat(path).then(
 )
 
 /**
+ * 把暂存目录原子落到目标位置。
+ *
+ * 目标目录在复制期间被创建（并发启动或用户手动放入）时不算失败：清理暂存并返回 false，
+ * 调用方据此不把该项记入「已复制」。
+ */
+export async function commitStagedDirectory(staging: string, target: string): Promise<boolean> {
+  try {
+    await rename(staging, target)
+    return true
+  } catch (error) {
+    await rm(staging, { recursive: true, force: true })
+    if (!(await pathExists(target))) throw error
+    return false
+  }
+}
+
+/**
  * 把旧应用名下的 userData 数据搬进当前 userData 目录。
  *
  * 只在目标目录还没有任何用户数据时执行一次：复制而不是移动，旧目录保留，便于回退旧版本；
@@ -86,14 +103,8 @@ export async function migrateLegacyUserData(options: {
         recursive: true,
         filter: (path) => !SKIPPED_DIRECTORY_ENTRIES.has(basename(path)),
       })
-      try {
-        await rename(staging, to)
-      } catch (error) {
-        await rm(staging, { recursive: true, force: true })
-        // 目标目录在复制期间被创建（并发启动或用户手动放入）时不算失败
-        if (!(await pathExists(to))) throw error
-      }
-      result.copied.push(name)
+      // 目标已存在（并发启动/用户手动放入）时不算复制成功，也不写进 marker
+      if (await commitStagedDirectory(staging, to)) result.copied.push(name)
     }
 
     result.migrated = true

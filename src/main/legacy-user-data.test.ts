@@ -2,7 +2,12 @@ import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { LEGACY_APP_NAME, LEGACY_MIGRATION_MARKER, migrateLegacyUserData } from './legacy-user-data'
+import {
+  LEGACY_APP_NAME,
+  LEGACY_MIGRATION_MARKER,
+  commitStagedDirectory,
+  migrateLegacyUserData,
+} from './legacy-user-data'
 
 describe('migrateLegacyUserData', () => {
   let root: string
@@ -136,5 +141,47 @@ describe('migrateLegacyUserData', () => {
 
     expect(result.migrated).toBe(false)
     expect(result.error).toBeTruthy()
+  })
+})
+
+describe('commitStagedDirectory', () => {
+  let root: string
+
+  beforeEach(async () => {
+    root = await mkdtemp(join(tmpdir(), 'hangarlab-staged-dir-'))
+  })
+
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true })
+  })
+
+  it('目标不存在时把暂存目录落位并返回 true', async () => {
+    const staging = join(root, 'Local Storage.migrating')
+    const target = join(root, 'Local Storage')
+    await mkdir(staging)
+    await writeFile(join(staging, 'leveldb.log'), 'db', 'utf8')
+
+    expect(await commitStagedDirectory(staging, target)).toBe(true)
+    expect(await readFile(join(target, 'leveldb.log'), 'utf8')).toBe('db')
+    expect(await stat(staging).then(() => true, () => false)).toBe(false)
+  })
+
+  it('目标已存在时返回 false、清理暂存且不覆盖目标', async () => {
+    const staging = join(root, 'Local Storage.migrating')
+    const target = join(root, 'Local Storage')
+    await mkdir(staging)
+    await writeFile(join(staging, 'legacy.log'), 'legacy', 'utf8')
+    await mkdir(target)
+    await writeFile(join(target, 'current.log'), 'current', 'utf8')
+
+    expect(await commitStagedDirectory(staging, target)).toBe(false)
+    expect(await readFile(join(target, 'current.log'), 'utf8')).toBe('current')
+    expect(await readdir(target)).toEqual(['current.log'])
+    expect(await stat(staging).then(() => true, () => false)).toBe(false)
+  })
+
+  it('目标不存在且暂存缺失时抛错，由调用方按迁移失败处理', async () => {
+    await expect(commitStagedDirectory(join(root, 'missing.migrating'), join(root, 'Local Storage')))
+      .rejects.toThrow()
   })
 })
