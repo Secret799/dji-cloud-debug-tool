@@ -129,7 +129,10 @@ try {
     })
   }
 
-  await window.getByRole('button', { name: 'OSS 管理' }).click()
+  await window.getByRole('button', { name: '设置', exact: true }).click()
+  const settingsPage = window.locator('.settings-center')
+  await settingsPage.waitFor({ state: 'visible' })
+  await settingsPage.getByRole('button', { name: /^对象存储/ }).click()
   await window.locator('.oss-center').waitFor({ state: 'visible' })
   if (!(await window.getByText('Access Key ID', { exact: true }).isVisible())) errors.push('OSS credentials are missing from OSS management')
   if (await window.locator('.oss-server-row').count() !== 2) errors.push('Expected two managed object storage profiles')
@@ -139,7 +142,7 @@ try {
 
   await browserWindow.evaluate((instance) => instance.setContentSize(1480, 920))
   await window.waitForFunction(() => window.innerWidth === 1480 && window.innerHeight === 920)
-  await window.getByRole('button', { name: '设备工作台' }).click()
+  await window.getByRole('button', { name: '设备', exact: true }).click()
   await window.getByRole('button', { name: '远程日志', exact: true }).click()
   await window.locator('.remote-log-center').waitFor({ state: 'visible' })
   if (await window.getByText('目标机场', { exact: true }).count()) errors.push('Redundant target dock selector is still visible')
@@ -232,7 +235,7 @@ try {
   await browserWindow.evaluate((instance) => instance.setContentSize(1200, 680))
   await window.waitForFunction(() => window.innerWidth === 1200 && window.innerHeight === 680)
   const compactLayout = await window.evaluate(async () => {
-    const scroller = document.querySelector('.device-tab-content.commands-tab')
+    const scroller = document.querySelector('.device-tab-content.logs-tab')
     const center = document.querySelector('.remote-log-center')
     const progress = document.querySelector('.remote-log-progress-panel')
     if (!(scroller instanceof HTMLElement) || !(center instanceof HTMLElement) || !(progress instanceof HTMLElement)) {

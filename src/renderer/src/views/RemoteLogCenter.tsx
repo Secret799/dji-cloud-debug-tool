@@ -278,7 +278,7 @@ export function RemoteLogCenter({
                   去配置对象存储 <span aria-hidden="true">›</span>
                 </button>
               )}
-              <button type="button" className="icon-button" title="打开 OSS 管理" aria-label="打开 OSS 管理" onClick={onOpenOssManager}><Settings size={15} /></button>
+              <button type="button" className="icon-button" title="打开 OSS 管理" aria-label="OSS 管理" onClick={onOpenOssManager}><Settings size={15} /></button>
             </div>
             {selectedModules.map((module) => (
               <label className="field" key={module}><span>{moduleLabels[module]}对象 Key</span><input value={objectKeys[module] ?? ''} onChange={(event) => setObjectKeys((current) => ({ ...current, [module]: event.target.value }))} /></label>
