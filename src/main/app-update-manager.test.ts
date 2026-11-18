@@ -9,7 +9,7 @@ vi.mock('node:fs', () => ({ createWriteStream: mocks.output }))
 vi.mock('node:fs/promises', () => ({ mkdir: vi.fn(), rm: mocks.rm }))
 
 const payload = Buffer.from('installer')
-const name = `DJI.Cloud.Studio-1.0.0-mac-${process.arch}.dmg`
+const name = `HangarLab.Studio-1.0.0-mac-${process.arch}.dmg`
 const hash = createHash('sha256').update(payload).digest('hex')
 
 const platform = Object.getOwnPropertyDescriptor(process, 'platform')!

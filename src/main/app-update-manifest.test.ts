@@ -17,8 +17,8 @@ const manifest = (patch: Record<string, unknown> = {}): Record<string, unknown> 
   publishedAt: '2026-11-18T02:00:00.000Z',
   notes: '- 更新检查改为签名清单',
   assets: [
-    { name: 'DJI.Cloud.Studio-1.3.0-mac-arm64.dmg', size: 1024, sha256: sha('a') },
-    { name: 'DJI.Cloud.Studio-1.3.0-windows-x64-setup.exe', size: 2048, sha256: sha('b') },
+    { name: 'HangarLab.Studio-1.3.0-mac-arm64.dmg', size: 1024, sha256: sha('a') },
+    { name: 'HangarLab.Studio-1.3.0-windows-x64-setup.exe', size: 2048, sha256: sha('b') },
   ],
   ...patch,
 })
@@ -76,10 +76,10 @@ describe('更新清单校验', () => {
 
 describe('更新清单安装包选择', () => {
   const assets = [
-    'DJI.Cloud.Studio-1.3.0-mac-arm64.dmg',
-    'DJI.Cloud.Studio-1.3.0-mac-x64.dmg',
-    'DJI.Cloud.Studio-1.3.0-windows-x64-setup.exe',
-    'DJI.Cloud.Studio-1.3.0-windows-arm64-setup.exe',
+    'HangarLab.Studio-1.3.0-mac-arm64.dmg',
+    'HangarLab.Studio-1.3.0-mac-x64.dmg',
+    'HangarLab.Studio-1.3.0-windows-x64-setup.exe',
+    'HangarLab.Studio-1.3.0-windows-arm64-setup.exe',
   ].map((name, index) => ({ name, size: 1024 + index, sha256: sha('d') }))
   const parsed = validateUpdateManifest(manifest({ assets }))
 

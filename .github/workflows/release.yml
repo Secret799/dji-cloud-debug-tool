@@ -164,13 +164,13 @@ jobs:
         if: matrix.platform == 'mac'
         shell: bash
         run: |
-          app_count="$(find release -mindepth 2 -maxdepth 2 -type d -name 'DJI Cloud Studio.app' | wc -l | tr -d ' ')"
+          app_count="$(find release -mindepth 2 -maxdepth 2 -type d -name 'HangarLab Studio.app' | wc -l | tr -d ' ')"
           if [[ "$app_count" != "1" ]]; then
             echo "Expected one packaged macOS app, found $app_count." >&2
-            find release -mindepth 2 -maxdepth 2 -type d -name 'DJI Cloud Studio.app' >&2
+            find release -mindepth 2 -maxdepth 2 -type d -name 'HangarLab Studio.app' >&2
             exit 1
           fi
-          app_path="$(find release -mindepth 2 -maxdepth 2 -type d -name 'DJI Cloud Studio.app' -print -quit)"
+          app_path="$(find release -mindepth 2 -maxdepth 2 -type d -name 'HangarLab Studio.app' -print -quit)"
           codesign --verify --deep --strict --verbose=2 "$app_path"
           signature_details="$(codesign --display --verbose=4 "$app_path" 2>&1)"
           printf '%s\n' "$signature_details"
@@ -185,7 +185,7 @@ jobs:
           DEBUG: pw:browser
         shell: bash
         run: |
-          app_path="$(find release -mindepth 2 -maxdepth 2 -type d -name 'DJI Cloud Studio.app' -print -quit)"
+          app_path="$(find release -mindepth 2 -maxdepth 2 -type d -name 'HangarLab Studio.app' -print -quit)"
           node scripts/macos-package-smoke.mjs "$app_path"
 
       - name: Package Windows
@@ -240,7 +240,7 @@ jobs:
 
       - name: Generate SHA-256 checksums
         shell: bash
-        run: cd release && sha256sum -- DJI.Cloud.Studio-* > SHA256SUMS.txt
+        run: cd release && sha256sum -- HangarLab.Studio-* > SHA256SUMS.txt
 
       - name: Extract release notes
         shell: bash
@@ -255,7 +255,7 @@ jobs:
             exit 1
           fi
           if [ -z "$state" ]; then
-            release_flags=(--draft --verify-tag --title "DJI Cloud Studio $TAG_NAME" --notes-file release-notes.md)
+            release_flags=(--draft --verify-tag --title "航坞联调台 $TAG_NAME" --notes-file release-notes.md)
             if [[ "$TAG_NAME" == *-* ]]; then
               release_flags+=(--prerelease)
             fi

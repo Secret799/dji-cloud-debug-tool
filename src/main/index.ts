@@ -48,6 +48,7 @@ import {
   type ResolvedTile,
   type TileRequest,
 } from './map-tile-resolver'
+import { LEGACY_APP_NAME, migrateLegacyUserData } from './legacy-user-data'
 import { MqttConnectionManager } from './mqtt-manager'
 import { ProfileStore } from './profile-store'
 import { MediaServerStore } from './media-server-store'
@@ -68,7 +69,10 @@ import {
   validateDevelopmentRendererUrl,
 } from './renderer-security'
 
-const PRODUCT_NAME = 'DJI Cloud Studio'
+const PRODUCT_NAME = 'HangarLab Studio'
+
+// 冒烟脚本用临时 userData，必须跳过旧数据迁移
+const skipLegacyUserDataMigration = process.env.DJI_STUDIO_SKIP_LEGACY_MIGRATION === 'true'
 
 // 必须在 app ready 之前注册协议特权，否则 protocol.handle 会失败
 protocol.registerSchemesAsPrivileged([
@@ -660,9 +664,24 @@ const registerIpc = (): void => {
   )
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   if (process.platform === 'darwin' && developmentIconPath) {
     app.dock?.setIcon(developmentIconPath)
+  }
+
+  // 改名后 userData 目录名变化：先把旧「DJI Cloud Studio」目录的数据搬过来，失败也不阻塞启动。
+  // 冒烟测试用临时 userData 目录，必须关掉迁移，否则会把开发机上的真实旧数据带进测试。
+  if (!skipLegacyUserDataMigration) {
+    const legacyMigration = await migrateLegacyUserData({
+      userDataPath: app.getPath('userData'),
+      appDataPath: app.getPath('appData'),
+      legacyAppName: LEGACY_APP_NAME,
+    })
+    if (legacyMigration.error) {
+      console.warn('旧版本用户数据迁移失败，已继续启动：', legacyMigration.error)
+    } else if (legacyMigration.migrated) {
+      console.info('已从旧版本目录继承用户数据：', legacyMigration.copied.join('、'))
+    }
   }
 
   profileStore = new ProfileStore()

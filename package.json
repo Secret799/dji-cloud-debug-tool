@@ -1,6 +1,6 @@
 {
   "name": "dji-cloud-debug-tool",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "private": true,
   "description": "A cross-platform desktop workbench for DJI Cloud API and MQTT debugging.",
   "main": "./out/main/index.js",
@@ -69,8 +69,8 @@
   },
   "build": {
     "appId": "com.dji-cloud-studio.desktop",
-    "productName": "DJI Cloud Studio",
-    "artifactName": "DJI.Cloud.Studio-${version}-${arch}.${ext}",
+    "productName": "HangarLab Studio",
+    "artifactName": "HangarLab.Studio-${version}-${arch}.${ext}",
     "directories": {
       "output": "release"
     },
@@ -81,7 +81,7 @@
     "mac": {
       "category": "public.app-category.developer-tools",
       "icon": "build/icon.png",
-      "artifactName": "DJI.Cloud.Studio-${version}-mac-${arch}.${ext}",
+      "artifactName": "HangarLab.Studio-${version}-mac-${arch}.${ext}",
       "target": [
         "dmg",
         "zip"
@@ -119,7 +119,7 @@
       ]
     },
     "dmg": {
-      "title": "DJI Cloud Studio ${version}",
+      "title": "航坞联调台 ${version}",
       "window": {
         "width": 560,
         "height": 380
@@ -127,7 +127,7 @@
     },
     "win": {
       "icon": "build/icon.png",
-      "artifactName": "DJI.Cloud.Studio-${version}-windows-${arch}.${ext}",
+      "artifactName": "HangarLab.Studio-${version}-windows-${arch}.${ext}",
       "target": [
         "nsis",
         "portable",
@@ -157,12 +157,12 @@
       ]
     },
     "nsis": {
-      "artifactName": "DJI.Cloud.Studio-${version}-windows-${arch}-setup.${ext}",
+      "artifactName": "HangarLab.Studio-${version}-windows-${arch}-setup.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     },
     "portable": {
-      "artifactName": "DJI.Cloud.Studio-${version}-windows-${arch}-portable.${ext}"
+      "artifactName": "HangarLab.Studio-${version}-windows-${arch}-portable.${ext}"
     }
   }
 }

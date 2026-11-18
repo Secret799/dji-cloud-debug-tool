@@ -11,8 +11,8 @@ describe('app update helpers', () => {
 
   it('selects the installer for the current platform and architecture', () => {
     const assets = [
-      { name: 'DJI Cloud Studio-1.2.0-mac-arm64.dmg', browser_download_url: 'mac', size: 10 },
-      { name: 'DJI Cloud Studio-1.2.0-windows-x64-setup.exe', browser_download_url: 'win', size: 20 },
+      { name: 'HangarLab.Studio-1.2.0-mac-arm64.dmg', browser_download_url: 'mac', size: 10 },
+      { name: 'HangarLab.Studio-1.2.0-windows-x64-setup.exe', browser_download_url: 'win', size: 20 },
     ]
     expect(selectReleaseAsset(assets, 'darwin', 'arm64')?.browser_download_url).toBe('mac')
     expect(selectReleaseAsset(assets, 'win32', 'x64')?.browser_download_url).toBe('win')
@@ -21,17 +21,17 @@ describe('app update helpers', () => {
 
   it('parses GNU checksum output with spaces in filenames', () => {
     const hash = 'a'.repeat(64)
-    expect(parseChecksums(`${hash}  DJI Cloud Studio-1.2.0-mac-arm64.dmg\n`).get(
-      'DJI Cloud Studio-1.2.0-mac-arm64.dmg',
+    expect(parseChecksums(`${hash}  HangarLab Studio-1.2.0-mac-arm64.dmg\n`).get(
+      'HangarLab Studio-1.2.0-mac-arm64.dmg',
     )).toBe(hash)
   })
 
   it('matches legacy checksum paths to GitHub-normalized asset names', () => {
     const hash = 'b'.repeat(64)
-    const checksums = parseChecksums(`${hash}  release/DJI Cloud Studio-1.2.0-mac-arm64.dmg\n`)
-    expect(checksums.get('DJI Cloud Studio-1.2.0-mac-arm64.dmg')).toBe(hash)
-    expect(checksums.get('DJI.Cloud.Studio-1.2.0-mac-arm64.dmg')).toBe(hash)
-    expect(checksums.has('release/DJI Cloud Studio-1.2.0-mac-arm64.dmg')).toBe(false)
+    const checksums = parseChecksums(`${hash}  release/HangarLab Studio-1.2.0-mac-arm64.dmg\n`)
+    expect(checksums.get('HangarLab Studio-1.2.0-mac-arm64.dmg')).toBe(hash)
+    expect(checksums.get('HangarLab.Studio-1.2.0-mac-arm64.dmg')).toBe(hash)
+    expect(checksums.has('release/HangarLab Studio-1.2.0-mac-arm64.dmg')).toBe(false)
   })
 
   it('turns basic markdown release notes into readable text', () => {

@@ -1443,7 +1443,7 @@ export default function App() {
       <header className="titlebar">
         <div className="brand-block">
           <BrandLogo className="brand-mark" />
-          <div><strong>大疆云调试台</strong><small>DJI Cloud Studio</small></div>
+          <div><strong>航坞联调台</strong><small>HangarLab Studio</small></div>
         </div>
         <div className="titlebar-context">
           <span className={`status-dot ${activeStatus}`} />

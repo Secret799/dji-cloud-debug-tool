@@ -78,7 +78,7 @@ const electronApp = await electron.launch({
   executablePath: electronPath,
   args: [projectRoot, `--user-data-dir=${userData}`],
   cwd: projectRoot,
-  env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: 'true' },
+  env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: 'true', DJI_STUDIO_SKIP_LEGACY_MIGRATION: 'true' },
 })
 let firstElectronAppClosed = false
 let secondElectronApp
@@ -296,7 +296,7 @@ try {
     executablePath: electronPath,
     args: [projectRoot, `--user-data-dir=${secondUserData}`],
     cwd: projectRoot,
-    env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: 'true' },
+    env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: 'true', DJI_STUDIO_SKIP_LEGACY_MIGRATION: 'true' },
   })
   const secondWindow = await secondElectronApp.firstWindow()
   secondWindow.on('pageerror', (error) => errors.push(`second client: ${error.message}`))

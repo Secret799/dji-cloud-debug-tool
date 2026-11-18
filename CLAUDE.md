@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目定位
 
-DJI Cloud Studio —— Electron + React 桌面调试工具，面向大疆（DJI）与草莓创新（SuperDock）机场上云 API、MQTT、设备控制、媒体流、远程日志与固件升级调试。
+航坞联调台 HangarLab Studio（原名 DJI Cloud Studio）—— Electron + React 桌面调试工具，面向大疆（DJI）与草莓创新（SuperDock）机场上云 API、MQTT、设备控制、媒体流、远程日志与固件升级调试。
 
 功能清单、操作步骤、发布流程等面向用户的说明全部在 `README.md`。**功能实现必须同步归档到 `README.md`**：新增或修改功能后，把流程、整体设计与使用方式补进 `README.md`，不要另建游离文档。
 
@@ -29,6 +29,8 @@ npm run smoke:logs    # 远程日志流程
 npm run smoke:webdav  # 内置 HTTP WebDAV 服务端到端同步
 npm run smoke:mqtt    # 连接公网 broker.emqx.io 真实收发，不属于发布门禁
 ```
+
+冒烟脚本都用临时 userData 目录，并设置 `DJI_STUDIO_SKIP_LEGACY_MIGRATION=true` 跳过「DJI Cloud Studio」旧目录的数据迁移 —— 否则会把开发机上的真实配置带进测试。
 
 `npm run release:verify`（= `npm test` + `npm run build`）是 CI 的发布门禁。
 

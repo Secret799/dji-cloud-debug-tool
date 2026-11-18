@@ -10,6 +10,7 @@ const electronApp = await electron.launch({
   executablePath: electronPath,
   args: [projectRoot, `--user-data-dir=${userData}`],
   cwd: projectRoot,
+  env: { ...process.env, DJI_STUDIO_SKIP_LEGACY_MIGRATION: 'true' },
 })
 
 try {
@@ -32,7 +33,7 @@ try {
   )
 
   const testTopic = `dji-cloud-studio/smoke/${Date.now()}-${Math.random().toString(16).slice(2)}`
-  const testPayload = JSON.stringify({ source: 'DJI Cloud Studio', timestamp: Date.now() })
+  const testPayload = JSON.stringify({ source: 'HangarLab Studio', timestamp: Date.now() })
   const operations = await window.evaluate(
     async ({ profileId, topic, payload }) => {
       const subscribed = await window.djiApi.mqtt.subscribe(profileId, topic, 1)

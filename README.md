@@ -1,6 +1,6 @@
-# DJI Cloud Studio
+# 航坞联调台 HangarLab Studio
 
-DJI Cloud Studio 是一款面向 macOS 和 Windows 的机场上云 API、MQTT、设备控制与媒体流调试工具，支持 DJI 机场与草莓创新 SuperDock。
+航坞联调台（HangarLab Studio）是一款面向 macOS 和 Windows 的机场上云 API、MQTT、设备控制与媒体流调试工具，支持大疆（DJI）机场与草莓创新 SuperDock。
 
 > 本项目不是 DJI 或草莓创新的官方产品。飞行、机场、负载和固件升级指令会直接发送到配置的 Broker。连接真实设备前，请先在隔离环境验证 Topic、Payload、设备 SN 和账号权限。
 
@@ -119,26 +119,33 @@ DJI Cloud Studio 是一款面向 macOS 和 Windows 的机场上云 API、MQTT、
 - 64 位 Windows：`windows-x64` 安装版、便携版或 ZIP。
 - ARM Windows：`windows-arm64` 安装版、便携版或 ZIP。
 
-Windows 安装版可选择安装目录；便携版可直接运行。发布页同时提供 `SHA256SUMS.txt` 用于校验下载文件。
+Windows 安装版可选择安装目录；便携版可直接运行。发布页同时提供 `SHA256SUMS.txt` 用于校验下载文件。安装包文件名形如 `HangarLab.Studio-<版本>-<平台>-<架构>`。
 
 ### macOS 提示应用“已损坏”
 
 macOS 发布包使用免费的 ad-hoc 签名，不需要 Apple Developer 证书。签名可以保证应用包内容完整，但无法获得 Apple 公证，因此首次安装时需要手工允许应用运行。
 
-1. 将 `DJI Cloud Studio.app` 拖入“应用程序”。
+1. 将 `HangarLab Studio.app` 拖入“应用程序”。
 2. 双击应用并关闭系统拦截提示。
 3. 打开“系统设置 > 隐私与安全性”。
-4. 在“安全性”区域找到 DJI Cloud Studio，点击“仍要打开”。
+4. 在“安全性”区域找到 航坞联调台，点击“仍要打开”。
 5. 使用登录密码或 Touch ID 确认。以后可正常双击运行当前版本。
 
 也可以在 Finder 中按住 `Control` 点击应用，选择“打开”。如果系统仍然显示“已损坏”，确认安装包来自本项目发布页后，可在终端执行：
 
 ```bash
-xattr -dr com.apple.quarantine "/Applications/DJI Cloud Studio.app"
-open "/Applications/DJI Cloud Studio.app"
+xattr -dr com.apple.quarantine "/Applications/HangarLab Studio.app"
+open "/Applications/HangarLab Studio.app"
 ```
 
 每次下载新版本时，macOS 都可能要求重新确认。公开发布且希望用户直接双击运行时，仍然只能使用 Developer ID 签名和 Apple 公证。
+
+### 从旧版本升级（DJI Cloud Studio → 航坞联调台）
+
+- 只改对外名称与图标：`appId` 与签名标识保持 `com.dji-cloud-studio.desktop`，macOS 会把新旧版本视为同一个应用，直接覆盖安装。
+- 应用数据目录名改为 `HangarLab Studio`。首次启动时会把旧目录 `~/Library/Application Support/DJI Cloud Studio` 下的连接配置、加密凭据、设备档案、WebDAV 配置与同步状态、底图源和界面状态复制到新目录，旧目录原样保留，可回退旧版本；瓦片与媒体服务运行目录属于可重建缓存，不复制。
+- `localStorage` 键名沿用 `dji-cloud-studio.*` 前缀，WebDAV 备份格式标识与云端目录名也保持不变，历史云端备份仍可正常识别和恢复。
+- 更新检查按安装包文件名后缀匹配，因此新命名的安装包仍能被旧版本发现；升级完成后首次启动执行上面的数据迁移。
 
 ### 本地开发运行
 

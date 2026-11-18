@@ -110,7 +110,7 @@ export function SettingsCenter({
                 <div><h3>本地数据</h3><p>界面状态只落本机，跨设备同步由云同步负责。</p></div>
               </div>
               <div className="settings-control-row">
-                <div><strong>渲染进程存储</strong><span>localStorage 键统一使用 dji-cloud-studio.*，并纳入 WebDAV 快照白名单。</span></div>
+                <div><strong>渲染进程存储</strong><span>localStorage 键沿用历史前缀（改名后不迁移键名），并纳入 WebDAV 快照白名单。</span></div>
                 <span className="settings-status">自动保存</span>
               </div>
               <div className="settings-control-row">
@@ -125,7 +125,7 @@ export function SettingsCenter({
                 <div><h3>软件更新</h3><p>检查 GitHub Releases，下载与当前平台匹配的安装包并校验 SHA-256。</p></div>
               </div>
               <div className="settings-control-row">
-                <div><strong>DJI Cloud Studio v{packageMetadata.version}</strong><span>启动 5 秒后静默检查一次；下载完成前使用 SHA256SUMS.txt 校验。</span></div>
+                <div><strong>HangarLab Studio v{packageMetadata.version}</strong><span>启动 5 秒后静默检查一次；下载完成前使用 SHA256SUMS.txt 校验。</span></div>
                 <div className="footer-actions"><button className="button secondary compact" onClick={() => setActiveSection('updates')}>查看更新</button></div>
               </div>
             </div>
@@ -134,7 +134,7 @@ export function SettingsCenter({
           <div className="settings-group settings-update-group">
             <div className="settings-group-heading">
               <RefreshCw size={16} />
-              <div><h3>DJI Cloud Studio</h3><p>检查 GitHub Releases 并下载适用于当前平台的安装包。</p></div>
+              <div><h3>航坞联调台</h3><p>检查 GitHub Releases 并下载适用于当前平台的安装包。</p></div>
             </div>
             <AppUpdatePanel />
           </div>
