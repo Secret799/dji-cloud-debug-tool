@@ -38,6 +38,90 @@ const SEED = {
 /** 迁移后 marker.copied 必须覆盖这四项配置与渲染进程快照；其余 store 的空文档可有可无 */
 const REQUIRED_COPIED = ['connection-profiles.json', 'media-servers.json', 'map-tile-sources.json', 'webdav-config.json', 'Local Storage']
 
+/**
+ * 旧版写入数据的页面回调。
+ *
+ * Playwright 把函数源码序列化进页面执行，因此这里只依赖页面全局 `window` 和参数对象；
+ * `UPGRADE_SMOKE_SELF_CHECK=1` 会用假 window 在 Node 里跑一遍，防止参数名漂移这类只在页面里才炸的错误。
+ */
+const seedLegacyDataInPage = async (params) => {
+  const [profile] = await window.djiApi.profiles.list()
+  if (!profile) return { ok: false, reason: '旧版没有默认连接配置' }
+  await window.djiApi.profiles.save({ ...profile, name: params.seed.profile, host: 'upgrade.smoke.local' })
+  const now = Date.now()
+  await window.djiApi.media.saveServer({
+    id: params.ids.media,
+    name: params.seed.media,
+    kind: 'remote-zlm',
+    host: 'upgrade.smoke.local',
+    apiProtocol: 'http',
+    apiPort: 8090,
+    httpProtocol: 'http',
+    httpPort: 8090,
+    rtmpPort: 1935,
+    rtspPort: 554,
+    webrtcPort: 8000,
+    secret: '',
+    clearStoredSecret: true,
+    createdAt: now,
+    updatedAt: now,
+  })
+  await window.djiApi.map.saveSource({
+    id: params.ids.map,
+    name: params.seed.map,
+    layer: 'imagery',
+    kind: 'url-template',
+    urlTemplate: 'https://upgrade.smoke.local/{z}/{x}/{y}.png',
+    path: '',
+    headers: [],
+    coordinateSystem: 'wgs84',
+    minZoom: 0,
+    maxZoom: 18,
+    tileSize: 256,
+    tileExtension: '',
+    attribution: '',
+    createdAt: now,
+    updatedAt: now,
+  })
+  await window.djiApi.webdav.saveConfig({
+    endpoint: 'http://127.0.0.1:9/dav',
+    authType: 'basic',
+    username: params.seed.webdavUser,
+    secret: 'upgrade-smoke',
+    rejectUnauthorized: false,
+    autoSync: false,
+    syncStrategy: 'smart-merge',
+    updatedAt: now,
+  })
+  window.localStorage.setItem(params.key, params.width)
+  window.localStorage.setItem(params.extraKey, params.extraValue)
+  return {
+    ok: true,
+    stored: window.localStorage.getItem(params.key),
+    extra: window.localStorage.getItem(params.extraKey),
+  }
+}
+
+/** 新版读取状态的页面回调，只依赖页面全局 `window` / `document` 和参数对象 */
+const readNewStateInPage = async (params) => {
+  const [profiles, servers, sources, webdav] = await Promise.all([
+    window.djiApi.profiles.list(),
+    window.djiApi.media.listServers(),
+    window.djiApi.map.listSources(),
+    window.djiApi.webdav.resolveConfig(),
+  ])
+  return {
+    profileNames: profiles.map((item) => item.name),
+    serverNames: servers.map((item) => item.name),
+    sourceNames: sources.map((item) => item.name),
+    webdavUser: webdav?.username ?? '',
+    stored: window.localStorage.getItem(params.key),
+    extra: window.localStorage.getItem(params.extraKey),
+    brand: document.querySelector('.brand-block strong')?.textContent ?? '',
+    title: document.title,
+  }
+}
+
 const checks = []
 const consoleErrors = []
 const volumes = []
@@ -166,63 +250,7 @@ const run = async () => {
     const window = await oldApp.firstWindow({ timeout: 20_000 })
     attachErrorListeners(window)
     await window.locator('.app-shell').waitFor({ state: 'visible', timeout: 20_000 })
-    const seeded = await window.evaluate(async ({ seed, ids, key, width, extraKey, extraValue }) => {
-      const [profile] = await window.djiApi.profiles.list()
-      if (!profile) return { ok: false, reason: '旧版没有默认连接配置' }
-      await window.djiApi.profiles.save({ ...profile, name: seed.profile, host: 'upgrade.smoke.local' })
-      const now = Date.now()
-      await window.djiApi.media.saveServer({
-        id: ids.media,
-        name: seed.media,
-        kind: 'remote-zlm',
-        host: 'upgrade.smoke.local',
-        apiProtocol: 'http',
-        apiPort: 8090,
-        httpProtocol: 'http',
-        httpPort: 8090,
-        rtmpPort: 1935,
-        rtspPort: 554,
-        webrtcPort: 8000,
-        secret: '',
-        clearStoredSecret: true,
-        createdAt: now,
-        updatedAt: now,
-      })
-      await window.djiApi.map.saveSource({
-        id: ids.map,
-        name: seed.map,
-        layer: 'imagery',
-        kind: 'url-template',
-        urlTemplate: 'https://upgrade.smoke.local/{z}/{x}/{y}.png',
-        path: '',
-        headers: [],
-        coordinateSystem: 'wgs84',
-        minZoom: 0,
-        maxZoom: 18,
-        tileSize: 256,
-        tileExtension: '',
-        attribution: '',
-        createdAt: now,
-        updatedAt: now,
-      })
-      await window.djiApi.webdav.saveConfig({
-        endpoint: 'http://127.0.0.1:9/dav',
-        authType: 'basic',
-        username: seed.webdavUser,
-        secret: 'upgrade-smoke',
-        rejectUnauthorized: false,
-        autoSync: false,
-        syncStrategy: 'smart-merge',
-        updatedAt: now,
-      })
-      window.localStorage.setItem(key, width)
-      window.localStorage.setItem(extraKey, extraValue)
-      return {
-        ok: true,
-        stored: window.localStorage.getItem(params.key),
-        extra: window.localStorage.getItem(params.extraKey),
-      }
-    }, {
+    const seeded = await window.evaluate(seedLegacyDataInPage, {
       seed: SEED,
       key: sidebarKey,
       width: SEED.sidebarWidth,
@@ -255,24 +283,7 @@ const run = async () => {
     record('新版应用名', runtime.name === 'HangarLab Studio', runtime.name)
     record('新版 userData 指向新目录', runtime.userData === NEW_USER_DATA, runtime.userData)
 
-    const view = await window.evaluate(async (params) => {
-      const [profiles, servers, sources, webdav] = await Promise.all([
-        window.djiApi.profiles.list(),
-        window.djiApi.media.listServers(),
-        window.djiApi.map.listSources(),
-        window.djiApi.webdav.resolveConfig(),
-      ])
-      return {
-        profileNames: profiles.map((item) => item.name),
-        serverNames: servers.map((item) => item.name),
-        sourceNames: sources.map((item) => item.name),
-        webdavUser: webdav?.username ?? '',
-        stored: window.localStorage.getItem(key),
-        extra: window.localStorage.getItem(extraKey),
-        brand: document.querySelector('.brand-block strong')?.textContent ?? '',
-        title: document.title,
-      }
-    }, { key: sidebarKey, extraKey: whitelistKey })
+    const view = await window.evaluate(readNewStateInPage, { key: sidebarKey, extraKey: whitelistKey })
 
     record('连接配置已迁移', view.profileNames.includes(SEED.profile), view.profileNames.join('、'))
     record('媒体服务配置已迁移', view.serverNames.includes(SEED.media), view.serverNames.join('、'))
@@ -305,6 +316,68 @@ const run = async () => {
   } finally {
     await relaunched.close().catch(() => {})
   }
+}
+
+
+/** 用假 window 跑两个页面回调，抓参数名漂移这类只在页面里才会炸的错误 */
+const selfCheckInPageCallbacks = async () => {
+  const store = new Map()
+  const written = { profiles: [], media: [], map: [], webdav: null }
+  const fakeWindow = {
+    localStorage: {
+      getItem: (key) => (store.has(key) ? store.get(key) : null),
+      setItem: (key, value) => store.set(key, String(value)),
+    },
+    djiApi: {
+      profiles: {
+        list: async () => (written.profiles.length
+          ? written.profiles.map((name, index) => ({ id: `profile-${index}`, name }))
+          : [{ id: 'smoke-profile' }]),
+        save: async (profile) => { written.profiles.push(profile.name); return profile },
+      },
+      media: {
+        saveServer: async (server) => { written.media.push(server.name); return server },
+        listServers: async () => written.media.map((name, index) => ({ id: `media-${index}`, name })),
+      },
+      map: {
+        saveSource: async (source) => { written.map.push(source.name); return source },
+        listSources: async () => written.map.map((name, index) => ({ id: `map-${index}`, name })),
+      },
+      webdav: {
+        saveConfig: async (config) => { written.webdav = config; return {} },
+        resolveConfig: async () => written.webdav,
+      },
+    },
+  }
+  const fakeDocument = { querySelector: () => ({ textContent: '航坞联调台' }), title: '航坞联调台' }
+  const revive = (fn) => new Function('window', 'document', `return (${fn.toString()})`)(fakeWindow, fakeDocument)
+
+  const seed = await revive(seedLegacyDataInPage)({
+    seed: SEED,
+    ids: { media: 'smoke-media', map: 'smoke-map' },
+    key: 'sidebar',
+    width: '321',
+    extraKey: 'extra',
+    extraValue: '{"smoke":"ok"}',
+  })
+  const view = await revive(readNewStateInPage)({ key: 'sidebar', extraKey: 'extra' })
+  const passed = seed.ok === true
+    && seed.stored === '321'
+    && seed.extra === '{"smoke":"ok"}'
+    && view.stored === '321'
+    && view.extra === '{"smoke":"ok"}'
+    && view.profileNames.includes(SEED.profile)
+    && view.serverNames.includes(SEED.media)
+    && view.sourceNames.includes(SEED.map)
+    && view.webdavUser === SEED.webdavUser
+  console.log(`${passed ? '✓' : '✗'} 页面回调自检（seed / read 的参数与假 window）`)
+  if (!passed) console.error(JSON.stringify({ seed, view }, null, 2))
+  return passed
+}
+
+if (process.env.UPGRADE_SMOKE_SELF_CHECK === '1') {
+  const passed = await selfCheckInPageCallbacks()
+  process.exit(passed ? 0 : 1)
 }
 
 try {
