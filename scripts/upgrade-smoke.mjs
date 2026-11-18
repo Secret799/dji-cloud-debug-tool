@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { _electron as electron } from 'playwright-core'
+import { selectUpgradeSmokeStorageKey } from './upgrade-smoke-storage.mjs'
 
 /**
  * 覆盖升级冒烟：在隔离的 CI macOS runner 上装旧版 → 经 djiApi 写入可识别数据 → 装新版 → 校验迁移。
@@ -214,13 +215,10 @@ const run = async () => {
   const sidebarKey = appSource.match(/const SIDEBAR_WIDTH_STORAGE_KEY = '([^']+)'/)?.[1]
   if (!sidebarKey) throw new Error('未能从 App.tsx 解析侧栏宽度存储键')
 
-  // 再取一个 WebDAV 快照白名单键，验证 localStorage 整体迁移而不是单个键碰巧还在
+  // 选择会持久保存用户布局的键，验证 localStorage 整体迁移；遥测缓存键会在启动时正常重建，不能作为样本
   const validationSource = await readFile(join(projectRoot, 'src/main/ipc-validation.ts'), 'utf8')
-  const whitelistBlock = validationSource.match(/ALLOWED_RENDERER_STORAGE_KEYS = new Set\(\[([\s\S]*?)\]\)/)?.[1] ?? ''
-  const whitelistKey = [...whitelistBlock.matchAll(/'([^']+)'/g)]
-    .map((match) => match[1])
-    .find((key) => key !== sidebarKey)
-  if (!whitelistKey) throw new Error('未能从 ipc-validation.ts 解析 localStorage 白名单键')
+  const layoutSource = await readFile(join(projectRoot, 'src/renderer/src/lib/telemetry-layout.ts'), 'utf8')
+  const whitelistKey = selectUpgradeSmokeStorageKey({ validationSource, layoutSource, sidebarKey })
 
   const oldDmg = await pickPackage(oldPackageDir, 'mac-arm64.dmg')
   const newDmg = await pickPackage(newPackageDir, 'mac-arm64.dmg')
