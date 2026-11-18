@@ -217,26 +217,62 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v5
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
       - name: Download all packages
         uses: actions/download-artifact@v4
         with:
           path: release
           merge-multiple: true
 
+      - name: Require update signing key
+        shell: bash
+        env:
+          SIGNING_KEY_PRESENT: ${{ secrets.UPDATE_SIGNING_KEY != '' }}
+        run: |
+          if [ "$SIGNING_KEY_PRESENT" != "true" ]; then
+            echo "::error::Configure the UPDATE_SIGNING_KEY Actions secret before releasing." >&2
+            exit 1
+          fi
+
       - name: Generate SHA-256 checksums
         shell: bash
         run: cd release && sha256sum -- DJI.Cloud.Studio-* > SHA256SUMS.txt
 
-      - name: Create or update GitHub Release
+      - name: Extract release notes
+        shell: bash
+        run: node scripts/release-notes.mjs "$TAG_NAME" > release-notes.md
+
+      - name: Prepare draft GitHub Release
         shell: bash
         run: |
-          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
-            gh release upload "$TAG_NAME" release/* --clobber
-            exit 0
+          state="$(gh release view "$TAG_NAME" --json isDraft --jq '.isDraft' 2>/dev/null || true)"
+          if [ "$state" = "false" ]; then
+            echo "::error::Release $TAG_NAME is already published; published releases are immutable." >&2
+            exit 1
           fi
+          if [ -z "$state" ]; then
+            release_flags=(--draft --verify-tag --title "DJI Cloud Studio $TAG_NAME" --notes-file release-notes.md)
+            if [[ "$TAG_NAME" == *-* ]]; then
+              release_flags+=(--prerelease)
+            fi
+            gh release create "$TAG_NAME" "${release_flags[@]}"
+          fi
+          gh release upload "$TAG_NAME" release/* --clobber
 
-          release_flags=(--verify-tag --generate-notes --title "DJI Cloud Studio $TAG_NAME")
-          if [[ "$TAG_NAME" == *-* ]]; then
-            release_flags+=(--prerelease)
-          fi
-          gh release create "$TAG_NAME" release/* "${release_flags[@]}"
+      - name: Sign update manifest
+        shell: bash
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: node scripts/create-update-manifest.mjs "$TAG_NAME" release release-notes.md
+
+      - name: Upload signed update manifest
+        shell: bash
+        run: gh release upload "$TAG_NAME" release/latest.json release/latest.json.sig --clobber
+
+      - name: Publish GitHub Release
+        shell: bash
+        run: gh release edit "$TAG_NAME" --draft=false

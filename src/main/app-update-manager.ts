@@ -6,6 +6,13 @@ import { basename, join } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type { AppUpdateState, OperationResult } from '../shared/contracts'
+import { APP_UPDATE_PUBLIC_KEY } from './app-update-public-key'
+import {
+  selectUpdateManifestAsset,
+  verifyUpdateManifest,
+  type UpdateManifest,
+  type UpdateManifestAsset,
+} from './app-update-manifest'
 import {
   compareAppVersions,
   parseChecksums,
@@ -25,6 +32,9 @@ interface GithubRelease {
 const RELEASE_API_URL = 'https://api.github.com/repos/Secret799/dji-cloud-debug-tool/releases/latest'
 const RELEASES_URL = 'https://github.com/Secret799/dji-cloud-debug-tool/releases'
 const LATEST_RELEASE_URL = `${RELEASES_URL}/latest`
+const LATEST_DOWNLOAD_URL = `${RELEASES_URL}/latest/download`
+const MANIFEST_URL = `${LATEST_DOWNLOAD_URL}/latest.json`
+const MANIFEST_SIGNATURE_URL = `${LATEST_DOWNLOAD_URL}/latest.json.sig`
 const USER_AGENT = 'DJI-Cloud-Studio-Updater'
 const CHECK_TIMEOUT_MS = 15_000
 
@@ -33,12 +43,16 @@ const errorMessage = (error: unknown): string => (error instanceof Error ? error
 export class AppUpdateManager {
   private state: AppUpdateState
   private release?: GithubRelease
+  private manifestInstaller?: UpdateManifestAsset
   private installerAsset?: GithubReleaseAsset
   private installerPath?: string
   private checkPromise?: Promise<AppUpdateState>
   private downloadPromise?: Promise<OperationResult>
 
-  constructor(private readonly notify: (state: AppUpdateState) => void) {
+  constructor(
+    private readonly notify: (state: AppUpdateState) => void,
+    private readonly publicKeyPem: string = APP_UPDATE_PUBLIC_KEY,
+  ) {
     this.state = {
       status: process.platform === 'darwin' || process.platform === 'win32' ? 'idle' : 'unsupported',
       currentVersion: app.getVersion(),
@@ -135,12 +149,58 @@ export class AppUpdateManager {
     return release
   }
 
+  private async fetchManifest(): Promise<UpdateManifest | undefined> {
+    let response: Response
+    try {
+      response = await net.fetch(MANIFEST_URL, {
+        headers: { 'User-Agent': USER_AGENT },
+        signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
+      })
+    } catch {
+      return undefined
+    }
+    // 旧版本发布没有清单，回退到 GitHub API 检查；清单存在但签名无效时直接报错，绝不降级绕过验签。
+    if (!response.ok) return undefined
+    const manifestText = await response.text()
+    const signatureResponse = await net.fetch(MANIFEST_SIGNATURE_URL, {
+      headers: { 'User-Agent': USER_AGENT },
+      signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
+    })
+    if (!signatureResponse.ok) throw new Error(`更新清单签名下载失败（HTTP ${signatureResponse.status}）`)
+    return verifyUpdateManifest(manifestText, await signatureResponse.text(), this.publicKeyPem)
+  }
+
   private async performCheck(): Promise<AppUpdateState> {
     this.release = undefined
+    this.manifestInstaller = undefined
     this.installerAsset = undefined
     this.installerPath = undefined
     this.setState({ status: 'checking', availableVersion: undefined, releaseName: undefined, releaseNotes: undefined, releaseUrl: LATEST_RELEASE_URL, progress: undefined, error: undefined })
     try {
+      const manifest = await this.fetchManifest()
+      if (manifest) {
+        const availableVersion = manifest.version
+        if (compareAppVersions(availableVersion, this.state.currentVersion) <= 0) {
+          this.setState({ status: 'not-available', availableVersion, releaseUrl: `${RELEASES_URL}/tag/${manifest.tag}` })
+          return this.getState()
+        }
+        const installer = selectUpdateManifestAsset(manifest, process.platform, process.arch)
+        this.manifestInstaller = installer
+        this.installerAsset = {
+          name: installer.name,
+          size: installer.size,
+          browser_download_url: `${RELEASES_URL}/download/${manifest.tag}/${encodeURIComponent(installer.name)}`,
+        }
+        this.setState({
+          status: 'available',
+          availableVersion,
+          releaseName: `DJI Cloud Studio v${availableVersion}`,
+          releaseNotes: plainTextReleaseNotes(manifest.notes),
+          releaseUrl: `${RELEASES_URL}/tag/${manifest.tag}`,
+        })
+        return this.getState()
+      }
+
       const release = await this.fetchRelease()
       const availableVersion = release.tag_name.replace(/^v/i, '')
       if (compareAppVersions(availableVersion, this.state.currentVersion) <= 0) {
@@ -165,20 +225,27 @@ export class AppUpdateManager {
     return this.getState()
   }
 
+  private async expectedInstallerHash(): Promise<string> {
+    if (this.manifestInstaller) return this.manifestInstaller.sha256
+    if (!this.release || !this.installerAsset) throw new Error('发布版本缺少校验信息')
+    const checksumAsset = this.release.assets.find((asset) => asset.name === 'SHA256SUMS.txt')
+    if (!checksumAsset) throw new Error('发布版本缺少 SHA256SUMS.txt，已拒绝下载')
+    const checksumResponse = await net.fetch(checksumAsset.browser_download_url, {
+      headers: { 'User-Agent': USER_AGENT },
+    })
+    if (!checksumResponse.ok) throw new Error(`下载校验文件失败（HTTP ${checksumResponse.status}）`)
+    const expectedHash = parseChecksums(await checksumResponse.text()).get(this.installerAsset.name)
+    if (!expectedHash) throw new Error('校验文件中没有当前安装包的 SHA-256')
+    return expectedHash
+  }
+
   private async performDownload(): Promise<OperationResult> {
-    if (!this.release || !this.installerAsset || this.state.status !== 'available') {
+    if (!this.installerAsset || this.state.status !== 'available') {
       return { ok: false, error: '请先检查并确认有可用更新' }
     }
     try {
       this.setState({ status: 'downloading', progress: 0, error: undefined })
-      const checksumAsset = this.release.assets.find((asset) => asset.name === 'SHA256SUMS.txt')
-      if (!checksumAsset) throw new Error('发布版本缺少 SHA256SUMS.txt，已拒绝下载')
-      const checksumResponse = await net.fetch(checksumAsset.browser_download_url, {
-        headers: { 'User-Agent': USER_AGENT },
-      })
-      if (!checksumResponse.ok) throw new Error(`下载校验文件失败（HTTP ${checksumResponse.status}）`)
-      const expectedHash = parseChecksums(await checksumResponse.text()).get(this.installerAsset.name)
-      if (!expectedHash) throw new Error('校验文件中没有当前安装包的 SHA-256')
+      const expectedHash = await this.expectedInstallerHash()
 
       const targetDirectory = join(app.getPath('temp'), 'dji-cloud-studio-updates', this.state.availableVersion ?? 'latest')
       await mkdir(targetDirectory, { recursive: true })
