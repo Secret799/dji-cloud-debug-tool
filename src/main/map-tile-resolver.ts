@@ -105,15 +105,22 @@ export const buildTileUrl = (
  *
  * @param source 底图源配置
  * @param apiKey 解密后的 API Key，无则传空串
+ * @param userAgent 上游请求的默认 User-Agent；用户已配置同名请求头时不覆盖
  * @returns 请求头映射；无可用请求头时返回空对象
  */
-export const buildTileHeaders = (source: MapTileSource, apiKey: string): Record<string, string> => {
+export const buildTileHeaders = (
+  source: MapTileSource,
+  apiKey: string,
+  userAgent?: string,
+): Record<string, string> => {
   const headers: Record<string, string> = {}
   for (const header of source.headers ?? []) {
     // 用函数形式替换：字符串形式的替换串会把密钥里的 $& / $1 当成替换模式，静默篡改密钥
     if (!apiKey && /\{key\}/i.test(header.value)) continue
     headers[header.name] = header.value.replace(/\{key\}/gi, () => apiKey)
   }
+  const hasUserAgent = Object.keys(headers).some((name) => name.toLowerCase() === 'user-agent')
+  if (userAgent && !hasUserAgent) headers['User-Agent'] = userAgent
   return headers
 }
 

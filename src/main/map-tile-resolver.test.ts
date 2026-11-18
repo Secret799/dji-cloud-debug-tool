@@ -93,6 +93,18 @@ describe('buildTileHeaders', () => {
     const withHeader = source({ headers: [{ name: 'Authorization', value: 'Bearer {key}' }] })
     expect(buildTileHeaders(withHeader, 'a$&b')).toEqual({ Authorization: 'Bearer a$&b' })
   })
+
+  it('adds an identifiable user agent when none is configured', () => {
+    // OSM 等公共瓦片服务会拦截 Electron 默认 UA，必须带可识别的应用身份
+    expect(buildTileHeaders(source(), '', 'HangarLabStudio/1.5.0 (map tile debugging)'))
+      .toEqual({ 'User-Agent': 'HangarLabStudio/1.5.0 (map tile debugging)' })
+  })
+
+  it('keeps a user configured user agent', () => {
+    const configured = source({ headers: [{ name: 'user-agent', value: 'Custom/1.0' }] })
+    expect(buildTileHeaders(configured, '', 'HangarLabStudio/1.5.0 (map tile debugging)'))
+      .toEqual({ 'user-agent': 'Custom/1.0' })
+  })
 })
 
 describe('resolveDirectoryTile', () => {

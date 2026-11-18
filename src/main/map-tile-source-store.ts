@@ -14,6 +14,13 @@ interface StoredMapTileSource extends Omit<MapTileSource, 'apiKey' | 'hasApiKey'
 interface StoreDocument {
   version: 1
   sources: StoredMapTileSource[]
+  /**
+   * 是否已经处理过「默认底图」：补齐预置源后置为 true。
+   *
+   * 旧版本首次打开地图会写下一份 `sources: []` 的空配置，缺少这段标记就无法与
+   * 「用户主动删空所有来源」区分；写到盘上的文档一律带上该标记。
+   */
+  defaultSeeded?: boolean
 }
 
 /** 底图源内存快照：以来源标识为键，值为公开配置加解密后的 API Key */
@@ -24,6 +31,58 @@ const apiKeyContext = (sourceId: string): CredentialContext => ({
   recordId: sourceId,
   field: 'api-key',
 })
+
+/** 首次启动预置的 OpenStreetMap 来源标识；固定值便于用户与文档核对 */
+export const DEFAULT_OPENSTREETMAP_SOURCE_ID = 'openstreetmap'
+
+/**
+ * 首次启动（userData 下还没有底图源配置文件）时预置的底图源清单。
+ *
+ * 只预置一个零 Key 的 OpenStreetMap 影像源：全新安装打开地图就能看到带署名的底图，
+ * 不必先配置才能出图。OSM 公共瓦片只适合低流量场景，因此必须保留
+ * © OpenStreetMap contributors 署名；用户仍可另存高德、天地图等来源并设为默认。
+ *
+ * 每次返回新对象而不是共享常量：读盘路径会就地归一化 isDefault，
+ * 共享同一份对象会被不同实例改脏。
+ *
+ * @returns 预置底图源（固定 OpenStreetMap，默认启用）
+ */
+export const createInitialMapTileSources = (): StoredMapTileSource[] => {
+  const now = Date.now()
+  return [
+    {
+      id: DEFAULT_OPENSTREETMAP_SOURCE_ID,
+      name: 'OpenStreetMap',
+      layer: 'imagery',
+      kind: 'url-template',
+      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      path: '',
+      headers: [],
+      coordinateSystem: 'wgs84',
+      minZoom: 0,
+      maxZoom: 19,
+      tileSize: 256,
+      tileExtension: '',
+      attribution: '© OpenStreetMap contributors',
+      isDefault: true,
+      createdAt: now,
+      updatedAt: now,
+    },
+  ]
+}
+
+/**
+ * 判断一份底图源配置是否需要补齐预置的 OpenStreetMap 默认源。
+ *
+ * 只补一次：任何一次落盘都会把 `defaultSeeded` 置为 true，
+ * 因此旧版本留下的空配置会被补齐，而用户主动删空的所有来源不会被重新预置。
+ *
+ * @param document 已读入的底图源文档
+ * @returns 需要预置默认源时返回 true
+ */
+const needsDefaultSource = (
+  document: Partial<Pick<StoreDocument, 'sources' | 'defaultSeeded'>>,
+): boolean => (document.sources?.length ?? 0) === 0 && document.defaultSeeded !== true
 
 /**
  * 底图源配置存储。
@@ -145,12 +204,16 @@ export class MapTileSourceStore {
       parsed = JSON.parse(await readFile(this.filePath, 'utf8')) as Partial<StoreDocument>
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-      parsed = { version: 1, sources: [] }
+      // 首次启动预置的 OpenStreetMap 源也要能被瓦片热路径读到，
+      // 否则 list() 尚未建立配置文件时默认底图的瓦片会全部 404
+      parsed = { version: 1, sources: createInitialMapTileSources() }
     }
     // 读盘期间若有写入落盘，本次读到的内容可能已经过期，交给提交环节丢弃
     if (this.writeRevision !== revision) return this.snapshot ?? new Map()
     if (parsed.version !== 1 || !Array.isArray(parsed.sources)) throw new Error('底图源配置版本无效')
-    return this.buildSnapshot(parsed.sources)
+    // 旧版本留下的空配置也要在内存快照里补上预置源，
+    // 否则 list() 建立配置文件之前，默认底图的瓦片会全部 404
+    return this.buildSnapshot(needsDefaultSource(parsed) ? createInitialMapTileSources() : parsed.sources)
   }
 
   /**
@@ -205,6 +268,12 @@ export class MapTileSourceStore {
           migrated = true
         }
       }
+      // 旧版本首次打开地图会留下 sources: [] 的空配置，同样按「从未预置过」补齐；
+      // 补齐后写盘会带上 defaultSeeded 标记，用户以后删空来源不会再复活
+      if (needsDefaultSource(parsed)) {
+        parsed.sources = createInitialMapTileSources()
+        migrated = true
+      }
       const defaultIndex = parsed.sources.findIndex((source) => source.isDefault)
       if (defaultIndex < 0 && parsed.sources[0]) {
         parsed.sources[0].isDefault = true
@@ -221,8 +290,8 @@ export class MapTileSourceStore {
       return parsed as StoreDocument
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-      // 首次启动不预置任何底图源：两种网络场景都可能遇到，默认挂在线底图会持续加载失败
-      const document: StoreDocument = { version: 1, sources: [] }
+      // 只在配置文件尚不存在时预置：用户把来源全部删空后不应再自动长回来
+      const document: StoreDocument = { version: 1, sources: createInitialMapTileSources() }
       await this.writeDocument(document)
       return document
     }
@@ -284,6 +353,8 @@ export class MapTileSourceStore {
   }
 
   private async writeDocument(document: StoreDocument): Promise<void> {
+    // 任何一次落盘都视为「默认源已处理过」：用户主动删空来源后 readDocument 不会再补回来
+    document.defaultSeeded = true
     await mkdir(dirname(this.filePath), { recursive: true })
     const temporaryPath = `${this.filePath}.${process.pid}.${crypto.randomUUID()}.tmp`
     try {

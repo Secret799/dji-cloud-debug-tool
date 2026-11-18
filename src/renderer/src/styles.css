@@ -12949,17 +12949,23 @@ textarea {
   gap: 5px;
   margin-left: auto;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .map-toolbar-meta svg {
   color: var(--muted-2);
 }
 
-.map-canvas {
+/* 画布与浮层单独成层：署名条在层外，设备浮层不会再压住版权文字 */
+.map-stage {
+  position: relative;
   flex: 1;
   min-height: 0;
-  position: relative;
+}
+
+.map-canvas {
+  width: 100%;
+  height: 100%;
 }
 
 .map-canvas .cesium-viewer,
@@ -12969,13 +12975,56 @@ textarea {
   height: 100%;
 }
 
+/* 版权署名条：Cesium 的 CreditDisplay 写入这里，文字色与画布脱钩 */
+.map-credit-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 2px 12px;
+  /* 深色条沿用 Cesium 署名的原始配色，OSM 文字与 ion 标识都能读清 */
+  background: #201e1c;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.map-credit-bar .cesium-widget-credits {
+  position: static;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding-right: 0;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 11px;
+  text-shadow: none;
+}
+
+.map-credit-bar .cesium-credit-text,
+.map-credit-bar .cesium-credit-wrapper,
+.map-credit-bar .cesium-credit-delimiter {
+  color: rgba(255, 255, 255, 0.84);
+}
+
+.map-credit-bar .cesium-widget-credits a {
+  color: #fff8f2;
+  text-decoration: underline;
+}
+
 .map-banner {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   align-items: center;
   padding: 8px 12px;
   background: var(--amber-soft);
   font-size: 13px;
+}
+
+.map-banner .button {
+  flex: none;
+  margin-left: auto;
 }
 
 .map-banner.error {

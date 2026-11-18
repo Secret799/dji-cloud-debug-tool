@@ -11,7 +11,10 @@ const electronMocks = vi.hoisted(() => ({
 }))
 
 vi.mock('electron', () => ({
-  app: { getPath: () => electronMocks.userDataPath },
+  app: {
+    getPath: () => electronMocks.userDataPath,
+    getVersion: () => '1.5.0',
+  },
   net: {
     fetch: vi.fn(async (url: string, options?: { headers?: Record<string, string> }) => {
       electronMocks.requests.push({ url, headers: options?.headers ?? {} })
@@ -158,6 +161,8 @@ describe('buildMapTileResponse', () => {
     const response = await buildMapTileResponse(handler, 'map-tile://tiles/remote-1/3/4/5')
     expect(electronMocks.requests[0]?.url).toContain('key=secret-token')
     expect(electronMocks.requests[0]?.headers.Authorization).toBe('Bearer secret-token')
+    // 公共瓦片服务按 UA 识别请求方：默认必须带上应用身份，否则 OSM 会返回拦截占位图
+    expect(electronMocks.requests[0]?.headers['User-Agent']).toBe('HangarLabStudio/1.5.0 (map tile debugging)')
     // 密钥只用于上游请求，不能随响应回给渲染进程
     expect([...response.headers.keys()].sort()).toEqual(['cache-control', 'content-type'])
     expect(response.headers.get('content-type')).not.toContain('secret-token')

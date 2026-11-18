@@ -14,6 +14,7 @@ import {
   CesiumTerrainProvider,
   CesiumWidget,
   Color,
+  Credit,
   EllipsoidTerrainProvider,
   Entity,
   EntityCollection,
@@ -77,6 +78,19 @@ const formatDegrees = (value: number): string => value.toFixed(6)
  */
 export const imageryProviderUrl = (source: MapTileSource): string =>
   `map-tile://tiles/${source.id}/{z}/{x}/{y}`
+
+/**
+ * 生成影像层署名。
+ *
+ * 署名必须直接可见：Cesium 的 `Credit` 默认收进右下角「Data attribution」弹层，
+ * 用户不点开就看不到 © OpenStreetMap contributors。这里显式 showOnScreen，
+ * 让默认底图与内置兜底影像的署名都直接显示在球面上。
+ *
+ * @param attribution 底图源配置的版权署名，可为空
+ * @returns 直接显示的 Credit；没有署名时为 undefined
+ */
+export const imageryCredit = (attribution: string): Credit | undefined =>
+  attribution ? new Credit(attribution, true) : undefined
 
 /**
  * 选取当前生效的影像底图源。
@@ -368,12 +382,19 @@ export interface CesiumMapHandle {
  * 本身已不再被拦）。本视图只需要地球、影像层与设备点位，
  * CesiumWidget 已提供 scene / imageryLayers / entities / camera，无需 Viewer 的控件外壳。
  *
+ * 版权署名默认挂在画布内部左下角，会被地图浮层盖住；传入 `creditContainerRef` 后由调用方
+ * 提供稳定可见的容器，Cesium 只负责往里写署名，位置与样式交给页面布局。
+ *
  * 没有可用 WebGL2 的环境会在构造时抛错，这里捕获后交给界面提示，避免整个视图崩溃。
  *
  * @param containerRef 承载三维地球的容器
+ * @param creditContainerRef 版权署名的展示容器；缺省时退回 Cesium 自建的画布内容器
  * @returns 控件引用、实体集合引用、就绪标记与初始化错误文案
  */
-export const useCesiumMap = (containerRef: RefObject<HTMLDivElement>): CesiumMapHandle => {
+export const useCesiumMap = (
+  containerRef: RefObject<HTMLDivElement>,
+  creditContainerRef?: RefObject<HTMLDivElement>,
+): CesiumMapHandle => {
   const widgetRef = useRef<CesiumWidget | null>(null)
   const entitiesRef = useRef<EntityCollection | null>(null)
   const [ready, setReady] = useState(false)
@@ -387,6 +408,8 @@ export const useCesiumMap = (containerRef: RefObject<HTMLDivElement>): CesiumMap
         sceneMode: SceneMode.SCENE3D,
         terrainProvider: new EllipsoidTerrainProvider(),
         baseLayer: false,
+        // 署名容器由视图提供，避免版权文字被左下角的设备浮层遮挡
+        creditContainer: creditContainerRef?.current ?? undefined,
         // 桌面工具会长时间挂着，按需渲染避免空闲时持续空转 GPU
         requestRenderMode: true,
       })
@@ -403,7 +426,7 @@ export const useCesiumMap = (containerRef: RefObject<HTMLDivElement>): CesiumMap
       setReady(false)
       if (!widget.isDestroyed()) widget.destroy()
     }
-  }, [containerRef])
+  }, [containerRef, creditContainerRef])
 
   return { widgetRef, entitiesRef, ready, runtimeError }
 }
@@ -431,7 +454,7 @@ export const useBasemapLayer = (handle: CesiumMapHandle, source: MapTileSource |
         maximumLevel: source.maxZoom,
         tileWidth: source.tileSize,
         tileHeight: source.tileSize,
-        credit: source.attribution || undefined,
+        credit: imageryCredit(source.attribution),
       }))
     } else {
       // Cesium 包自带的 Natural Earth II 离线影像：免费、无需 token、完全离线，
@@ -439,7 +462,7 @@ export const useBasemapLayer = (handle: CesiumMapHandle, source: MapTileSource |
       // 1.145 的 TileMapServiceImageryProvider 构造函数不再接受 url，须走 fromUrl。
       void TileMapServiceImageryProvider.fromUrl(
         buildModuleUrl('Assets/Textures/NaturalEarthII'),
-        { credit: 'Natural Earth II（Cesium 内置离线影像）' },
+        { credit: imageryCredit('Natural Earth II（Cesium 内置离线影像）') },
       ).then((provider) => {
         if (widgetRef.current && !widgetRef.current.isDestroyed() && !layers.isDestroyed()) {
           layers.addImageryProvider(provider)
@@ -723,7 +746,8 @@ interface MapViewProps {
  */
 export function MapView({ sources, devices, onOpenSources }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const map = useCesiumMap(containerRef)
+  const creditRef = useRef<HTMLDivElement>(null)
+  const map = useCesiumMap(containerRef, creditRef)
   const activeSource = useMemo(() => activeImagerySource(sources), [sources])
   const terrainSource = useMemo(() => activeTerrainSource(sources), [sources])
   const positions = useMemo(() => devicePositions(devices), [devices])
@@ -780,15 +804,22 @@ export function MapView({ sources, devices, onOpenSources }: MapViewProps) {
           <button className="button secondary" onClick={onOpenSources}>立即配置</button>
         </div>
       )}
-      {map.runtimeError && <div className="map-banner error">{map.runtimeError}</div>}
+      {map.runtimeError && <div className="map-banner error" role="alert">{map.runtimeError}</div>}
       {terrain.state === 'failed' && terrain.detail && (
-        <div className="map-banner error">{terrain.detail}</div>
+        <div className="map-banner" role="status">
+          <span>{terrain.detail}</span>
+          <button className="button secondary compact" onClick={onOpenSources}>检查地形配置</button>
+        </div>
       )}
 
-      <div ref={containerRef} className="map-canvas" />
+      <div className="map-stage">
+        <div ref={containerRef} className="map-canvas" />
+        <DeviceDetailPanel positions={positions} system={system} />
+        <MissingFixPanel devices={missingFix} />
+      </div>
 
-      <DeviceDetailPanel positions={positions} system={system} />
-      <MissingFixPanel devices={missingFix} />
+      {/* 版权署名由 Cesium 写入，固定放在画布下方，避免被设备浮层遮挡 */}
+      <div className="map-credit-bar" ref={creditRef} aria-label="地图版权署名" />
     </div>
   )
 }

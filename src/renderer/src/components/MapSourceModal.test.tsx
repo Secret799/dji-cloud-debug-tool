@@ -18,6 +18,7 @@ import {
   mapTileSourceNameFromPath,
   probeMapSource,
   reloadMapSourceDraft,
+  terrainTokenLabel,
   removeMapSource,
   saveMapSource,
   setDefaultMapSource,
@@ -612,6 +613,14 @@ describe('MapSourceModal rendering', () => {
   })
 })
 
+describe('terrainTokenLabel', () => {
+  it('names the token the way each provider does', () => {
+    expect(terrainTokenLabel(validTerrain())).toBe('Cesium ion Access Token')
+    expect(terrainTokenLabel(validTerrain({ kind: 'terrain-arcgis' }))).toBe('ArcGIS API Key')
+    expect(terrainTokenLabel(validTerrain({ kind: 'terrain-url' }))).toBe('访问令牌（可选）')
+  })
+})
+
 describe('MapSourceModal terrain rendering', () => {
   /** 取当前被按下的图层按钮文案，用于断言表单处在哪一层 */
   const pressedLayer = (markup: string): string =>
@@ -648,6 +657,14 @@ describe('MapSourceModal terrain rendering', () => {
     expect(markup).not.toContain('最小级别')
     expect(markup).not.toContain('URL 模板')
     expect(markup).not.toContain('本地瓦片目录')
+    // 版权署名只作用于影像 provider，地形层上没有可写入的位置
+    expect(markup).not.toContain('版权署名')
+  })
+
+  it('keeps the attribution field and its hint on the imagery layer', () => {
+    const markup = renderModal({ sources: [validSource({ id: 'source-1' })], selectedId: 'source-1' })
+    expect(markup).toContain('版权署名')
+    expect(markup).toContain('署名显示在地图底部')
   })
 
   it('asks for the quantized mesh root address on a custom terrain url', () => {

@@ -25,22 +25,23 @@ export interface TerrainSourcePreset {
  * 地形源预设清单。
  *
  * 两项都由厂商托管地形服务承载，用户需要自行注册账号换取访问令牌，因此 `requiresToken` 均为 true；
- * 说明文案必须写明注册地址与「注册免费」，否则用户会以为要付费才能用。
+ * 说明文案必须写明注册地址与「注册免费、额度与条款以厂商为准」，否则用户会以为要付费才能用，
+ * 或误以为厂商服务可以无限量使用。
  */
 export const TERRAIN_PRESETS: readonly TerrainSourcePreset[] = Object.freeze([
   {
     name: 'Cesium World Terrain',
     kind: 'terrain-ion',
     requiresToken: true,
-    help: '在 cesium.com/ion 免费注册 Cesium ion 账号即可领取 access token，注册与个人使用均不收费；'
-      + '把 token 填到下方的 API Key 处即可加载 Cesium World Terrain 全球地形。',
+    help: '在 cesium.com/ion 免费注册 Cesium ion 账号即可领取 access token；免费额度与服务条款以 Cesium 官方说明为准。'
+      + '把 Access Token 填到下方即可加载 Cesium World Terrain 全球地形。',
   },
   {
     name: 'ArcGIS WorldElevation3D',
     kind: 'terrain-arcgis',
     requiresToken: true,
-    help: '在 developers.arcgis.com 免费注册 ArcGIS 开发者账号并创建 API Key，注册免费；'
-      + '把 API Key 填到下方的 API Key 处即可加载 ArcGIS WorldElevation3D 全球地形。',
+    help: '在 developers.arcgis.com 免费注册 ArcGIS 开发者账号并创建 API Key；免费额度与服务条款以 Esri 官方说明为准。'
+      + '把 API Key 填到下方即可加载 ArcGIS WorldElevation3D 全球地形。',
   },
 ])
 
