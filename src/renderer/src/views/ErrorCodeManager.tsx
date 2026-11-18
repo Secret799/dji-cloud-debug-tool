@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { CircleAlert, CircleHelp, Search, Siren } from 'lucide-react'
 import type { DeviceProvider } from '../../../shared/contracts'
 import {
@@ -181,15 +181,17 @@ const linkify = (value: string): ReactNode[] => value.split(/(https?:\/\/[^\s]+)
 
 interface ErrorCodeManagerProps {
   provider?: DeviceProvider
+  initialCode?: string
 }
 
-export function ErrorCodeManager({ provider = 'dji' }: ErrorCodeManagerProps) {
-  const sectionMeta = provider === 'superdock' ? superDockSectionMeta : djiSectionMeta
-  const recordsBySection = provider === 'superdock' ? superDockRecordsBySection : djiRecordsBySection
+export function ErrorCodeManager({ provider = 'dji', initialCode }: ErrorCodeManagerProps) {
+  const [activeProvider, setActiveProvider] = useState<DeviceProvider>(provider)
+  const sectionMeta = activeProvider === 'superdock' ? superDockSectionMeta : djiSectionMeta
+  const recordsBySection = activeProvider === 'superdock' ? superDockRecordsBySection : djiRecordsBySection
   const sectionKeys = Object.keys(sectionMeta) as ErrorCodeSection[]
-  const defaultSection: ErrorCodeSection = provider === 'superdock' ? 'task' : 'cloud'
+  const defaultSection: ErrorCodeSection = activeProvider === 'superdock' ? 'task' : 'cloud'
   const [section, setSection] = useState<ErrorCodeSection>(defaultSection)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(initialCode ?? '')
   const [selectedKey, setSelectedKey] = useState('')
   const normalizedQuery = query.trim().toLocaleLowerCase()
   const activeMeta = (sectionMeta[section] ?? sectionMeta[defaultSection]) as ErrorCodeSectionMeta
@@ -199,6 +201,24 @@ export function ErrorCodeManager({ provider = 'dji' }: ErrorCodeManagerProps) {
   )
   const selected = records.find((entry) => entry.key === selectedKey) ?? records[0]
 
+  useEffect(() => {
+    setActiveProvider(provider)
+    setSection(provider === 'superdock' ? 'task' : 'cloud')
+    setSelectedKey('')
+  }, [provider])
+
+  useEffect(() => {
+    if (initialCode === undefined) return
+    setQuery(initialCode)
+    setSelectedKey('')
+  }, [initialCode])
+
+  const selectProvider = (next: DeviceProvider): void => {
+    setActiveProvider(next)
+    setSection(next === 'superdock' ? 'task' : 'cloud')
+    setSelectedKey('')
+  }
+
   const selectSection = (next: ErrorCodeSection): void => {
     setSection(next)
     setSelectedKey('')
@@ -207,6 +227,10 @@ export function ErrorCodeManager({ provider = 'dji' }: ErrorCodeManagerProps) {
   return (
     <div className="error-code-manager">
       <header className="error-code-toolbar">
+        <div className="segmented error-provider-segmented" role="group" aria-label="设备品牌">
+          <button type="button" className={activeProvider === 'dji' ? 'active' : ''} onClick={() => selectProvider('dji')}>大疆</button>
+          <button type="button" className={activeProvider === 'superdock' ? 'active' : ''} onClick={() => selectProvider('superdock')}>草莓</button>
+        </div>
         <div className="segmented error-code-segmented" aria-label="错误码分类">
           {sectionKeys.map((key) => {
             const meta = sectionMeta[key] as ErrorCodeSectionMeta

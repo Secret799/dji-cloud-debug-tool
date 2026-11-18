@@ -355,6 +355,12 @@ export function FirmwareUpgradeCenter({
             <label><span>对象 Key</span><input disabled={!selection || uploading || Boolean(artifact)} value={objectKey} onChange={(event) => setObjectKey(event.target.value)} placeholder="firmware/gateway/date/package.zip" /></label>
           </div>
 
+          {(!selectedStorage || storageIssues.length > 0) && (
+            <button type="button" className="firmware-config-link" onClick={onOpenOssManager}>
+              去配置对象存储 <span aria-hidden="true">›</span>
+            </button>
+          )}
+
           {uploading && uploadProgress && (
             <div className="firmware-upload-progress">
               <div><span>正在上传到 {selectedStorage?.name}</span><strong>{uploadProgress.percent}%</strong></div>

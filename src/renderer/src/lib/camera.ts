@@ -69,7 +69,9 @@ export const videoTypeLabel = (type: string): string => ({
   thermal: '热成像',
 }[type.toLowerCase()] ?? type)
 
-export const cameraStreamName = (stream: CameraVideoStream): string =>
+export const cameraStreamName = (
+  stream: Pick<CameraVideoStream, 'sourceSn' | 'cameraIndex' | 'videoIndex'> & Partial<CameraVideoStream>,
+): string =>
   `${stream.sourceSn}-${stream.cameraIndex}-${stream.videoIndex}`
     .replace(/[^a-zA-Z0-9_-]+/g, '-')
     .replace(/^-+|-+$/g, '')

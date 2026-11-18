@@ -19,6 +19,17 @@ export interface MediaPlaybackEndpoint {
   url: string
 }
 
+export interface ExternalMediaPreviewRequest {
+  serverId: string
+  app: string
+  stream: string
+  url: string
+  protocol: MediaPlaybackProtocol
+  title: string
+  sourceSn: string
+  nonce: number
+}
+
 const normalizeSegment = (value: string, fallback: string): string => {
   const normalized = value.trim().replace(/^\/+|\/+$/g, '')
   return normalized || fallback

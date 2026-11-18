@@ -1387,7 +1387,7 @@ export const commandTransactions = (records: MqttMessageRecord[], now = Date.now
 
   return [...transactions.values()]
     .map((transaction) =>
-      transaction.status === 'pending' && now - transaction.startedAt > 10_000
+      transaction.status === 'pending' && now - transaction.startedAt > 20_000
         ? { ...transaction, status: 'timeout' as const }
         : transaction,
     )

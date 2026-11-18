@@ -63,19 +63,19 @@ try {
     await tooltip.waitFor({ state: 'hidden' })
   }
 
-  await assertTooltip('设备工作台')
+  await assertTooltip('设备')
   await assertTooltip('添加网关')
   await assertTooltip('地图')
-  await assertTooltip('云同步')
+  await assertTooltip('错误码')
 
   const railOrder = await window.locator('.app-rail').evaluate((rail) => ({
     top: [...rail.querySelectorAll('.rail-top button')].map((button) => button.getAttribute('aria-label')),
     bottom: [...rail.querySelectorAll('.rail-bottom button')].map((button) => button.getAttribute('aria-label')),
   }))
-  if (railOrder.top.join('|') !== '设备工作台|媒体中心|地图|OSS 管理|监测项配置') {
+  if (railOrder.top.join('|') !== '设备|媒体|地图|错误码') {
     errors.push(`navigation: unexpected top rail order (${railOrder.top.join(', ')})`)
   }
-  if (railOrder.bottom.join('|') !== '云同步|设置|关于') {
+  if (railOrder.bottom.join('|') !== '设置|关于') {
     errors.push(`navigation: unexpected bottom rail order (${railOrder.bottom.join(', ')})`)
   }
 
@@ -130,8 +130,13 @@ try {
   if (!(await settingsPage.getByText('在线版本更新', { exact: true }).isVisible())) {
     errors.push('settings: update section did not render')
   }
+  for (const section of ['常规', '对象存储', '云同步', '监测布局', '软件更新']) {
+    if (!await settingsPage.getByRole('button', { name: new RegExp(section) }).count()) {
+      errors.push(`settings: missing ${section} category`)
+    }
+  }
   await window.screenshot({ path: `${screenshotBase}-settings.png` })
-  await window.getByRole('button', { name: '设备工作台', exact: true }).click()
+  await window.getByRole('button', { name: '设备', exact: true }).click()
   await settingsPage.waitFor({ state: 'hidden' })
 
   await window.getByRole('button', { name: '关于', exact: true }).click()
@@ -1073,10 +1078,9 @@ try {
     errors.push('overview: recent commands should not remain inside the telemetry tab')
   }
   const deviceTabLabels = await window.locator('.device-tabs button span').allTextContents()
-  const messagesTabIndex = deviceTabLabels.indexOf('消息')
-  const historyTabIndex = deviceTabLabels.indexOf('历史')
-  if (historyTabIndex < 0 || messagesTabIndex !== historyTabIndex + 1) {
-    errors.push(`overview: message console should follow command history (${JSON.stringify(deviceTabLabels)})`)
+  const traceTabIndex = deviceTabLabels.indexOf('报文')
+  if (traceTabIndex < 0 || deviceTabLabels.includes('历史') || deviceTabLabels.includes('消息')) {
+    errors.push(`overview: device workbench should expose only the trace tab (${JSON.stringify(deviceTabLabels)})`)
   }
   await window.getByRole('button', { name: '固件升级', exact: true }).click()
   await window.locator('.firmware-workspace').waitFor({ state: 'visible' })
@@ -1149,85 +1153,47 @@ try {
       }
     }, commandMessages)
   }
-  await window.getByRole('button', { name: /^历史/ }).click()
-  await window.locator('.history-workspace .command-history-panel').waitFor({ state: 'visible' })
-  if (profileId) {
-    const commandHistoryItem = window.locator('.command-history-item').first()
-    await commandHistoryItem.waitFor({ state: 'visible' })
-    if (await commandHistoryItem.getAttribute('open') !== null) {
-      errors.push('history: command details should be collapsed by default')
-    }
-    await commandHistoryItem.locator('summary').click()
-    await window.waitForFunction(() => document.querySelector('.command-history-item')?.hasAttribute('open'))
-    const commandHistoryText = await commandHistoryItem.innerText()
-    for (const expected of [
-      '发送信息',
-      '返回信息',
-      'thing/product/DOCK-SMOKE-001/services',
-      'thing/product/DOCK-SMOKE-001/services_reply',
-      'smoke-request-value',
-      'smoke-response-value',
-      '45 ms',
-    ]) {
-      if (!commandHistoryText.includes(expected)) errors.push(`history: missing ${expected}`)
-    }
-    if (commandHistoryText.includes('设置返航模式失败')) {
-      errors.push('history: result-code guidance should not be expanded inline')
-    }
-
-    await commandHistoryItem.getByRole('button', { name: '核查', exact: true }).click()
-    const resultCheckPage = window.locator('.command-result-check-page')
-    await resultCheckPage.waitFor({ state: 'visible' })
-    if (await window.locator('.command-history-panel').isVisible()) {
-      errors.push('history: command list should be hidden while the result-code page is open')
-    }
-    const resultCheckText = await resultCheckPage.innerText()
-    for (const expected of [
-      '结果码 316031 核查结果',
-      '设置返航模式失败',
-      '2代机库下发任务需指定返航模式',
-      '机场日志、飞机日志',
-    ]) {
-      if (!resultCheckText.includes(expected)) errors.push(`history check page: missing ${expected}`)
-    }
-    await inspectLayout('history-result-check', [
-      '.history-workspace',
-      '.command-result-check-page',
-      '.command-result-check-header',
-      '.command-result-check-content',
-      '.command-result-check-context',
-      '.command-error-guidance',
-    ])
-    await window.screenshot({ path: `${screenshotBase}-history-result-check.png` })
-    await resultCheckPage.getByRole('button', { name: '返回最近指令', exact: true }).click()
-    await window.locator('.command-history-panel').waitFor({ state: 'visible' })
-    if (await commandHistoryItem.getAttribute('open') === null) {
-      errors.push('history: command details should remain open after returning from the result-code page')
-    }
+  await window.getByRole('button', { name: /^报文/ }).click()
+  await window.locator('.device-trace').waitFor({ state: 'visible' })
+  await window.locator('.trace-record-row').first().waitFor({ state: 'visible' })
+  const traceText = await window.locator('.device-trace').innerText()
+  for (const expected of [
+    '报文流',
+    '事务',
+    '本设备',
+    'services',
+    'smoke-request-value',
+    'smoke-response-value',
+  ]) {
+    if (!traceText.includes(expected)) errors.push(`trace: missing ${expected}`)
   }
-  await inspectLayout('history', [
+  await window.getByRole('button', { name: '事务', exact: true }).click()
+  await window.locator('.trace-transaction-item').first().waitFor({ state: 'visible' })
+  const transactionItem = window.locator('.trace-transaction-item').first()
+  await transactionItem.locator('summary').click()
+  await window.waitForFunction(() => document.querySelector('.trace-transaction-item')?.hasAttribute('open'))
+  const transactionText = await transactionItem.innerText()
+  for (const expected of [
+    'flighttask_prepare',
+    '失败',
+    '请求',
+    '回执',
+    '316031',
+  ]) {
+    if (!transactionText.includes(expected)) errors.push(`trace transaction: missing ${expected}`)
+  }
+  await inspectLayout('trace', [
     'body',
     '.app-shell',
     '.workspace-content',
-    '.history-workspace',
-    '.command-history-panel',
-    '.command-history-item',
-    '.command-message-pair',
+    '.device-trace',
+    '.trace-toolbar',
+    '.trace-content',
+    '.trace-list',
+    '.trace-inspector',
+    '.trace-publisher',
   ])
-  await window.screenshot({ path: `${screenshotBase}-history.png` })
-
-  await window.getByRole('button', { name: /^消息/ }).click()
-  await window.locator('.mqtt-console').waitFor({ state: 'visible' })
-  await inspectLayout('messages', [
-    'body',
-    '.app-shell',
-    '.workspace-content',
-    '.mqtt-console',
-    '.console-toolbar',
-    '.console-content',
-    '.publish-composer',
-  ])
-  await window.screenshot({ path: `${screenshotBase}-messages.png` })
+  await window.screenshot({ path: `${screenshotBase}-trace.png` })
 
   await browserWindow.evaluate((instance) => instance.setContentSize(1440, 800))
   await window.waitForFunction(
@@ -1244,6 +1210,24 @@ try {
   if (await window.getByText('请求响应记录', { exact: true }).count()) {
     errors.push('commands: duplicated request and response history is still visible')
   }
+  await window.locator('.command-receipt-column').waitFor({ state: 'visible' })
+  const receiptText = await window.locator('.command-receipt-column').innerText()
+  for (const expected of ['指令回执', '失败', '来自 指令', '查错误码', '在报文中查看']) {
+    if (!receiptText.includes(expected)) errors.push(`commands receipt: missing ${expected}`)
+  }
+  await window.getByRole('button', { name: '查错误码', exact: true }).click()
+  await window.locator('.command-receipt-error').waitFor({ state: 'visible' })
+  if (!(await window.locator('.command-receipt-error').innerText()).includes('设置返航模式失败')) {
+    errors.push('commands receipt: error guidance did not expand')
+  }
+  await window.getByRole('button', { name: /在报文中查看/ }).first().click()
+  await window.locator('.device-trace').waitFor({ state: 'visible' })
+  await window.locator('.trace-transaction-item[open]').waitFor({ state: 'visible' })
+  if (!(await window.locator('.trace-transaction-item[open]').first().innerText()).includes('flighttask_prepare')) {
+    errors.push('commands receipt: trace focus did not select the failed transaction')
+  }
+  await window.getByRole('button', { name: '指令', exact: true }).click()
+  await window.locator('.command-center').waitFor({ state: 'visible' })
   await window.locator('.remote-debug-console').waitFor({ state: 'visible' })
   const lockedDebugText = await window.locator('.remote-debug-console').innerText()
   if (!lockedDebugText.includes('状态未知') || !lockedDebugText.includes('请先进入远程调试模式')) {
@@ -1349,8 +1333,8 @@ try {
   for (const expected of ['AIR-SMOKE-001', 'DOCK-SMOKE-001']) {
     if (!cameraConsoleText.includes(expected)) errors.push(`cameras: missing ${expected}`)
   }
-  if (!await window.getByRole('button', { name: '播放', exact: true }).count()) {
-    errors.push('cameras: missing playback control')
+  if (!await window.getByRole('button', { name: '开始直播', exact: true }).count()) {
+    errors.push('cameras: missing live control')
   }
   if (await window.locator('.camera-console-header, .camera-device-status').count()) {
     errors.push('cameras: removed summary or device-status element is still visible')
@@ -1365,7 +1349,6 @@ try {
     '.command-center',
     '.camera-console',
     '.camera-console-layout',
-    '.camera-player',
     '.camera-stream-toolbar',
   ])
   await window.screenshot({ path: `${screenshotBase}-commands-cameras.png` })
@@ -1432,9 +1415,7 @@ try {
     { timeout: 5_000 },
   )
 
-  await window.getByRole('button', { name: '监测项配置', exact: true }).click()
-  await window.locator('.dji-config-center').waitFor({ state: 'visible' })
-  await window.getByRole('button', { name: /错误码管理/ }).click()
+  await window.getByRole('button', { name: '错误码', exact: true }).click()
   await window.locator('.error-code-manager').waitFor({ state: 'visible' })
   if (await window.locator('.error-code-row').count() !== 551) {
     errors.push('error-codes: cloud error rows were not loaded')
@@ -1465,7 +1446,8 @@ try {
   ])
   await window.screenshot({ path: `${screenshotBase}-error-codes.png` })
 
-  await window.getByRole('button', { name: /监测项管理/ }).click()
+  await window.getByRole('button', { name: '设置', exact: true }).click()
+  await window.locator('.settings-center').getByRole('button', { name: /监测布局/ }).click()
   await window.locator('.telemetry-manager').waitFor({ state: 'visible' })
   await window.locator('.telemetry-field-editor-form').waitFor({ state: 'visible' })
   await inspectLayout('telemetry-manager', [
@@ -1483,7 +1465,7 @@ try {
   ])
   await window.screenshot({ path: `${screenshotBase}-telemetry-manager.png` })
 
-  await window.getByRole('button', { name: '媒体中心' }).click()
+  await window.getByRole('button', { name: '媒体', exact: true }).click()
   await window.locator('.media-center').waitFor({ state: 'visible' })
   await inspectLayout('media', [
     'body',
@@ -1515,7 +1497,7 @@ try {
   await window.screenshot({ path: `${screenshotBase}-media.png` })
   if (!skipLocalMediaServerStart) await window.getByRole('button', { name: '停止服务' }).click()
 
-  await window.getByRole('button', { name: '设备工作台' }).click()
+  await window.getByRole('button', { name: '设备', exact: true }).click()
   await window.locator('.overview-view').waitFor({ state: 'visible' })
   await window.getByRole('button', { name: '指令', exact: true }).click()
   await window.getByRole('button', { name: '相机与云台', exact: true }).click()
@@ -1556,41 +1538,7 @@ try {
     ipcMain.handle('mqtt:subscribe', () => ({ ok: true }))
     ipcMain.removeHandler('media:sei-parser-start')
     ipcMain.handle('media:sei-parser-start', () => ({ ok: true, sessionId: 'smoke-sei-session' }))
-    ipcMain.removeHandler('media:sei-message-detail')
-    ipcMain.handle('media:sei-message-detail', (_event, request) => {
-      const text = request.messageId === 'smoke-sei-message-1'
-        ? '{"flightId":"SMOKE-001","lat":31.2304,"lng":121.4737}\n{"height":42,"mode":"mission"}'
-        : undefined
-      const payload = text
-        ? Buffer.concat([Buffer.from('00112233445566778899aabbccddeeff', 'hex'), Buffer.from(text)])
-        : Buffer.from('b5003c000102030405060708', 'hex')
-      return {
-        ok: true,
-        message: {
-          id: request.messageId,
-          payloadType: text ? 5 : 1,
-          payloadSize: payload.length,
-          uuid: text ? '00112233-4455-6677-8899-aabbccddeeff' : undefined,
-          text,
-          hex: [...payload].map((value) => value.toString(16).padStart(2, '0')).join(' '),
-          base64: payload.toString('base64'),
-        },
-      }
-    })
     for (const instance of BrowserWindow.getAllWindows()) {
-      instance.webContents.send('media:sei-parser-event', {
-        sessionId: 'smoke-sei-session',
-        streamId: 'pending',
-        source: 'local-zlm',
-        state: 'waiting',
-        at: Date.now(),
-        videoNalUnits: 0,
-        seiNalUnits: 0,
-        seiMessages: 0,
-        malformedMessages: 0,
-        latestMessages: [],
-        detail: '等待本地 ZLMediaKit 码流',
-      })
       instance.webContents.send('runtime:event', {
         type: 'status',
         profileId: smokeProfileId,
@@ -1613,148 +1561,35 @@ try {
       })
     }
   }, profileId)
-  await window.getByRole('button', { name: '播放', exact: true }).first().waitFor({ state: 'visible' })
-  await window.getByRole('button', { name: '播放', exact: true }).first().click()
-  const seiPanel = window.locator('.camera-sei-panel').first()
-  await seiPanel.waitFor({ state: 'visible', timeout: 5_000 })
-  if (await window.getByRole('button', { name: '查看 SEI 详情' }).count()) {
-    errors.push('sei: detail button is visible before any SEI message exists')
+  await window.getByRole('button', { name: '开始直播', exact: true }).first().waitFor({ state: 'visible' })
+  await window.getByRole('button', { name: '开始直播', exact: true }).first().click()
+  const cameraConsole = window.locator('.camera-console')
+  await window.getByRole('button', { name: '在媒体页预览', exact: true }).first().waitFor({ state: 'visible', timeout: 5_000 })
+  if (await cameraConsole.locator('.camera-player').count()) {
+    errors.push('payload: camera page should not render a player')
   }
-  await electronApp.evaluate(({ BrowserWindow }) => {
-    for (const instance of BrowserWindow.getAllWindows()) {
-      instance.webContents.send('media:sei-parser-event', {
-        sessionId: 'smoke-sei-session',
-        streamId: 'DOCK-SMOKE-001/165-0-0/normal-0',
-        source: 'local-zlm',
-        state: 'running',
-        at: Date.now(),
-        codec: 'h265',
-        videoNalUnits: 428,
-        seiNalUnits: 3,
-        seiMessages: 3,
-        malformedMessages: 1,
-        latestMessages: [
-          {
-            id: 'smoke-sei-message-1',
-            at: Date.now(),
-            codec: 'h265',
-            payloadType: 5,
-            payloadSize: 58,
-            uuid: '00112233-4455-6677-8899-aabbccddeeff',
-            textPreview: '{"flightId":"SMOKE-001","lat":31.2304,"lng":121.4737}',
-            hexPreview: '00 11 22 33 44 55 66 77',
-          },
-          {
-            id: 'smoke-sei-message-2',
-            at: Date.now() - 800,
-            codec: 'h265',
-            payloadType: 1,
-            payloadSize: 12,
-            hexPreview: 'b5 00 3c 00 01 02 03 04 05 06 07 08',
-          },
-        ],
-        detail: undefined,
-      })
-    }
-  })
-  await window.getByText('已解析 3 条', { exact: true }).waitFor({ state: 'visible' })
-  const seiPanelText = await seiPanel.innerText()
-  for (const expected of ['SEI', '已解析 3 条', 'H265', 'NAL 428', '异常 1']) {
-    if (!seiPanelText.includes(expected)) errors.push(`sei: missing ${expected} (${JSON.stringify(seiPanelText)})`)
+  if (await cameraConsole.locator('.camera-sei-panel, .camera-sei-detail-modal').count()) {
+    errors.push('payload: camera page should not render SEI diagnostics')
   }
-  const seiDetailButton = window.getByRole('button', { name: '查看 SEI 详情' }).first()
-  await seiDetailButton.waitFor({ state: 'visible' })
-  await seiDetailButton.click()
-  const seiDetailModal = window.getByRole('dialog', { name: 'SEI 详情' })
-  await seiDetailModal.waitFor({ state: 'visible' })
-  await seiDetailModal.getByText('SMOKE-001', { exact: false }).first().waitFor({ state: 'visible' })
-  const detailText = await seiDetailModal.innerText()
-  for (const expected of ['视频与 SEI 详情', 'SEI 消息', 'user_data_unregistered', '"height":42']) {
-    if (!detailText.includes(expected)) errors.push(`sei detail: missing ${expected} (${JSON.stringify(detailText)})`)
+  await window.getByRole('button', { name: '在媒体页预览', exact: true }).first().click()
+  await window.locator('.media-center').waitFor({ state: 'visible' })
+  await window.locator('.media-preview-source').getByText('来自 设备 › 负载', { exact: false }).waitFor({ state: 'visible', timeout: 5_000 })
+  const mediaPreviewText = await window.locator('.media-preview-panel').innerText()
+  for (const expected of ['来自 设备 › 负载', '测试机场 · 普通', 'WebRTC']) {
+    if (!mediaPreviewText.includes(expected)) errors.push(`media preview: missing ${expected} (${JSON.stringify(mediaPreviewText)})`)
   }
-  await seiDetailModal.getByRole('tab', { name: 'JSON', exact: true }).click()
-  const formattedJson = await seiDetailModal.locator('.camera-sei-payload pre').innerText()
-  if (!formattedJson.includes('\n  "flightId": "SMOKE-001"') || !formattedJson.includes('\n  "height": 42')) {
-    errors.push(`sei detail: JSON payload was not formatted (${JSON.stringify(formattedJson)})`)
+  if (!await window.locator('.media-preview-panel .camera-player').count()) {
+    errors.push('media preview: external camera stream did not mount a player')
   }
-  await seiDetailModal.getByRole('tab', { name: 'HEX', exact: true }).click()
-  await seiDetailModal.getByText('00 11 22 33 44 55 66 77', { exact: false }).waitFor({ state: 'visible' })
-  await seiDetailModal.getByRole('tab', { name: 'Base64', exact: true }).click()
-  const expectedBase64Prefix = Buffer.from('0011223344556677', 'hex').toString('base64').slice(0, 8)
-  await seiDetailModal.getByText(expectedBase64Prefix, { exact: false }).waitFor({ state: 'visible' })
-  await seiDetailModal.getByRole('button', { name: '暂停 SEI 消息刷新' }).click()
-  await seiDetailModal.getByText('H265 · 共 3 条 · 已暂停', { exact: true }).waitFor({ state: 'visible' })
-  await electronApp.evaluate(({ BrowserWindow }) => {
-    for (const instance of BrowserWindow.getAllWindows()) {
-      instance.webContents.send('media:sei-parser-event', {
-        sessionId: 'smoke-sei-session',
-        streamId: 'DOCK-SMOKE-001/165-0-0/normal-0',
-        source: 'local-zlm',
-        state: 'running',
-        at: Date.now(),
-        codec: 'h265',
-        videoNalUnits: 999,
-        seiNalUnits: 99,
-        seiMessages: 99,
-        malformedMessages: 1,
-        latestMessages: [{
-          id: 'smoke-sei-message-3',
-          at: Date.now(),
-          codec: 'h265',
-          payloadType: 1,
-          payloadSize: 12,
-          hexPreview: 'b5 00 3c 00 01 02 03 04 05 06 07 08',
-        }],
-      })
-    }
-  })
-  await window.waitForTimeout(100)
-  if (await seiDetailModal.getByText('H265 · 共 99 条', { exact: true }).count()) {
-    errors.push('sei detail: paused message snapshot continued updating')
-  }
-  await seiDetailModal.getByRole('button', { name: '继续 SEI 消息刷新' }).click()
-  await seiDetailModal.getByText('H265 · 共 99 条', { exact: true }).waitFor({ state: 'visible' })
-  await inspectLayout('camera-sei-narrow', [
-    '.camera-console',
-    '.camera-console-layout',
-    '.camera-monitor-tile.playing',
-    '.camera-sei-panel',
-    '.camera-monitor-footer',
-    '.camera-sei-detail-modal',
-    '.camera-sei-detail-video',
-    '.camera-sei-detail-data',
-    '.camera-sei-detail-list',
-    '.camera-sei-payload',
-  ])
-  await window.screenshot({ path: `${screenshotBase}-camera-sei-1024.png` })
-
-  await browserWindow.evaluate((instance) => instance.setContentSize(1440, 800))
-  await window.waitForFunction(
-    () => window.innerWidth === 1440 && window.innerHeight === 800,
-    undefined,
-    { timeout: 5_000 },
-  )
-  await inspectLayout('camera-sei-wide', [
+  await inspectLayout('camera-payload-no-player', [
     '.camera-console',
     '.camera-console-layout',
     '.camera-monitor-grid',
     '.camera-monitor-tile.playing',
-    '.camera-sei-panel',
-    '.camera-sei-detail-modal',
-    '.camera-sei-detail-body',
+    '.camera-monitor-footer',
   ])
-  await window.screenshot({ path: `${screenshotBase}-camera-sei-1440.png` })
-  await browserWindow.evaluate((instance) => instance.setContentSize(1024, 680))
-  await window.waitForFunction(
-    () => window.innerWidth === 1024 && window.innerHeight === 680,
-    undefined,
-    { timeout: 5_000 },
-  )
-  await seiDetailModal.getByRole('button', { name: '关闭 SEI 详情' }).click()
-  await seiDetailModal.waitFor({ state: 'hidden' })
+  await window.screenshot({ path: `${screenshotBase}-camera-payload-no-player.png` })
 
-  await window.getByRole('button', { name: '媒体中心' }).click()
-  await window.locator('.media-center').waitFor({ state: 'visible' })
   const savedServerState = await window.locator('.media-server-row')
     .filter({ hasText: '冒烟测试流媒体' })
     .locator('.server-state-dot')

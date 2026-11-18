@@ -1,9 +1,14 @@
 import { useMemo, useState } from 'react'
-import { DatabaseBackup, PanelLeft, RefreshCw, RotateCcw, Search, SlidersHorizontal } from 'lucide-react'
+import { Cloud, Database, DatabaseBackup, ListTree, PanelLeft, RefreshCw, RotateCcw, Search, SlidersHorizontal } from 'lucide-react'
+import type { ObjectStorageProfile, OperationResult, TelemetryLayoutConfig, WebDavOverview } from '../../../shared/contracts'
 import packageMetadata from '../../../../package.json'
 import { AppUpdatePanel } from '../components/AppUpdatePanel'
+import { DataVersions } from './DataVersions'
+import { DjiConfigCenter } from './DjiConfigCenter'
+import { OssManager } from './OssManager'
+import { createDefaultTelemetryLayout } from '../lib/telemetry-layout'
 
-type SettingsSection = 'general' | 'updates'
+export type SettingsSection = 'general' | 'oss' | 'sync' | 'telemetry' | 'updates'
 
 interface SettingsCenterProps {
   sidebarWidth: number
@@ -11,6 +16,17 @@ interface SettingsCenterProps {
   minSidebarWidth: number
   maxSidebarWidth: number
   onSidebarWidthChange: (width: number) => void
+  section?: SettingsSection
+  onSectionChange?: (section: SettingsSection) => void
+  objectStorageProfiles?: ObjectStorageProfile[]
+  activeObjectStorageId?: string
+  onSelectObjectStorage?: (profileId: string) => void
+  onSaveObjectStorage?: (profile: ObjectStorageProfile) => Promise<ObjectStorageProfile>
+  onRemoveObjectStorage?: (profileId: string) => Promise<OperationResult>
+  onNotify?: (text: string, tone?: 'info' | 'success' | 'error') => void
+  onOverviewChange?: (overview: WebDavOverview) => void
+  telemetryConfig?: TelemetryLayoutConfig
+  onTelemetryChange?: (config: TelemetryLayoutConfig) => void
 }
 
 const sections: Array<{
@@ -20,6 +36,9 @@ const sections: Array<{
   icon: typeof SlidersHorizontal
 }> = [
   { id: 'general', label: '常规', description: '窗口与界面', icon: SlidersHorizontal },
+  { id: 'oss', label: '对象存储', description: '日志与固件资源', icon: Database },
+  { id: 'sync', label: '云同步', description: 'WebDAV 加密同步', icon: Cloud },
+  { id: 'telemetry', label: '监测布局', description: '页签与字段设置', icon: ListTree },
   { id: 'updates', label: '软件更新', description: '版本与安装包', icon: RefreshCw },
 ]
 
@@ -29,8 +48,20 @@ export function SettingsCenter({
   minSidebarWidth,
   maxSidebarWidth,
   onSidebarWidthChange,
+  section,
+  onSectionChange,
+  objectStorageProfiles = [],
+  activeObjectStorageId = '',
+  onSelectObjectStorage = () => undefined,
+  onSaveObjectStorage = async (profile) => profile,
+  onRemoveObjectStorage = async () => ({ ok: true }),
+  onNotify = () => undefined,
+  onOverviewChange,
+  telemetryConfig,
+  onTelemetryChange = () => undefined,
 }: SettingsCenterProps) {
-  const [activeSection, setActiveSection] = useState<SettingsSection>('general')
+  const [localSection, setLocalSection] = useState<SettingsSection>('general')
+  const activeSection = section ?? localSection
   const [query, setQuery] = useState('')
   const filteredSections = useMemo(() => {
     const keyword = query.trim().toLocaleLowerCase()
@@ -39,6 +70,10 @@ export function SettingsCenter({
   }, [query])
   const activeMeta = sections.find((section) => section.id === activeSection) ?? sections[0]
   const ActiveIcon = activeMeta.icon
+  const selectSection = (next: SettingsSection): void => {
+    setLocalSection(next)
+    onSectionChange?.(next)
+  }
 
   return (
     <div className="settings-center">
@@ -54,7 +89,7 @@ export function SettingsCenter({
               <button
                 key={section.id}
                 className={activeSection === section.id ? 'active' : ''}
-                onClick={() => setActiveSection(section.id)}
+                onClick={() => selectSection(section.id)}
               >
                 <SectionIcon size={17} />
                 <span><strong>{section.label}</strong><small>{section.description}</small></span>
@@ -126,10 +161,33 @@ export function SettingsCenter({
               </div>
               <div className="settings-control-row">
                 <div><strong>HangarLab Studio v{packageMetadata.version}</strong><span>启动 5 秒后静默检查一次；下载完成前使用 SHA256SUMS.txt 校验。</span></div>
-                <div className="footer-actions"><button className="button secondary compact" onClick={() => setActiveSection('updates')}>查看更新</button></div>
+                <div className="footer-actions"><button className="button secondary compact" onClick={() => selectSection('updates')}>查看更新</button></div>
               </div>
             </div>
           </>
+        ) : activeSection === 'oss' ? (
+          <div className="settings-embedded-page">
+            <OssManager
+              profiles={objectStorageProfiles}
+              selectedId={activeObjectStorageId}
+              onSelect={onSelectObjectStorage}
+              onSave={onSaveObjectStorage}
+              onRemove={onRemoveObjectStorage}
+              onNotify={onNotify}
+            />
+          </div>
+        ) : activeSection === 'sync' ? (
+          <div className="settings-embedded-page">
+            <DataVersions onNotify={onNotify} onOverviewChange={onOverviewChange} />
+          </div>
+        ) : activeSection === 'telemetry' ? (
+          <div className="settings-embedded-page settings-telemetry-page">
+            <DjiConfigCenter
+              config={telemetryConfig ?? createDefaultTelemetryLayout()}
+              onChange={onTelemetryChange}
+              onNotify={onNotify}
+            />
+          </div>
         ) : (
           <div className="settings-group settings-update-group">
             <div className="settings-group-heading">

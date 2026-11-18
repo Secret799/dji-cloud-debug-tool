@@ -104,9 +104,10 @@ import {
   parseHmsPayload,
 } from '../lib/dji-hms'
 import { CommandCenter } from './CommandCenter'
-import { MqttConsole } from './MqttConsole'
+import { DeviceTrace, type TraceFocus } from './DeviceTrace'
 import { RemoteLogCenter } from './RemoteLogCenter'
 import { FirmwareUpgradeCenter } from './FirmwareUpgradeCenter'
+import { ErrorCodeCard } from '../components/ErrorCodeCard'
 import { PropertySetModal, type PropertySetTarget } from '../components/PropertySetModal'
 import { SpeakerControl } from '../components/SpeakerControl'
 import { Tooltip } from '../components/Tooltip'
@@ -117,6 +118,7 @@ import {
   telemetrySectionKindForPath,
 } from '../lib/telemetry-layout'
 import { formatTelemetryValue, rawTelemetryValue } from '../lib/telemetry-format'
+import type { ExternalMediaPreviewRequest } from '../lib/media'
 import {
   PAYLOAD_TYPE_OPTIONS,
   loadPayloadTypeAssignments,
@@ -142,11 +144,14 @@ interface OverviewProps {
   onClear?: () => void
   onNotify?: (text: string, tone?: 'info' | 'success' | 'error') => void
   onOpenOssManager?: () => void
+  onOpenErrorCode?: (code: string) => void
   objectStorageProfiles?: ObjectStorageProfile[]
   activeObjectStorageId?: string
   onSelectObjectStorage?: (profileId: string) => void
   telemetryLayout?: TelemetryLayoutConfig
   mediaServers?: MediaServerProfile[]
+  traceFocus?: TraceFocus
+  onOpenMediaPreview?: (request: ExternalMediaPreviewRequest) => void
 }
 
 const MAX_TELEMETRY_FIELDS = 500
@@ -561,7 +566,7 @@ export function CommandHistory({
   )
 }
 
-type WorkbenchTab = 'remote' | 'payload' | 'events' | 'logs' | 'firmware' | 'history' | 'commands' | 'messages'
+type WorkbenchTab = 'remote' | 'payload' | 'events' | 'logs' | 'firmware' | 'trace' | 'commands'
 
 const deviceTypeCopy = {
   dock: { label: '机场', model: 'DJI Dock', icon: RadioTower },
@@ -999,8 +1004,17 @@ function FieldHelp({ path, metadata, sourceLabel, displayLabel, description }: F
   )
 }
 
-export function HmsPayloadDetails({ payload }: { payload: string }) {
+export function HmsPayloadDetails({
+  payload,
+  onOpenTrace,
+  onOpenErrorCode,
+}: {
+  payload: string
+  onOpenTrace?: (focus: TraceFocus) => void
+  onOpenErrorCode?: (code: string) => void
+}) {
   const parsed = useMemo(() => parseHmsPayload(payload), [payload])
+  const [expandedErrorCode, setExpandedErrorCode] = useState('')
 
   if (!parsed) {
     return (
@@ -1091,6 +1105,31 @@ export function HmsPayloadDetails({ payload }: { payload: string }) {
                       )}
                     </div>
                   )}
+                  <div className="hms-alarm-actions">
+                    <button
+                      type="button"
+                      className="hms-alarm-action"
+                      onClick={() => setExpandedErrorCode((current) => current === displayCode ? '' : displayCode)}
+                    >
+                      {expandedErrorCode === displayCode ? '收起错误码' : '查错误码'}
+                    </button>
+                    {parsed.bid && onOpenTrace && (
+                      <button
+                        type="button"
+                        className="hms-alarm-action"
+                        onClick={() => onOpenTrace({ view: 'tx', bid: parsed.bid })}
+                      >
+                        在报文中查看 <span aria-hidden="true">›</span>
+                      </button>
+                    )}
+                  </div>
+                  {expandedErrorCode === displayCode && (
+                    <ErrorCodeCard
+                      result={displayCode}
+                      className="hms-error-card"
+                      onOpenErrorCode={onOpenErrorCode ? () => onOpenErrorCode(displayCode) : undefined}
+                    />
+                  )}
                 </div>
               </section>
             )
@@ -1111,9 +1150,13 @@ export function HmsPayloadDetails({ payload }: { payload: string }) {
 export function DeviceEventWorkspace({
   activities,
   onNotify,
+  onOpenTrace,
+  onOpenErrorCode,
 }: {
   activities: DeviceActivity[]
   onNotify?: (text: string, tone?: 'info' | 'success' | 'error') => void
+  onOpenTrace?: (focus: TraceFocus) => void
+  onOpenErrorCode?: (code: string) => void
 }) {
   const [selectedMethod, setSelectedMethod] = useState<string>(EVENT_TYPE_OPTIONS[0].method)
   const [selectedMessageId, setSelectedMessageId] = useState('')
@@ -1221,7 +1264,11 @@ export function DeviceEventWorkspace({
                     <div><dt>QoS</dt><dd>{selectedActivity.record.qos}</dd></div>
                     <div><dt>大小</dt><dd>{selectedActivity.record.size} B</dd></div>
                   </dl>
-                  <HmsPayloadDetails payload={selectedActivity.record.payload} />
+                  <HmsPayloadDetails
+                    payload={selectedActivity.record.payload}
+                    onOpenTrace={onOpenTrace}
+                    onOpenErrorCode={onOpenErrorCode}
+                  />
               </article>
             </div>
           </div>
@@ -1369,13 +1416,17 @@ export function Overview({
   onClear,
   onNotify,
   onOpenOssManager,
+  onOpenErrorCode,
   objectStorageProfiles = [],
   activeObjectStorageId = '',
   onSelectObjectStorage,
   telemetryLayout = DEFAULT_TELEMETRY_LAYOUT,
   mediaServers = [],
+  traceFocus,
+  onOpenMediaPreview,
 }: OverviewProps) {
   const [activeTab, setActiveTab] = useState<WorkbenchTab>('remote')
+  const [localTraceFocus, setLocalTraceFocus] = useState<TraceFocus>()
   const [activeTelemetryTab, setActiveTelemetryTab] = useState<TelemetryTabId>('operation')
   const [activeTelemetrySection, setActiveTelemetrySection] = useState<TelemetrySectionId>()
   const [telemetrySearch, setTelemetrySearch] = useState('')
@@ -1390,6 +1441,10 @@ export function Overview({
   const deviceSn = requestedConfigured || requestedTelemetry ? selectedDeviceSn : fallbackSn
   const selected = telemetry.find((device) => device.sn === deviceSn)
   const configured = profile.devices.find((device) => device.sn === deviceSn)
+
+  useEffect(() => {
+    setActiveTab('remote')
+  }, [deviceSn])
   const deviceType = configured?.type ?? selected?.type
   const topologyProductKey = selected?.identity ? djiProductKey(selected.identity) : undefined
   const selectedProvider = resolveGatewayProvider(configured, selected)
@@ -1618,8 +1673,7 @@ export function Overview({
     { id: 'events', label: '事件', icon: Bell, count: hmsActivities.length },
     { id: 'commands', label: '指令', icon: Command },
     { id: 'payload', label: '负载', icon: Box, count: payloadIndexes.length },
-    { id: 'history', label: '历史', icon: Clock3, count: transactions.length },
-    { id: 'messages', label: '消息', icon: MessagesSquare, count: deviceRecords.length },
+    { id: 'trace', label: '报文', icon: MessagesSquare, count: deviceRecords.length },
     { id: 'logs', label: '远程日志', icon: FileArchive },
     { id: 'firmware', label: '固件升级', icon: Package },
   ]
@@ -1632,11 +1686,16 @@ export function Overview({
       ))
     : tabs.filter((tab) => tab.id !== 'commands' && tab.id !== 'payload' && tab.id !== 'logs' && tab.id !== 'firmware')
   const visibleTabs = deviceType === 'aircraft'
-    ? configuredTabs.filter((tab) => tab.id === 'remote' || tab.id === 'messages')
+    ? configuredTabs.filter((tab) => tab.id === 'remote' || tab.id === 'trace')
     : deviceType === 'dock'
       ? configuredTabs
       : configuredTabs.filter((tab) => tab.id !== 'payload')
   const activeWorkbenchTab = visibleTabs.some((tab) => tab.id === activeTab) ? activeTab : 'remote'
+  const activeTraceFocus = traceFocus ?? localTraceFocus
+  const openTrace = (focus: TraceFocus): void => {
+    setLocalTraceFocus(focus)
+    setActiveTab('trace')
+  }
   const renderTelemetryTable = (categoryFields: typeof fields) => {
     type TelemetryField = (typeof fields)[number]
     type TelemetryTreeNode = {
@@ -2282,10 +2341,27 @@ export function Overview({
             </section>
           )}
           {activeWorkbenchTab === 'events' && (
-            <DeviceEventWorkspace activities={generalActivities} onNotify={onNotify} />
+            <DeviceEventWorkspace
+              activities={generalActivities}
+              onNotify={onNotify}
+              onOpenTrace={openTrace}
+              onOpenErrorCode={onOpenErrorCode}
+            />
           )}
-          {activeWorkbenchTab === 'history' && (
-            <CommandHistory transactions={transactions} onNotify={onNotify} />
+          {activeWorkbenchTab === 'trace' && onPublish && onExport && onClear && (
+            <DeviceTrace
+              profile={profile}
+              status={status}
+              busy={busy}
+              records={records}
+              transactions={transactions}
+              selectedDeviceSn={deviceSn}
+              onPublish={onPublish}
+              onExport={onExport}
+              onClear={onClear}
+              onNotify={onNotify}
+              focus={activeTraceFocus}
+            />
           )}
           {configured && gatewayCapabilities.deviceControl && <section className="control-center-workspace" hidden={activeWorkbenchTab !== 'commands'}>
             <div className="control-center-content controls">
@@ -2300,46 +2376,50 @@ export function Overview({
                       onPublish={onPublish}
                       onService={onService}
                       onNotify={onNotify}
+                      onOpenMediaPreview={onOpenMediaPreview}
                       allowedCategories={['debug', 'flight', 'payload']}
                       mediaServers={mediaServers}
+                      transactions={transactions.filter((transaction) => transaction.gatewaySn === gatewaySn)}
+                      onOpenTrace={openTrace}
                     />
                 </div>
               )}
             </div>
           </section>}
-          {activeWorkbenchTab === 'logs' && supportsRemoteLogs && onPublish && onNotify && onOpenOssManager && onSelectObjectStorage && (
-            <RemoteLogCenter
-              profileId={profile.id}
-              gatewaySn={deviceSn}
-              status={status}
-              busy={busy}
-              records={records}
-              objectStorageProfiles={objectStorageProfiles}
-              activeObjectStorageId={activeObjectStorageId}
-              onSelectObjectStorage={onSelectObjectStorage}
-              onPublish={onPublish}
-              onNotify={onNotify}
-              onOpenOssManager={onOpenOssManager}
-            />
+          {supportsRemoteLogs && onPublish && onNotify && onOpenOssManager && onSelectObjectStorage && (
+            <div className="persistent-remote-log-center" hidden={activeWorkbenchTab !== 'logs'}>
+              <RemoteLogCenter
+                profileId={profile.id}
+                gatewaySn={deviceSn}
+                status={status}
+                busy={busy}
+                records={records}
+                objectStorageProfiles={objectStorageProfiles}
+                activeObjectStorageId={activeObjectStorageId}
+                onSelectObjectStorage={onSelectObjectStorage}
+                onPublish={onPublish}
+                onNotify={onNotify}
+                onOpenOssManager={onOpenOssManager}
+              />
+            </div>
           )}
-          {activeWorkbenchTab === 'firmware' && supportsFirmwareUpgrade && onService && onSelectObjectStorage && onOpenOssManager && (
-            <FirmwareUpgradeCenter
-              profile={profile}
-              gatewaySn={deviceSn}
-              status={status}
-              busy={busy}
-              telemetry={telemetry}
-              records={records}
-              objectStorageProfiles={objectStorageProfiles}
-              activeObjectStorageId={activeObjectStorageId}
-              onSelectObjectStorage={onSelectObjectStorage}
-              onOpenOssManager={onOpenOssManager}
-              onService={onService}
-              onNotify={onNotify}
-            />
-          )}
-          {activeWorkbenchTab === 'messages' && onPublish && onExport && onClear && (
-            <MqttConsole profile={profile} status={status} busy={busy} records={deviceRecords} selectedDeviceSn={deviceSn} onPublish={onPublish} onExport={onExport} onClear={onClear} />
+          {supportsFirmwareUpgrade && onService && onSelectObjectStorage && onOpenOssManager && (
+            <div className="persistent-firmware-center" hidden={activeWorkbenchTab !== 'firmware'}>
+              <FirmwareUpgradeCenter
+                profile={profile}
+                gatewaySn={deviceSn}
+                status={status}
+                busy={busy}
+                telemetry={telemetry}
+                records={records}
+                objectStorageProfiles={objectStorageProfiles}
+                activeObjectStorageId={activeObjectStorageId}
+                onSelectObjectStorage={onSelectObjectStorage}
+                onOpenOssManager={onOpenOssManager}
+                onService={onService}
+                onNotify={onNotify}
+              />
+            </div>
           )}
         </div>
       </section>
