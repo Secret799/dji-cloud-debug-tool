@@ -1,4 +1,4 @@
-import { copyFile, cp, mkdir, stat, writeFile } from 'node:fs/promises'
+import { copyFile, cp, mkdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 
 /** 旧版本的应用名：userData 目录名由它派生，改名后必须把这里的用户数据搬过来 */
@@ -59,16 +59,9 @@ export async function migrateLegacyUserData(options: {
     ])).some(Boolean)
     if (!hasSourceData) return result
 
-    // 目标端已有全部待迁移文档，说明这次不是首次启动（或迁移已完整跑过），不再覆盖用户现有数据
-    const sourceFiles = (await Promise.all(
-      MIGRATED_FILES.map(async (name) => ((await pathExists(join(source, name))) ? name : null)),
-    )).filter((name): name is string => name !== null)
-    const targetFiles = (await Promise.all(
-      MIGRATED_FILES.map(async (name) => ((await pathExists(join(target, name))) ? name : null)),
-    )).filter((name): name is string => name !== null)
-    const migrationComplete = (await pathExists(join(target, LEGACY_MIGRATION_MARKER)))
-      || sourceFiles.every((name) => targetFiles.includes(name))
-    if (migrationComplete) return result
+    // 只认完成标记：中途失败（含 Local Storage 这类目录）时下次启动必须能续传。
+    // 逐项 pathExists(to) 已经保证不覆盖用户现有数据，因此不需要「目标端已有文档就跳过」的短路。
+    if (await pathExists(join(target, LEGACY_MIGRATION_MARKER))) return result
 
     await mkdir(target, { recursive: true })
 
@@ -86,11 +79,20 @@ export async function migrateLegacyUserData(options: {
       if (!(await pathExists(from))) continue
       const to = join(target, name)
       if (await pathExists(to)) continue
-      await cp(from, to, {
+      // 目录先复制到 *.migrating 再改名：中途失败不会留下半份目录被后续启动误判为已完成
+      const staging = `${to}.migrating`
+      await rm(staging, { recursive: true, force: true })
+      await cp(from, staging, {
         recursive: true,
-        force: false,
         filter: (path) => !SKIPPED_DIRECTORY_ENTRIES.has(basename(path)),
       })
+      try {
+        await rename(staging, to)
+      } catch (error) {
+        await rm(staging, { recursive: true, force: true })
+        // 目标目录在复制期间被创建（并发启动或用户手动放入）时不算失败
+        if (!(await pathExists(to))) throw error
+      }
       result.copied.push(name)
     }
 

@@ -42,17 +42,45 @@ describe('migrateLegacyUserData', () => {
     expect(await stat(join(appDataPath, LEGACY_APP_NAME, 'connection-profiles.json'))).toBeTruthy()
   })
 
-  it('目标目录已有用户数据时不覆盖、不重复迁移', async () => {
+  it('目标已有同名文档时不覆盖，其余项照常补齐', async () => {
     await writeFile(join(appDataPath, LEGACY_APP_NAME, 'connection-profiles.json'), '{"profiles":1}', 'utf8')
     await mkdir(userDataPath, { recursive: true })
     await writeFile(join(userDataPath, 'connection-profiles.json'), '{"profiles":2}', 'utf8')
 
     const result = await migrateLegacyUserData({ userDataPath, appDataPath })
 
-    expect(result.migrated).toBe(false)
-    expect(result.copied).toEqual([])
+    expect(result.copied).toEqual(['Local Storage'])
     expect(await readFile(join(userDataPath, 'connection-profiles.json'), 'utf8')).toBe('{"profiles":2}')
-    expect((await readdir(userDataPath)).includes(LEGACY_MIGRATION_MARKER)).toBe(false)
+    expect((await readdir(userDataPath)).includes(LEGACY_MIGRATION_MARKER)).toBe(true)
+  })
+
+  it('旧目录只有 Local Storage、没有 JSON 文档时也要迁移', async () => {
+    await writeFile(join(appDataPath, LEGACY_APP_NAME, 'Local Storage', 'leveldb', '000005.log'), 'only-db', 'utf8')
+
+    const result = await migrateLegacyUserData({ userDataPath, appDataPath })
+
+    expect(result.error).toBeUndefined()
+    expect(result.copied).toEqual(['Local Storage'])
+    expect(await readFile(join(userDataPath, 'Local Storage', 'leveldb', '000005.log'), 'utf8')).toBe('only-db')
+    expect((await readdir(userDataPath)).includes(LEGACY_MIGRATION_MARKER)).toBe(true)
+  })
+
+  it('JSON 已就位但 Local Storage 缺失时补齐目录，不重复复制 JSON', async () => {
+    const files = ['connection-profiles.json', 'webdav-config.json']
+    for (const name of files) {
+      await writeFile(join(appDataPath, LEGACY_APP_NAME, name), '{"v":1}', 'utf8')
+    }
+    await mkdir(userDataPath, { recursive: true })
+    for (const name of files) {
+      await writeFile(join(userDataPath, name), '{"v":1}', 'utf8')
+    }
+    await writeFile(join(appDataPath, LEGACY_APP_NAME, 'Local Storage', 'leveldb', '000002.log'), 'snapshot', 'utf8')
+
+    const result = await migrateLegacyUserData({ userDataPath, appDataPath })
+
+    expect(result.copied).toEqual(['Local Storage'])
+    expect(await readFile(join(userDataPath, 'Local Storage', 'leveldb', '000002.log'), 'utf8')).toBe('snapshot')
+    expect((await readdir(userDataPath)).includes(LEGACY_MIGRATION_MARKER)).toBe(true)
   })
 
   it('上次迁移只完成一部分时补齐缺失文档且不覆盖已有数据', async () => {
