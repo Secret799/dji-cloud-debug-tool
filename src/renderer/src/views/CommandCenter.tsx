@@ -44,6 +44,7 @@ import {
   isValidSuperDockLtePhone,
   isValidSuperDockLteVerificationCode,
 } from '../lib/superdock'
+import type { ExternalMediaPreviewRequest } from '../lib/media'
 import { CameraCenter } from './CameraCenter'
 import { ErrorCodeCard } from '../components/ErrorCodeCard'
 
@@ -62,6 +63,7 @@ interface CommandCenterProps {
   mediaServers?: MediaServerProfile[]
   transactions?: CommandTransaction[]
   onOpenTrace?: (focus: { view: 'tx'; tid: string }) => void
+  onOpenMediaPreview?: (request: ExternalMediaPreviewRequest) => void
 }
 
 const categories: { id: CommandTemplate['category']; label: string; icon: typeof Gamepad2 }[] = [
@@ -224,6 +226,7 @@ export function CommandCenter({
   mediaServers = [],
   transactions = [],
   onOpenTrace,
+  onOpenMediaPreview,
 }: CommandCenterProps) {
   const gatewayDevices = useMemo(
     () => profile.devices.filter((device) => device.type === 'dock' || device.type === 'pilot'),
@@ -788,6 +791,7 @@ export function CommandCenter({
           onPublish={onPublish}
           onService={onService}
           onNotify={onNotify}
+          onOpenMediaPreview={onOpenMediaPreview}
         />
       </div>
 

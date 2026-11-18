@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import type { MediaServerProfile } from '../../../shared/contracts'
-import { MediaCenter, previewModeLabel } from './MediaCenter'
+import { MediaCenter, previewModeLabel, resolveExternalPreview } from './MediaCenter'
+import type { ExternalMediaPreviewRequest } from '../lib/media'
 
 const localServer: MediaServerProfile = {
   id: 'local-zlm',
@@ -52,5 +53,28 @@ describe('previewModeLabel', () => {
     expect(previewModeLabel('hls')).toBe('HLS')
     expect(previewModeLabel('webrtc')).toBe('WebRTC')
     expect(previewModeLabel('http-ts')).toBe('HTTP-TS')
+    expect(previewModeLabel('rtmp')).toBe('RTMP')
+  })
+})
+
+describe('external media preview', () => {
+  it('uses the request playback address and keeps its source metadata', () => {
+    const request: ExternalMediaPreviewRequest = {
+      serverId: 'local-zlm',
+      app: 'live',
+      stream: 'air-1-0-0',
+      url: 'http://127.0.0.1/index/api/webrtc?app=live&stream=air-1-0-0&type=play',
+      protocol: 'webrtc',
+      title: '飞机 AIR-1 · 普通',
+      sourceSn: 'AIR-1',
+      nonce: 1,
+    }
+
+    expect(resolveExternalPreview(request)).toEqual({
+      mode: 'webrtc',
+      url: request.url,
+      title: request.title,
+      sourceLabel: '设备 › 负载',
+    })
   })
 })

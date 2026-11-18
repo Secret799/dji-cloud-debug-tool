@@ -118,6 +118,7 @@ import {
   telemetrySectionKindForPath,
 } from '../lib/telemetry-layout'
 import { formatTelemetryValue, rawTelemetryValue } from '../lib/telemetry-format'
+import type { ExternalMediaPreviewRequest } from '../lib/media'
 import {
   PAYLOAD_TYPE_OPTIONS,
   loadPayloadTypeAssignments,
@@ -150,6 +151,7 @@ interface OverviewProps {
   telemetryLayout?: TelemetryLayoutConfig
   mediaServers?: MediaServerProfile[]
   traceFocus?: TraceFocus
+  onOpenMediaPreview?: (request: ExternalMediaPreviewRequest) => void
 }
 
 const MAX_TELEMETRY_FIELDS = 500
@@ -1421,6 +1423,7 @@ export function Overview({
   telemetryLayout = DEFAULT_TELEMETRY_LAYOUT,
   mediaServers = [],
   traceFocus,
+  onOpenMediaPreview,
 }: OverviewProps) {
   const [activeTab, setActiveTab] = useState<WorkbenchTab>('remote')
   const [localTraceFocus, setLocalTraceFocus] = useState<TraceFocus>()
@@ -2373,6 +2376,7 @@ export function Overview({
                       onPublish={onPublish}
                       onService={onService}
                       onNotify={onNotify}
+                      onOpenMediaPreview={onOpenMediaPreview}
                       allowedCategories={['debug', 'flight', 'payload']}
                       mediaServers={mediaServers}
                       transactions={transactions.filter((transaction) => transaction.gatewaySn === gatewaySn)}

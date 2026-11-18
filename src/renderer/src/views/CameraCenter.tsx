@@ -1,19 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Aperture,
-  Binary,
   Camera,
   ChevronDown,
   CircleStop,
   Copy,
   Crosshair,
   LockKeyhole,
-  Maximize2,
-  Pause,
+  MonitorPlay,
   Play,
   RotateCcw,
   Video,
-  X,
 } from 'lucide-react'
 import type {
   ConnectionProfile,
@@ -22,11 +19,7 @@ import type {
   MediaServerProfile,
   MqttQos,
   OperationResult,
-  SeiMessageDetail,
-  SeiParserEvent,
-  SeiParserStartRequest,
 } from '../../../shared/contracts'
-import { LivePlayer } from '../components/LivePlayer'
 import { Tooltip } from '../components/Tooltip'
 import {
   cameraStreamName,
@@ -49,7 +42,7 @@ import {
   type MediaPlaybackProtocol,
   type StreamEndpoints,
 } from '../lib/media'
-import { formatJsonText } from '../lib/json'
+import type { ExternalMediaPreviewRequest } from '../lib/media'
 
 interface CameraCenterProps {
   profile: ConnectionProfile
@@ -64,6 +57,7 @@ interface CameraCenterProps {
   onPublish: (topic: string, payload: string, qos: MqttQos, retain: boolean) => Promise<OperationResult>
   onService?: ServiceCaller
   onNotify?: (text: string, tone?: 'info' | 'success' | 'error') => void
+  onOpenMediaPreview?: (request: ExternalMediaPreviewRequest) => void
 }
 
 interface ActivePlayback {
@@ -71,11 +65,9 @@ interface ActivePlayback {
   protocol: MediaPlaybackProtocol
   playbackUrl: string
   streamUrl: string
-  seiSessionId?: string
 }
 
 type PushProtocol = 'rtmp' | 'webrtc'
-type SeiDetailFormat = 'text' | 'json' | 'hex' | 'base64'
 
 export const selectCameraPushEndpoint = (
   provider: DeviceProvider,
@@ -93,6 +85,23 @@ export const isCameraLiveQualityLocked = (
   sourceType: CameraSource['sourceType'],
   live: boolean,
 ): boolean => provider === 'superdock' && sourceType === 'dock' && live
+
+export const buildMediaPreviewRequest = (
+  server: Pick<MediaServerProfile, 'id'>,
+  camera: Pick<CameraSource, 'sourceName'>,
+  video: Pick<CameraVideoStream, 'sourceSn' | 'cameraIndex' | 'videoIndex' | 'videoType'>,
+  playback: Pick<ActivePlayback, 'playbackUrl' | 'protocol'>,
+  nonce: number,
+): ExternalMediaPreviewRequest => ({
+  serverId: server.id,
+  app: 'live',
+  stream: cameraStreamName(video),
+  url: playback.playbackUrl,
+  protocol: playback.protocol,
+  title: `${camera.sourceName} · ${videoTypeLabel(video.videoType)}`,
+  sourceSn: video.sourceSn,
+  nonce,
+})
 
 const qualityOptions = [
   { value: 0, label: '自适应' },
@@ -157,13 +166,6 @@ const liveCommandError = (result: ServiceCallResult, fallback: string): string =
 const hasLiveResult = (result: ServiceCallResult, code: number): boolean =>
   normalizeLiveResultCode(result.result) === code
 
-const seiStatusLabel = (event?: SeiParserEvent): string => {
-  if (!event || event.state === 'waiting') return '等待码流'
-  if (event.state === 'error') return '解析异常'
-  if (event.state === 'stopped') return '已停止'
-  return event.seiMessages ? `已解析 ${event.seiMessages} 条` : '解析中 · 未发现 SEI'
-}
-
 export function CameraCenter({
   profile,
   telemetry,
@@ -177,6 +179,7 @@ export function CameraCenter({
   onPublish,
   onService,
   onNotify,
+  onOpenMediaPreview,
 }: CameraCenterProps) {
   const isSuperDock = provider === 'superdock'
   const providerLabel = isSuperDock ? 'SuperDock' : 'DJI'
@@ -206,14 +209,7 @@ export function CameraCenter({
   const [quality, setQuality] = useState(2)
   const [sending, setSending] = useState('')
   const [playbacks, setPlaybacks] = useState<Record<string, ActivePlayback>>({})
-  const [seiEvents, setSeiEvents] = useState<Record<string, SeiParserEvent>>({})
-  const [seiDetailStreamId, setSeiDetailStreamId] = useState<string>()
-  const [selectedSeiMessageId, setSelectedSeiMessageId] = useState<string>()
-  const [seiMessageDetail, setSeiMessageDetail] = useState<SeiMessageDetail>()
-  const [seiDetailFormat, setSeiDetailFormat] = useState<SeiDetailFormat>('text')
-  const [seiDetailError, setSeiDetailError] = useState('')
-  const [pausedSeiEvent, setPausedSeiEvent] = useState<SeiParserEvent>()
-  const seiSessionIdsRef = useRef(new Set<string>())
+  const mediaPreviewNonceRef = useRef(0)
   const [selectedLensTypes, setSelectedLensTypes] = useState<Record<string, string>>({})
   const [selectedDockCameraPositions, setSelectedDockCameraPositions] = useState<Record<string, number>>({})
   const [selectedQualities, setSelectedQualities] = useState<Record<string, number>>({})
@@ -238,141 +234,6 @@ export function CameraCenter({
     }
   }, [selectedCamera, selectedVideoId])
 
-  useEffect(() => window.djiApi.media.onSeiParserEvent((event) => {
-    setSeiEvents((current) => ({ ...current, [event.sessionId]: event }))
-  }), [])
-
-  const detailPlayback = seiDetailStreamId ? playbacks[seiDetailStreamId] : undefined
-  const detailCamera = detailPlayback
-    ? cameras.find((camera) => camera.sourceSn === detailPlayback.stream.sourceSn && camera.cameraIndex === detailPlayback.stream.cameraIndex)
-    : undefined
-  const liveDetailSeiEvent = detailPlayback?.seiSessionId ? seiEvents[detailPlayback.seiSessionId] : undefined
-  const detailSeiEvent = pausedSeiEvent?.sessionId === detailPlayback?.seiSessionId
-    ? pausedSeiEvent
-    : liveDetailSeiEvent
-  const detailMessages = detailSeiEvent?.latestMessages ?? []
-  const formattedSeiJson = formatJsonText(seiMessageDetail?.text)
-  const seiDetailValue = !seiMessageDetail
-    ? undefined
-    : seiDetailFormat === 'text'
-      ? seiMessageDetail.text
-      : seiDetailFormat === 'json'
-        ? formattedSeiJson
-        : seiMessageDetail[seiDetailFormat]
-
-  useEffect(() => {
-    if (!seiDetailStreamId) return
-    if (!detailPlayback || !detailMessages.length) {
-      setSeiDetailStreamId(undefined)
-      setSelectedSeiMessageId(undefined)
-      setSeiMessageDetail(undefined)
-      setSeiDetailError('')
-      setPausedSeiEvent(undefined)
-      return
-    }
-    if (!selectedSeiMessageId || !detailMessages.some((message) => message.id === selectedSeiMessageId)) {
-      setSelectedSeiMessageId(detailMessages[0].id)
-    }
-  }, [detailMessages, detailPlayback, seiDetailStreamId, selectedSeiMessageId])
-
-  useEffect(() => {
-    const sessionId = detailPlayback?.seiSessionId
-    if (!sessionId || !selectedSeiMessageId) return
-    let current = true
-    setSeiMessageDetail(undefined)
-    setSeiDetailError('')
-    void window.djiApi.media.getSeiMessageDetail({ sessionId, messageId: selectedSeiMessageId })
-      .then((result) => {
-        if (!current) return
-        if (!result.ok || !result.message) {
-          setSeiDetailError(result.error ?? '无法读取 SEI 消息详情')
-          return
-        }
-        setSeiMessageDetail(result.message)
-        setSeiDetailFormat((format) => format === 'text' && !result.message?.text ? 'hex' : format)
-      })
-      .catch((error) => {
-        if (current) setSeiDetailError(error instanceof Error ? error.message : String(error))
-      })
-    return () => { current = false }
-  }, [detailPlayback?.seiSessionId, selectedSeiMessageId])
-
-  useEffect(() => {
-    if (!seiDetailStreamId) return undefined
-    const closeOnEscape = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setSeiDetailStreamId(undefined)
-    }
-    window.addEventListener('keydown', closeOnEscape)
-    return () => window.removeEventListener('keydown', closeOnEscape)
-  }, [seiDetailStreamId])
-
-  useEffect(() => () => {
-    for (const sessionId of seiSessionIdsRef.current) {
-      void window.djiApi.media.stopSeiParser(sessionId)
-    }
-    seiSessionIdsRef.current.clear()
-  }, [])
-
-  const startSeiParser = async (
-    video: CameraVideoStream,
-    request?: Pick<SeiParserStartRequest, 'source' | 'url'>,
-  ): Promise<string | undefined> => {
-    if (!request) return undefined
-    try {
-      const result = await window.djiApi.media.startSeiParser({ streamId: video.id, ...request })
-      if (!result.ok || !result.sessionId) {
-        onNotify?.(`视频已开始播放，但 SEI 解析未启动：${result.error ?? '未知错误'}`, 'error')
-        return undefined
-      }
-      seiSessionIdsRef.current.add(result.sessionId)
-      return result.sessionId
-    } catch (error) {
-      onNotify?.(`视频已开始播放，但 SEI 解析未启动：${error instanceof Error ? error.message : String(error)}`, 'error')
-      return undefined
-    }
-  }
-
-  const stopSeiParser = (sessionId?: string): void => {
-    if (!sessionId) return
-    seiSessionIdsRef.current.delete(sessionId)
-    setSeiEvents((current) => {
-      const next = { ...current }
-      delete next[sessionId]
-      return next
-    })
-    void window.djiApi.media.stopSeiParser(sessionId)
-  }
-
-  const openSeiDetail = (streamId: string, event: SeiParserEvent): void => {
-    if (!event.latestMessages.length) return
-    setPausedSeiEvent(undefined)
-    setSeiDetailStreamId(streamId)
-    setSelectedSeiMessageId(event.latestMessages[0].id)
-    setSeiMessageDetail(undefined)
-    setSeiDetailFormat('text')
-    setSeiDetailError('')
-  }
-
-  const closeSeiDetail = (): void => {
-    setPausedSeiEvent(undefined)
-    setSeiDetailStreamId(undefined)
-    setSelectedSeiMessageId(undefined)
-    setSeiMessageDetail(undefined)
-    setSeiDetailError('')
-  }
-
-  const toggleSeiDetailPause = (): void => {
-    if (pausedSeiEvent) {
-      setPausedSeiEvent(undefined)
-      return
-    }
-    if (liveDetailSeiEvent) {
-      setPausedSeiEvent({
-        ...liveDetailSeiEvent,
-        latestMessages: liveDetailSeiEvent.latestMessages.map((message) => ({ ...message })),
-      })
-    }
-  }
 
   const publishService = async (
     gatewaySn: string,
@@ -439,7 +300,6 @@ export function CameraCenter({
         onNotify?.(liveCommandError(response, '停止推流失败'), 'error')
         return false
       }
-      stopSeiParser(current.seiSessionId)
       setPlaybacks((active) => {
         const next = { ...active }
         delete next[current.stream.id]
@@ -468,9 +328,6 @@ export function CameraCenter({
       const failedIds = activePlaybacks
         .filter((_, index) => !results[index]?.ok && !hasLiveResult(results[index], 13011))
         .map((current) => current.stream.id)
-      activePlaybacks.forEach((current) => {
-        if (!failedIds.includes(current.stream.id)) stopSeiParser(current.seiSessionId)
-      })
       setPlaybacks((active) => Object.fromEntries(
         Object.entries(active).filter(([id]) => failedIds.includes(id)),
       ))
@@ -517,22 +374,13 @@ export function CameraCenter({
     const webRtc = pushProtocol === 'webrtc'
     const prepared = candidates.flatMap(({ video }) => {
       const endpoints = buildMediaEndpoints(selectedServer, 'live', cameraStreamName(video))
-      const localEndpoints = selectedServer.kind === 'local-zlm'
-        ? buildMediaEndpoints({ ...selectedServer, host: '127.0.0.1' }, 'live', cameraStreamName(video))
-        : endpoints
       const pushUrl = webRtc
         ? selectCameraPushEndpoint(provider, selectedServer.kind, endpoints, pushProtocol)
         : endpoints.rtmp
       const playbackEndpoint = selectMediaPlaybackEndpoint(endpoints, pushProtocol)
       const streamUrl = webRtc ? endpoints.whep : endpoints.rtmp
-      const seiRequest: Pick<SeiParserStartRequest, 'source' | 'url'> | undefined =
-        webRtc && selectedServer.kind === 'local-zlm' && localEndpoints.rtsp
-          ? { source: 'local-zlm', url: localEndpoints.rtsp }
-          : selectedServer.kind === 'remote-easymedia' && endpoints.seiDiagnostics
-            ? { source: 'secret-ems', url: endpoints.seiDiagnostics }
-            : undefined
       return pushUrl && playbackEndpoint && streamUrl
-        ? [{ video, pushUrl, playbackEndpoint, streamUrl, seiRequest }]
+        ? [{ video, pushUrl, playbackEndpoint, streamUrl }]
         : []
     })
     if (!prepared.length) {
@@ -548,7 +396,6 @@ export function CameraCenter({
         const item = prepared[index]
         const result = await startDeviceStream(item.video, item.pushUrl, webRtc)
         if (result.ok) {
-          const seiSessionId = await startSeiParser(item.video, item.seiRequest)
           started.push(item)
           setPlaybacks((active) => ({
             ...active,
@@ -557,7 +404,6 @@ export function CameraCenter({
               protocol: item.playbackEndpoint.protocol,
               playbackUrl: item.playbackEndpoint.url,
               streamUrl: item.streamUrl,
-              seiSessionId,
             },
           }))
         } else {
@@ -615,9 +461,6 @@ export function CameraCenter({
     setSending(`play:${video.id}`)
     try {
       const endpoints = buildMediaEndpoints(selectedServer, 'live', cameraStreamName(video))
-      const localEndpoints = selectedServer.kind === 'local-zlm'
-        ? buildMediaEndpoints({ ...selectedServer, host: '127.0.0.1' }, 'live', cameraStreamName(video))
-        : endpoints
       const webRtc = pushProtocol === 'webrtc'
       const pushUrl = webRtc
         ? selectCameraPushEndpoint(provider, selectedServer.kind, endpoints, pushProtocol)
@@ -633,13 +476,6 @@ export function CameraCenter({
         onNotify?.(liveCommandError(response, '开始推流失败'), 'error')
         return
       }
-      const seiRequest: Pick<SeiParserStartRequest, 'source' | 'url'> | undefined =
-        webRtc && selectedServer.kind === 'local-zlm' && localEndpoints.rtsp
-          ? { source: 'local-zlm', url: localEndpoints.rtsp }
-          : selectedServer.kind === 'remote-easymedia' && endpoints.seiDiagnostics
-            ? { source: 'secret-ems', url: endpoints.seiDiagnostics }
-            : undefined
-      const seiSessionId = await startSeiParser(video, seiRequest)
       setPlaybacks((active) => ({
         ...active,
         [video.id]: {
@@ -647,7 +483,6 @@ export function CameraCenter({
           protocol: playbackEndpoint.protocol,
           playbackUrl: playbackEndpoint.url,
           streamUrl,
-          seiSessionId,
         },
       }))
       onNotify?.(`设备已确认开始 ${webRtc ? realtimePushLabel : 'RTMP'} 推流，正在连接画面`, 'success')
@@ -788,6 +623,12 @@ export function CameraCenter({
     }
   }
 
+  const openMediaPreview = (camera: CameraSource, video: CameraVideoStream, playback: ActivePlayback): void => {
+    if (!selectedServer || !onOpenMediaPreview) return
+    mediaPreviewNonceRef.current += 1
+    onOpenMediaPreview(buildMediaPreviewRequest(selectedServer, camera, video, playback, mediaPreviewNonceRef.current))
+  }
+
   return (
     <section className="camera-console">
       <div className="camera-console-layout">
@@ -851,12 +692,12 @@ export function CameraCenter({
             <div className="camera-stream-bulk-actions">
               {videoSources.some(({ video }) => !playbacks[video.id]) && (
                 <button className="button primary compact" disabled={!selectedServer || status !== 'connected' || busy || Boolean(sending)} onClick={() => void startAllPlaybacks()}>
-                  <Play size={14} />{sending === 'play-all' ? '启动中' : '全部播放'}
+                  <Play size={14} />{sending === 'play-all' ? '启动中' : '全部开始直播'}
                 </button>
               )}
               {hasActivePlaybacks && (
                 <button className="button secondary compact" disabled={Boolean(sending)} onClick={() => void stopAllPlaybacks()}>
-                  <CircleStop size={14} />{sending === 'stop-all' ? '停止中' : '全部停止'}
+                  <CircleStop size={14} />{sending === 'stop-all' ? '停止中' : '全部停止直播'}
                 </button>
               )}
             </div>
@@ -868,7 +709,6 @@ export function CameraCenter({
             {!videoSources.length && <span className="camera-lens-empty">暂无可播放的视频源</span>}
             {videoSources.map(({ camera, video }) => {
               const playback = playbacks[video.id]
-              const seiEvent = playback?.seiSessionId ? seiEvents[playback.seiSessionId] : undefined
               const activeLensType = selectedLensTypes[video.id] ?? video.videoType
               const supportedTypes = videoLensTypes(video)
               const selectedQuality = qualityForVideo(video)
@@ -891,12 +731,6 @@ export function CameraCenter({
                     </span>
                   </header>
 
-                  <LivePlayer
-                    src={playback?.playbackUrl}
-                    protocol={playback?.protocol ?? 'http-ts'}
-                    title={`${camera.sourceName} ${videoTypeLabel(activeLensType)}视频`}
-                  />
-
                   {playback && (
                     <div className="camera-monitor-address">
                       <code title={playback.streamUrl}>{playback.streamUrl}</code>
@@ -904,28 +738,6 @@ export function CameraCenter({
                         <button className="icon-button small" onClick={() => void copyPlaybackUrl(playback.streamUrl, '播放地址')}><Copy size={13} /></button>
                       </Tooltip>
                     </div>
-                  )}
-
-                  {playback?.seiSessionId && (
-                    <section className="camera-sei-panel" aria-label={`${video.videoIndex} SEI 解析`}>
-                      <header>
-                        <span><Binary size={13} />SEI</span>
-                        <strong className={seiEvent?.seiMessages ? 'detected' : ''}>{seiStatusLabel(seiEvent)}</strong>
-                        <small>{seiEvent?.codec?.toUpperCase() ?? '待识别'} · {seiEvent?.source === 'secret-ems' ? '帧' : 'NAL'} {seiEvent?.videoNalUnits ?? 0}</small>
-                        {Boolean(seiEvent?.malformedMessages) && <small className="warning">异常 {seiEvent?.malformedMessages}</small>}
-                        {Boolean(seiEvent?.latestMessages.length) && (
-                          <Tooltip label="查看 SEI 详情">
-                            <button
-                              type="button"
-                              className="icon-button small camera-sei-detail-button"
-                              aria-label="查看 SEI 详情"
-                              onClick={() => openSeiDetail(video.id, seiEvent!)}
-                            ><Maximize2 size={13} /></button>
-                          </Tooltip>
-                        )}
-                      </header>
-                      {!seiEvent?.latestMessages.length && <p>{seiEvent?.detail ?? '正在扫描 H.264/H.265 SEI NAL 单元'}</p>}
-                    </section>
                   )}
 
                   <footer className="camera-monitor-footer">
@@ -981,14 +793,21 @@ export function CameraCenter({
                         <ChevronDown size={13} aria-hidden="true" />
                       </label>
                     </div>
-                    <button
-                      className={`button compact ${playback ? 'secondary' : 'primary'}`}
-                      disabled={!selectedServer || status !== 'connected' || busy || Boolean(sending)}
-                      onClick={() => void playVideo(video)}
-                    >
-                      {playback ? <CircleStop size={14} /> : <Play size={14} />}
-                      {processing ? '处理中' : playback ? '停止' : '播放'}
-                    </button>
+                    <div className="camera-monitor-actions">
+                      {playback && onOpenMediaPreview && (
+                        <button className="button primary compact" onClick={() => openMediaPreview(camera, video, playback)}>
+                          <MonitorPlay size={14} />在媒体页预览
+                        </button>
+                      )}
+                      <button
+                        className={`button compact ${playback ? 'secondary' : 'primary'}`}
+                        disabled={!selectedServer || status !== 'connected' || busy || Boolean(sending)}
+                        onClick={() => void playVideo(video)}
+                      >
+                        {playback ? <CircleStop size={14} /> : <Play size={14} />}
+                        {processing ? '处理中' : playback ? '停止直播' : '开始直播'}
+                      </button>
+                    </div>
                   </footer>
                 </article>
               )
@@ -1012,97 +831,6 @@ export function CameraCenter({
         </div>
       </div>
 
-      {detailPlayback && detailSeiEvent && detailMessages.length > 0 && (
-        <div className="modal-backdrop camera-sei-detail-backdrop" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) closeSeiDetail()
-        }}>
-          <div className="modal camera-sei-detail-modal" role="dialog" aria-modal="true" aria-label="SEI 详情">
-            <header className="modal-header">
-              <div>
-                <span className="eyebrow">LIVE SEI</span>
-                <h2>视频与 SEI 详情</h2>
-              </div>
-              <Tooltip label="关闭">
-                <button type="button" className="icon-button" aria-label="关闭 SEI 详情" onClick={closeSeiDetail}><X size={17} /></button>
-              </Tooltip>
-            </header>
-            <div className="camera-sei-detail-body">
-              <section className="camera-sei-detail-video" aria-label="实时画面">
-                <header>
-                  <strong>{detailCamera?.sourceName ?? detailPlayback.stream.sourceSn} · {videoTypeLabel(detailPlayback.stream.videoType)}</strong>
-                  <span>{detailPlayback.protocol.toUpperCase()}</span>
-                </header>
-                <LivePlayer
-                  src={detailPlayback.playbackUrl}
-                  protocol={detailPlayback.protocol}
-                  title={`${detailCamera?.sourceName ?? detailPlayback.stream.sourceSn} SEI 详情视频`}
-                />
-              </section>
-              <aside className="camera-sei-detail-data" aria-label="SEI 数据">
-                <header>
-                  <div>
-                    <strong>SEI 消息</strong>
-                    <span>{detailSeiEvent.codec?.toUpperCase() ?? '待识别'} · 共 {detailSeiEvent.seiMessages} 条{pausedSeiEvent ? ' · 已暂停' : ''}</span>
-                  </div>
-                  <div className="camera-sei-detail-controls">
-                    <Tooltip label={pausedSeiEvent ? '继续接收最新消息' : '暂停消息刷新'}>
-                      <button
-                        type="button"
-                        className={`icon-button small camera-sei-pause-button ${pausedSeiEvent ? 'active' : ''}`}
-                        aria-label={pausedSeiEvent ? '继续 SEI 消息刷新' : '暂停 SEI 消息刷新'}
-                        aria-pressed={Boolean(pausedSeiEvent)}
-                        onClick={toggleSeiDetailPause}
-                      >{pausedSeiEvent ? <Play size={13} /> : <Pause size={13} />}</button>
-                    </Tooltip>
-                    <div className="segmented camera-sei-format-tabs" role="tablist" aria-label="SEI 数据格式">
-                      <button type="button" role="tab" className={seiDetailFormat === 'text' ? 'active' : ''} disabled={!seiMessageDetail?.text} onClick={() => setSeiDetailFormat('text')}>文本</button>
-                      <button type="button" role="tab" className={seiDetailFormat === 'json' ? 'active' : ''} disabled={!formattedSeiJson} onClick={() => setSeiDetailFormat('json')}>JSON</button>
-                      <button type="button" role="tab" className={seiDetailFormat === 'hex' ? 'active' : ''} onClick={() => setSeiDetailFormat('hex')}>HEX</button>
-                      <button type="button" role="tab" className={seiDetailFormat === 'base64' ? 'active' : ''} onClick={() => setSeiDetailFormat('base64')}>Base64</button>
-                    </div>
-                  </div>
-                </header>
-                <div className="camera-sei-detail-content">
-                  <div className="camera-sei-detail-list" role="listbox" aria-label="SEI 消息列表">
-                    {detailMessages.map((message) => (
-                      <button
-                        type="button"
-                        role="option"
-                        key={message.id}
-                        className={message.id === selectedSeiMessageId ? 'selected' : ''}
-                        aria-selected={message.id === selectedSeiMessageId}
-                        onClick={() => {
-                          setSelectedSeiMessageId(message.id)
-                          setSeiDetailFormat('text')
-                        }}
-                      >
-                        <span><time>{new Date(message.at).toLocaleTimeString('zh-CN', { hour12: false })}</time><small>{message.payloadSize} B</small></span>
-                        <strong>{message.payloadType === 5 ? 'user_data_unregistered' : `payload type ${message.payloadType}`}</strong>
-                        <code>{message.textPreview ?? message.hexPreview ?? '空 payload'}</code>
-                      </button>
-                    ))}
-                  </div>
-                  <section className="camera-sei-payload" aria-live="polite">
-                    <header>
-                      <span>{seiMessageDetail ? `${seiMessageDetail.payloadSize} B` : '读取中'}</span>
-                      {seiMessageDetail && (
-                        <Tooltip label="复制当前 SEI 数据">
-                          <button type="button" className="icon-button small" aria-label="复制当前 SEI 数据" onClick={() => {
-                            void copyPlaybackUrl(seiDetailValue ?? '', 'SEI 数据')
-                          }}><Copy size={13} /></button>
-                        </Tooltip>
-                      )}
-                    </header>
-                    {seiDetailError
-                      ? <p className="camera-sei-detail-error">{seiDetailError}</p>
-                      : <pre>{seiMessageDetail ? seiDetailValue : '正在读取完整 SEI 数据...'}</pre>}
-                  </section>
-                </div>
-              </aside>
-            </div>
-          </div>
-        </div>
-      )}
     </section>
   )
 }

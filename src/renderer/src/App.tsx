@@ -70,6 +70,7 @@ import { ErrorCodeManager } from './views/ErrorCodeManager'
 import { SettingsCenter, type SettingsSection } from './views/SettingsCenter'
 import { errorCodeStats, formatServiceError } from './lib/dji-error-codes'
 import { superDockErrorCodeStats } from './lib/superdock-error-codes'
+import type { ExternalMediaPreviewRequest } from './lib/media'
 import { buildFirmwareEventReply } from './lib/dji-firmware'
 import {
   loadTelemetryLayout,
@@ -205,6 +206,7 @@ export default function App() {
   const [mediaServers, setMediaServers] = useState<MediaServerProfile[]>([])
   const [mediaServerRuntimes, setMediaServerRuntimes] = useState<Record<string, MediaServerRuntime>>({})
   const [mediaServersLoading, setMediaServersLoading] = useState(true)
+  const [mediaPreviewRequest, setMediaPreviewRequest] = useState<ExternalMediaPreviewRequest>()
   const [telemetryLayout, setTelemetryLayout] = useState<TelemetryLayoutConfig>(() => loadTelemetryLayout())
   const [connectionEditor, setConnectionEditor] = useState<{ profile: ConnectionProfile; isNew: boolean } | null>(null)
   const connectionEditorLoadGenerationRef = useRef(0)
@@ -222,6 +224,10 @@ export default function App() {
   const subscriptionSyncGenerationRef = useRef<Record<string, number>>({})
   const discoveredAircraftSubscriptionRef = useRef(new Set<string>())
   const pendingServiceRepliesRef = useRef(new Map<string, PendingServiceReply>())
+
+  useEffect(() => {
+    if (activeView !== 'media') setMediaPreviewRequest(undefined)
+  }, [activeView])
 
   useEffect(() => {
     try {
@@ -1651,6 +1657,10 @@ export default function App() {
                 activeObjectStorageId={activeObjectStorageId}
                 onSelectObjectStorage={setActiveObjectStorageId}
                 mediaServers={mediaServers}
+                onOpenMediaPreview={(request) => {
+                  setMediaPreviewRequest(request)
+                  setActiveView('media')
+                }}
               />
             </div>
             {activeView === 'map' && (
@@ -1672,6 +1682,7 @@ export default function App() {
                 onServersChange={setMediaServers}
                 onRuntimeChange={updateMediaServerRuntime}
                 onNotify={showToast}
+                externalPreview={mediaPreviewRequest}
               />
             )}
             {activeView === 'errors' && <ErrorCodeManager initialCode={errorCodeFocus} />}

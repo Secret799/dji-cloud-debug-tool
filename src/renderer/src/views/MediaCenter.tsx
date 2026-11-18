@@ -28,7 +28,11 @@ import { HlsPlayer } from '../components/HlsPlayer'
 import { LivePlayer } from '../components/LivePlayer'
 import { SecretInput } from '../components/SecretInput'
 import { Tooltip } from '../components/Tooltip'
-import { buildMediaEndpoints } from '../lib/media'
+import {
+  buildMediaEndpoints,
+  type ExternalMediaPreviewRequest,
+  type MediaPlaybackProtocol,
+} from '../lib/media'
 
 interface MediaCenterProps {
   servers: MediaServerProfile[]
@@ -37,6 +41,7 @@ interface MediaCenterProps {
   onServersChange: (servers: MediaServerProfile[]) => void
   onRuntimeChange: (runtime: MediaServerRuntime) => void
   onNotify: (text: string, tone?: 'info' | 'success' | 'error') => void
+  externalPreview?: ExternalMediaPreviewRequest
 }
 
 const runtimeLabel: Record<MediaServerRuntime['state'], string> = {
@@ -72,16 +77,24 @@ const displayedServerPort = (server: MediaServerProfile): number =>
 const displayedRuntimeLabel = (server: MediaServerProfile, runtime?: MediaServerRuntime): string =>
   runtime ? runtimeLabel[runtime.state] : server.kind === 'local-zlm' ? '已停止' : '未检测'
 
-type MediaPreviewMode = 'hls' | 'webrtc' | 'http-ts'
+type MediaPreviewMode = 'hls' | MediaPlaybackProtocol
 
 interface MediaPreview {
   mode: MediaPreviewMode
   url: string
   title: string
+  sourceLabel?: string
 }
 
 export const previewModeLabel = (mode: MediaPreviewMode): string =>
-  mode === 'hls' ? 'HLS' : mode === 'webrtc' ? 'WebRTC' : 'HTTP-TS'
+  mode === 'hls' ? 'HLS' : mode === 'webrtc' ? 'WebRTC' : mode === 'rtmp' ? 'RTMP' : 'HTTP-TS'
+
+export const resolveExternalPreview = (request: ExternalMediaPreviewRequest): MediaPreview => ({
+  mode: request.protocol,
+  url: request.url,
+  title: request.title,
+  sourceLabel: '设备 › 负载',
+})
 
 const seiStatusLabel = (event?: SeiParserEvent): string => {
   if (!event) return '等待码流'
@@ -138,6 +151,7 @@ export function MediaCenter({
   onServersChange,
   onRuntimeChange,
   onNotify,
+  externalPreview,
 }: MediaCenterProps) {
   const [selectedId, setSelectedId] = useState('')
   const [editor, setEditor] = useState<MediaServerProfile | null>(null)
@@ -153,6 +167,7 @@ export function MediaCenter({
   const [seiDetail, setSeiDetail] = useState<SeiMessageDetail>()
   const seiSessionRef = useRef('')
   const previewGenerationRef = useRef(0)
+  const consumedExternalPreviewNonceRef = useRef<number>()
 
   useEffect(() => {
     setSelectedId((current) => {
@@ -212,17 +227,17 @@ export function MediaCenter({
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [seiDetail])
 
-  const startPreview = async (): Promise<void> => {
+  const startPreview = async (request?: ExternalMediaPreviewRequest): Promise<void> => {
     if (!selectedServer || !endpoints) return
     stopPreview()
     const generation = previewGenerationRef.current
     setPreviewBusy(true)
     try {
       const isSecretEms = selectedServer.kind === 'remote-easymedia'
-      const useWebRtc = !isSecretEms && previewProtocol === 'webrtc' && Boolean(endpoints.whep)
-      const previewUrl = isSecretEms ? endpoints.httpTs : useWebRtc ? endpoints.whep : endpoints.hls
+      const useWebRtc = !request && !isSecretEms && previewProtocol === 'webrtc' && Boolean(endpoints.whep)
+      const previewUrl = request?.url ?? (isSecretEms ? endpoints.httpTs : useWebRtc ? endpoints.whep : endpoints.hls)
       if (!previewUrl) throw new Error('当前媒体服务没有可用的播放地址')
-      const title = `${selectedServer.name} · ${streamApp}/${streamName}`
+      const title = request?.title ?? `${selectedServer.name} · ${streamApp}/${streamName}`
       const startSei = async (
         source: 'local-zlm' | 'secret-ems',
         url: string,
@@ -261,9 +276,11 @@ export function MediaCenter({
       setSeiSessionId(sessionId)
       setSeiEvent(undefined)
       setPreview({
-        mode: isSecretEms ? 'http-ts' : useWebRtc ? 'webrtc' : 'hls',
-        url: previewUrl,
-        title,
+        ...(request ? resolveExternalPreview(request) : {
+          mode: isSecretEms ? 'http-ts' : useWebRtc ? 'webrtc' : 'hls',
+          url: previewUrl,
+          title,
+        }),
       })
       onNotify(sessionId ? '已开始预览并启动 SEI 诊断' : '已开始预览', 'success')
     } catch (error) {
@@ -272,6 +289,25 @@ export function MediaCenter({
       setPreviewBusy(false)
     }
   }
+
+  useEffect(() => {
+    if (!externalPreview || consumedExternalPreviewNonceRef.current === externalPreview.nonce) return
+    if (loading || !servers.length) return
+    if (externalPreview.serverId && selectedId !== externalPreview.serverId && servers.some((server) => server.id === externalPreview.serverId)) {
+      setSelectedId(externalPreview.serverId)
+      return
+    }
+    if (streamApp !== externalPreview.app) {
+      setStreamApp(externalPreview.app)
+      return
+    }
+    if (streamName !== externalPreview.stream) {
+      setStreamName(externalPreview.stream)
+      return
+    }
+    consumedExternalPreviewNonceRef.current = externalPreview.nonce
+    void startPreview(externalPreview)
+  }, [externalPreview, loading, selectedId, servers, streamApp, streamName])
 
   const openSeiMessage = async (messageId: string): Promise<void> => {
     const sessionId = seiSessionRef.current
@@ -497,6 +533,7 @@ export function MediaCenter({
                   <div>
                     <h3>码流预览</h3>
                     <span>{streamApp} / {streamName} · {preview ? previewModeLabel(preview.mode) : '未开始'}</span>
+                    {preview?.sourceLabel && <small className="media-preview-source">来自 {preview.sourceLabel} · {preview.title}</small>}
                   </div>
                   <div className="media-preview-actions">
                     {preview && <button className="button secondary compact" onClick={stopPreview}><Square size={12} />停止</button>}

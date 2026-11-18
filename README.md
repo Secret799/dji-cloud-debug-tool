@@ -82,6 +82,7 @@
 - 本地 ZLMediaKit 和 SecretEMS 支持 DJI 推流的实时 SEI 诊断。
 - 支持使用 HLS.js 直接预览 HLS 流。
 - 媒体中心右侧提供当前服务的码流预览：ZLM 可选 HLS / WebRTC，SRS 使用 HLS，SecretEMS 使用 HTTP-TS；本地 ZLMediaKit 与 SecretEMS 在预览时同步启动 SEI 诊断，展示编码、视频 NAL、SEI 消息数、解析异常和最近消息，点击消息可查看 payloadType、长度、UUID、文本与 HEX。
+- 设备 › 指令 › 相机与云台只负责开始 / 停止直播；推流中点击“在媒体页预览”可带着当前码流跳转到媒体中心自动播放，播放器与 SEI 诊断统一收拢在媒体页。
 
 ### 错误码与诊断
 
@@ -252,10 +253,9 @@ npm run dev
 4. 选择媒体服务，输入应用名和流 ID，复制生成的推流/播放地址。
 5. 将推流地址填入 DJI 直播配置，再使用 HLS 地址预览。
 6. 在媒体中心右侧“码流预览”选择 HLS / WebRTC（SecretEMS 固定 HTTP-TS）后点击“预览”；本地 ZLMediaKit 与 SecretEMS 会同时启动 SEI 诊断，点击最近消息可查看详情。
+7. 也可以先在设备 › 指令 › 相机与云台开始直播，再点击相机卡片里的“在媒体页预览”；媒体中心会自动选中对应服务、应用名和流 ID，并开始播放，预览头部标注“来自 设备 › 负载”。
 
-在相机监看中选择“本地 ZLMediaKit”和“WebRTC”后，应用会同时从本地 RTSP 轨道旁路读取原始视频码流。选择 SecretEMS 时，应用会自动订阅 `/easyMedia/api/sei/events?app=live&stream={streamId}` SSE 诊断接口；设备事件接口 `/easyMedia/api/sei/devices/{deviceId}/events` 的 `sei` 数据格式也受支持。SecretEMS 的 RTMP 与 WebRTC 推流都会启用该订阅。
-
-SEI 面板显示编码、帧或 NAL 计数、解析异常数以及最近的 `payloadType`、长度、UUID 和受限预览。本地解析只针对标准 H.264/H.265 SEI 语法，客户端不会将未公开的 payload 推断为飞行遥测字段。
+媒体页的 SEI 面板显示编码、帧或 NAL 计数、解析异常数以及最近的 `payloadType`、长度、UUID 和受限预览。本地解析只针对标准 H.264/H.265 SEI 语法，客户端不会将未公开的 payload 推断为飞行遥测字段。
 
 内置 ZLMediaKit 默认端口：
 
