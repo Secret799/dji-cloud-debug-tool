@@ -3160,7 +3160,8 @@ textarea {
 .control-center-workspace {
   display: grid;
   min-height: 100%;
-  grid-template-rows: 46px minmax(0, 1fr);
+  /* 远程日志、固件升级已提升为一级页签，控制中心只剩内容区，不再预留子页签条高度 */
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .control-center-workspace[hidden] {
