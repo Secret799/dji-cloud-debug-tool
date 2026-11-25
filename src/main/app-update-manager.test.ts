@@ -1,12 +1,14 @@
 import { createHash, generateKeyPairSync, sign } from 'node:crypto'
+import { EventEmitter } from 'node:events'
 import { Writable } from 'node:stream'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { AppUpdateManager } from './app-update-manager'
 
-const mocks = vi.hoisted(() => ({ fetch: vi.fn(), output: vi.fn(), rm: vi.fn() }))
-vi.mock('electron', () => ({ app: { getVersion: () => '0.1.0', getPath: () => '/virtual' }, net: { fetch: mocks.fetch }, shell: {} }))
+const mocks = vi.hoisted(() => ({ fetch: vi.fn(), output: vi.fn(), rm: vi.fn(), spawn: vi.fn(), quit: vi.fn() }))
+vi.mock('electron', () => ({ app: { getVersion: () => '0.1.0', getPath: () => '/virtual', getAppPath: () => '/Applications/HangarLab Studio.app/Contents/Resources/app.asar', quit: mocks.quit }, net: { fetch: mocks.fetch }, shell: { openPath: vi.fn() } }))
 vi.mock('node:fs', () => ({ createWriteStream: mocks.output }))
 vi.mock('node:fs/promises', () => ({ mkdir: vi.fn(), rm: mocks.rm }))
+vi.mock('node:child_process', () => ({ spawn: mocks.spawn }))
 
 const payload = Buffer.from('installer')
 const name = `HangarLab.Studio-1.0.0-mac-${process.arch}.dmg`
@@ -15,17 +17,25 @@ const hash = createHash('sha256').update(payload).digest('hex')
 const platform = Object.getOwnPropertyDescriptor(process, 'platform')!
 beforeEach(() => {
   vi.resetAllMocks()
+  mocks.rm.mockResolvedValue(undefined)
+  mocks.output.mockReturnValue(new Writable({ write(_chunk, _encoding, callback) { callback() } }))
+  mocks.spawn.mockImplementation(() => {
+    const child = new EventEmitter()
+    Object.assign(child, { unref: vi.fn() })
+    queueMicrotask(() => child.emit('spawn'))
+    return child
+  })
   Object.defineProperty(process, 'platform', { ...platform, value: 'darwin' })
 })
 afterEach(() => { Object.defineProperty(process, 'platform', platform) })
 
-async function available(body: ReadableStream<Uint8Array>) {
+async function available(body: ReadableStream<Uint8Array>, assetName = name) {
   const manager = new AppUpdateManager(() => {})
   mocks.fetch.mockResolvedValueOnce(new Response('', { status: 404 }))
     .mockResolvedValueOnce({ ok: true, json: async () => ({ tag_name: 'v1.0.0', assets: [
-    { name, size: payload.length, browser_download_url: 'installer' },
+    { name: assetName, size: payload.length, browser_download_url: 'installer' },
     { name: 'SHA256SUMS.txt', browser_download_url: 'sums' },
-  ] }) }).mockResolvedValueOnce({ ok: true, text: async () => `${hash}  ${name}` })
+  ] }) }).mockResolvedValueOnce({ ok: true, text: async () => `${hash}  ${assetName}` })
     .mockResolvedValueOnce({ ok: true, headers: new Headers(), body })
   expect((await manager.check()).status).toBe('available')
   return manager
@@ -171,4 +181,46 @@ it('keeps a manual release link for API errors that are not rate limits', async 
   expect(state.releaseUrl).toBe(`${releasesUrl}/latest`)
   // 第一次是签名清单探测（该测试里返回 404），第二次才是 GitHub API
   expect(mocks.fetch).toHaveBeenCalledTimes(2)
+})
+
+it('starts a detached macOS helper and quits only after it spawns', async () => {
+  const manager = await available(new ReadableStream({ start(controller) { controller.enqueue(payload); controller.close() } }))
+  expect(await manager.download()).toEqual({ ok: true })
+
+  expect(await manager.openInstaller()).toEqual({ ok: true })
+  expect(mocks.spawn).toHaveBeenCalledWith('/bin/sh', ['-c', expect.stringContaining('hdiutil attach')], {
+    detached: true,
+    stdio: 'ignore',
+  })
+  expect(mocks.quit).toHaveBeenCalledOnce()
+  expect((await import('electron')).shell.openPath).not.toHaveBeenCalled()
+})
+
+it('starts a silent detached Windows installer after it spawns', async () => {
+  Object.defineProperty(process, 'platform', { ...platform, value: 'win32' })
+  const windowsName = `HangarLab.Studio-1.0.0-windows-${process.arch}-setup.exe`
+  const manager = await available(new ReadableStream({ start(controller) { controller.enqueue(payload); controller.close() } }), windowsName)
+  expect(await manager.download()).toEqual({ ok: true })
+
+  expect(await manager.openInstaller()).toEqual({ ok: true })
+  expect(mocks.spawn).toHaveBeenCalledWith(expect.stringContaining('.exe'), ['/S', '/force-run'], {
+    detached: true,
+    windowsHide: true,
+    stdio: 'ignore',
+  })
+  expect(mocks.quit).toHaveBeenCalledOnce()
+})
+
+it('keeps the current app open when the installer fails to spawn', async () => {
+  mocks.spawn.mockImplementation(() => {
+    const child = new EventEmitter()
+    Object.assign(child, { unref: vi.fn() })
+    queueMicrotask(() => child.emit('error', new Error('启动安装器失败')))
+    return child
+  })
+  const manager = await available(new ReadableStream({ start(controller) { controller.enqueue(payload); controller.close() } }))
+  expect(await manager.download()).toEqual({ ok: true })
+
+  expect(await manager.openInstaller()).toEqual({ ok: false, error: '启动自动安装失败：启动安装器失败' })
+  expect(mocks.quit).not.toHaveBeenCalled()
 })

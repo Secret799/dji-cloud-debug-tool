@@ -1,10 +1,16 @@
-import { app, net, shell } from 'electron'
+import { app, net } from 'electron'
+import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { createWriteStream } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
+import {
+  buildMacInstallScript,
+  buildWindowsInstallCommand,
+  currentMacAppPath,
+} from './app-update-installer'
 import type { AppUpdateState, OperationResult } from '../shared/contracts'
 import { APP_UPDATE_PUBLIC_KEY } from './app-update-public-key'
 import {
@@ -87,10 +93,42 @@ export class AppUpdateManager {
     if (!this.installerPath || this.state.status !== 'downloaded') {
       return { ok: false, error: '更新安装包尚未下载完成' }
     }
-    const openError = await shell.openPath(this.installerPath)
-    if (openError) return { ok: false, error: openError }
-    if (process.platform === 'win32') setTimeout(() => app.quit(), 500)
-    return { ok: true }
+    try {
+      if (process.platform === 'win32') {
+        const command = buildWindowsInstallCommand(this.installerPath)
+        await this.startDetached(command.file, command.args, command.options)
+      } else if (process.platform === 'darwin') {
+        const appPath = currentMacAppPath(app.getAppPath())
+        const script = buildMacInstallScript(this.installerPath, appPath, `${process.pid}`)
+        await this.startDetached('/bin/sh', ['-c', script], { detached: true, stdio: 'ignore' })
+      } else {
+        return { ok: false, error: '当前平台不支持自动安装更新' }
+      }
+      app.quit()
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, error: `启动自动安装失败：${errorMessage(error)}` }
+    }
+  }
+
+  private startDetached(
+    file: string,
+    args: string[],
+    options: { detached: true; windowsHide?: true; stdio: 'ignore' },
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      let spawned = false
+      const child = spawn(file, args, options)
+      child.once('error', reject)
+      child.once('spawn', () => {
+        spawned = true
+        child.unref()
+        resolve()
+      })
+      child.once('close', (code) => {
+        if (!spawned && code !== 0) reject(new Error(`安装辅助进程退出（${code ?? '未知原因'}）`))
+      })
+    })
   }
 
   private setState(patch: Partial<AppUpdateState>): void {
