@@ -7782,6 +7782,11 @@ textarea {
   white-space: nowrap;
 }
 
+.camera-monitor-tile .camera-player {
+  height: clamp(160px, 24vh, 240px);
+  border-radius: 0;
+}
+
 .camera-monitor-footer {
   min-height: 42px;
   justify-content: space-between;

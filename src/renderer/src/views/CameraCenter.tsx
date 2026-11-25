@@ -21,6 +21,7 @@ import type {
   OperationResult,
 } from '../../../shared/contracts'
 import { Tooltip } from '../components/Tooltip'
+import { LivePlayer } from '../components/LivePlayer'
 import {
   cameraStreamName,
   collectCameraSources,
@@ -735,6 +736,12 @@ export function CameraCenter({
                       {live ? '直播中' : '待机'}
                     </span>
                   </header>
+
+                  <LivePlayer
+                    src={playback?.playbackUrl}
+                    protocol={playback?.protocol ?? 'http-ts'}
+                    title={`${camera.sourceName} ${videoTypeLabel(activeLensType)}视频`}
+                  />
 
                   {playback && (
                     <div className="camera-monitor-address">

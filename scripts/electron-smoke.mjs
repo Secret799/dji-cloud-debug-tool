@@ -1329,6 +1329,7 @@ try {
 
   await window.getByRole('button', { name: '相机与云台', exact: true }).click()
   await window.locator('.camera-console').waitFor({ state: 'visible' })
+  await window.locator('.camera-monitor-tile .camera-player-state.idle').first().waitFor({ state: 'visible' })
   const cameraConsoleText = await window.locator('.camera-console').innerText()
   for (const expected of ['AIR-SMOKE-001', 'DOCK-SMOKE-001']) {
     if (!cameraConsoleText.includes(expected)) errors.push(`cameras: missing ${expected}`)
@@ -1565,12 +1566,20 @@ try {
   await window.getByRole('button', { name: '开始直播', exact: true }).first().click()
   const cameraConsole = window.locator('.camera-console')
   await window.getByRole('button', { name: '在媒体页预览', exact: true }).first().waitFor({ state: 'visible', timeout: 5_000 })
-  if (await cameraConsole.locator('.camera-player').count()) {
-    errors.push('payload: camera page should not render a player')
-  }
+  await cameraConsole.locator('.camera-monitor-tile.playing .camera-player').first().waitFor({ state: 'visible' })
+  await cameraConsole.locator('.camera-monitor-tile.playing .camera-player-state.idle').waitFor({ state: 'hidden' })
   if (await cameraConsole.locator('.camera-sei-panel, .camera-sei-detail-modal').count()) {
     errors.push('payload: camera page should not render SEI diagnostics')
   }
+  await inspectLayout('camera-payload-player', [
+    '.camera-console',
+    '.camera-console-layout',
+    '.camera-monitor-grid',
+    '.camera-monitor-tile.playing',
+    '.camera-player',
+    '.camera-monitor-footer',
+  ])
+  await window.screenshot({ path: `${screenshotBase}-camera-payload-player.png` })
   await window.getByRole('button', { name: '在媒体页预览', exact: true }).first().click()
   await window.locator('.media-center').waitFor({ state: 'visible' })
   await window.locator('.media-preview-source').getByText('来自 设备 › 负载', { exact: false }).waitFor({ state: 'visible', timeout: 5_000 })
@@ -1581,15 +1590,6 @@ try {
   if (!await window.locator('.media-preview-panel .camera-player').count()) {
     errors.push('media preview: external camera stream did not mount a player')
   }
-  await inspectLayout('camera-payload-no-player', [
-    '.camera-console',
-    '.camera-console-layout',
-    '.camera-monitor-grid',
-    '.camera-monitor-tile.playing',
-    '.camera-monitor-footer',
-  ])
-  await window.screenshot({ path: `${screenshotBase}-camera-payload-no-player.png` })
-
   const savedServerState = await window.locator('.media-server-row')
     .filter({ hasText: '冒烟测试流媒体' })
     .locator('.server-state-dot')
