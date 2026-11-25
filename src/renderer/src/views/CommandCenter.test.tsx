@@ -8,7 +8,7 @@ import {
   isValidSuperDockLtePhone,
   isValidSuperDockLteVerificationCode,
 } from '../lib/superdock'
-import { isCameraLiveQualityLocked, selectCameraPushEndpoint } from './CameraCenter'
+import { CameraCenter, isCameraLiveQualityLocked, selectCameraPushEndpoint } from './CameraCenter'
 import { CommandCenter, commandReceiptSource, superDockLteAuthenticationStatus } from './CommandCenter'
 import { ErrorCodeCard } from '../components/ErrorCodeCard'
 
@@ -397,6 +397,61 @@ describe('CommandCenter remote debugging category', () => {
 })
 
 describe('CommandCenter camera category', () => {
+  it.each([
+    ['正在推流', 'connected', false, 1, ['直播中', '未直播'], 'enabled'],
+    ['连接同步中', 'connected', true, 1, ['直播中', '未直播'], 'disabled'],
+    ['已停止', 'connected', false, 0, ['未直播', '未直播'], 'hidden'],
+    ['整体状态为空', 'connected', false, 'empty', ['未直播', '未直播'], 'hidden'],
+    ['尚未上报', 'connected', false, undefined, ['尚未上报', '尚未上报'], 'hidden'],
+    ['MQTT 已断开', 'disconnected', false, 1, ['离线档案', '离线档案'], 'hidden'],
+  ] as const)('shows reported camera status and stop control when %s', (_scenario, status, busy, report, labels, availability) => {
+    const telemetry = [{
+      profileId: 'profile', sn: 'DOCK-A', type: 'dock', name: '测试机场', online: true,
+      lastSeenAt: Date.now(), lastTopic: 'thing/product/DOCK-A/state', status: {},
+      state: report === undefined ? {} : {
+        live_status: report === 'empty' ? [] : [{ video_id: 'DOCK-A/165-0-0/normal-0', status: report }],
+      },
+      osd: {
+        live_capacity: { device_list: [{
+          sn: 'DOCK-A', camera_list: [
+            { camera_index: '165-0-0', video_list: [{ video_index: 'normal-0', video_type: 'normal' }] },
+            { camera_index: '165-0-1', video_list: [{ video_index: 'normal-0', video_type: 'normal' }] },
+          ],
+        }] },
+      },
+    }] satisfies DeviceTelemetry[]
+    const profile = {
+      id: 'profile',
+      devices: [{ id: 'dock-a', name: '测试机场', sn: 'DOCK-A', type: 'dock' }],
+    } as ConnectionProfile
+    const markup = renderToStaticMarkup(
+      <CameraCenter
+        profile={profile}
+        telemetry={telemetry}
+        gatewaySn="DOCK-A"
+        provider="dji"
+        status={status}
+        busy={busy}
+        mediaServers={[]}
+        selectedMediaServerId=""
+        onSelectMediaServer={() => {}}
+        onPublish={async () => ({ ok: true })}
+      />,
+    )
+    const sourceList = markup.split('aria-label="直播设置"')[0]
+    const stopButtons = sourceList.match(/<button[^>]*aria-label="停止推流[^"]*"[^>]*>/g) ?? []
+    const statusLabels = Array.from(sourceList.matchAll(/class="camera-stream-status[^"]*">([^<]+)<\/span>/g), (match) => match[1])
+
+    expect(statusLabels).toEqual(labels)
+    if (availability === 'hidden') {
+      expect(stopButtons).toHaveLength(0)
+      return
+    }
+    expect(stopButtons).toHaveLength(1)
+    expect(stopButtons[0]).toContain('aria-label="停止推流：测试机场 · 165-0-0"')
+    expect(stopButtons[0]?.includes(' disabled=""')).toBe(availability === 'disabled')
+  })
+
   it('only lists cameras from the selected airport and its aircraft', () => {
     const profile = {
       id: 'profile',

@@ -7335,15 +7335,12 @@ textarea {
   width: 100%;
   min-width: 0;
   min-height: 68px;
-  align-items: start;
   gap: 6px;
   padding: 8px 9px;
   border: 1px solid transparent;
   border-radius: 6px;
   color: var(--text);
   background: transparent;
-  text-align: left;
-  cursor: pointer;
 }
 
 .camera-source-row:hover {
@@ -7355,6 +7352,35 @@ textarea {
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
   background: var(--accent-soft);
   box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.camera-source-select {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.camera-source-select .camera-source-copy {
+  width: 100%;
+}
+
+.camera-source-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.button.compact.camera-source-stop {
+  min-height: 24px;
+  gap: 4px;
+  padding: 0 4px;
+  font-size: 10px;
+  white-space: nowrap;
 }
 
 .camera-source-copy {

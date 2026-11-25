@@ -41,7 +41,7 @@ const textValue = (value: unknown): string | undefined =>
   typeof value === 'string' && value.trim() ? value.trim() : undefined
 
 const numberValue = (value: unknown): number | undefined => {
-  const parsed = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : Number.NaN
+  const parsed = typeof value === 'number' ? value : typeof value === 'string' && value.trim() ? Number(value) : Number.NaN
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
@@ -77,13 +77,18 @@ export const cameraStreamName = (
     .replace(/^-+|-+$/g, '')
     .toLowerCase() || 'dji-camera'
 
+const gatewayCameraTelemetry = ({ type, provider, status, state, osd }: DeviceTelemetry): Record<string, unknown> =>
+  type === 'dock' && provider !== 'superdock'
+    ? mergeNestedRecords(status, osd, state)
+    : mergeNestedRecords(status, state, osd)
+
 export const cameraLiveCapacity = (
   telemetry: DeviceTelemetry[],
   gatewaySn: string,
 ): CameraLiveCapacity => {
   const gateway = telemetry.find((device) => device.sn === gatewaySn)
   if (!gateway) return {}
-  const source = mergeNestedRecords(gateway.status, gateway.state, gateway.osd)
+  const source = gatewayCameraTelemetry(gateway)
   const capacity = telemetryValue(source, 'live_capacity')
   const liveStatus = telemetryValue(source, 'live_status')
   const currentVideoNumber = Array.isArray(liveStatus)
@@ -125,12 +130,14 @@ export function collectCameraSources(
   telemetry
     .filter((gateway) => gateway.type === 'dock' || gateway.type === 'pilot')
     .forEach((gateway) => {
-      const source = mergeNestedRecords(gateway.status, gateway.state, gateway.osd)
+      const source = gatewayCameraTelemetry(gateway)
       const capacity = telemetryValue(source, 'live_capacity')
       if (!isRecord(capacity)) return
 
+      const liveStatusReport = telemetryValue(source, 'live_status')
+      const liveStatusReported = Array.isArray(liveStatusReport)
       const liveStatusByVideoId = new Map(
-        recordArray(telemetryValue(source, 'live_status'))
+        recordArray(liveStatusReport)
           .map((status) => [textValue(status.video_id), status] as const)
           .filter((entry): entry is [string, Record<string, unknown>] => Boolean(entry[0])),
       )
@@ -159,7 +166,7 @@ export function collectCameraSources(
               videoIndex,
               videoType: textValue(video.video_type) ?? videoIndex,
               switchableVideoTypes: stringArray(video.switchable_video_types),
-              status: numberValue(liveStatus?.status),
+              status: liveStatus ? numberValue(liveStatus.status) : liveStatusReported ? 0 : undefined,
               errorStatus: numberValue(liveStatus?.error_status),
               videoQuality: numberValue(liveStatus?.video_quality),
             }]
