@@ -21,16 +21,21 @@ export function AppUpdatePanel() {
     setUpdateState(await window.djiApi.updates.check())
   }
 
-  const downloadUpdate = async (): Promise<void> => {
+  const downloadAndInstall = async (): Promise<void> => {
     setActionError(undefined)
     const result = await window.djiApi.updates.download()
-    if (!result.ok) setActionError(result.error ?? '更新下载失败')
+    if (!result.ok) {
+      setActionError(result.error ?? '更新下载失败')
+      return
+    }
+    const installResult = await window.djiApi.updates.openInstaller()
+    if (!installResult.ok) setActionError(installResult.error ?? '无法启动自动安装')
   }
 
   const openInstaller = async (): Promise<void> => {
     setActionError(undefined)
     const result = await window.djiApi.updates.openInstaller()
-    if (!result.ok) setActionError(result.error ?? '无法打开安装包')
+    if (!result.ok) setActionError(result.error ?? '无法启动自动安装')
   }
 
   const statusCopy = updateState.status === 'checking'
@@ -42,7 +47,7 @@ export function AppUpdatePanel() {
         : updateState.status === 'downloading'
           ? `正在下载并校验安装包${updateState.progress === undefined ? '' : ` · ${updateState.progress}%`}`
           : updateState.status === 'downloaded'
-            ? '安装包已下载并通过 SHA-256 校验'
+            ? '安装包已校验，点击后将自动安装并重启应用'
             : updateState.status === 'unsupported'
               ? updateState.error ?? '当前平台暂不支持在线更新'
               : updateState.status === 'error'
@@ -91,12 +96,12 @@ export function AppUpdatePanel() {
         )}
         <span />
         {updateState.status === 'available' ? (
-          <button className="button primary compact" onClick={() => void downloadUpdate()}>
-            <Download size={14} />下载更新
+          <button className="button primary compact" onClick={() => void downloadAndInstall()}>
+            <Download size={14} />下载安装
           </button>
         ) : updateState.status === 'downloaded' ? (
           <button className="button primary compact" onClick={() => void openInstaller()}>
-            <PackageOpen size={14} />打开安装包
+            <PackageOpen size={14} />下载安装
           </button>
         ) : updateState.status !== 'unsupported' ? (
           <button className="button secondary compact" disabled={busy} onClick={() => void checkForUpdates()}>

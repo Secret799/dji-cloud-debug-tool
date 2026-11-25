@@ -117,6 +117,31 @@ describe('camera source aggregation', () => {
     expect(cameraLiveCapacity(telemetry, 'DOCK')).toMatchObject({ currentVideoNumber: 1 })
   })
 
+  it('reads DJI airport streams from state ahead of archived capacity and older OSD status', () => {
+    const profile = {
+      id: 'profile',
+      devices: [{ id: 'dock', name: '机场', sn: 'DOCK', type: 'dock' }],
+    } as ConnectionProfile
+    const gateway = runtime('DOCK', 'dock', {
+      live_capacity: { device_list: [{ sn: 'DOCK', camera_list: [{
+        camera_index: '165-0-7', video_list: [{ video_index: 'normal-0' }],
+      }] }] },
+      live_status: [{ video_id: 'DOCK/165-0-7/normal-0', status: 1 }],
+    })
+    gateway.state = {
+      live_capacity: { device_list: [{ sn: 'DOCK', camera_list: [{
+        camera_index: '165-0-7', video_list: [{ video_index: 'normal-0' }, { video_index: 'wide-0' }],
+      }] }] },
+      live_status: [{ video_id: 'DOCK/165-0-7/normal-0', status: 0 }],
+    }
+
+    expect(collectCameraSources(profile, [gateway])[0]?.videos).toEqual([
+      expect.objectContaining({ id: 'DOCK/165-0-7/normal-0', status: 0 }),
+      expect.objectContaining({ id: 'DOCK/165-0-7/wide-0', status: 0 }),
+    ])
+    expect(cameraLiveCapacity([gateway], 'DOCK').currentVideoNumber).toBe(0)
+  })
+
   it('normalizes current DJI live service result codes to the legacy result family', () => {
     expect(normalizeLiveResultCode(513003)).toBe(13003)
     expect(normalizeLiveResultCode(513011)).toBe(13011)

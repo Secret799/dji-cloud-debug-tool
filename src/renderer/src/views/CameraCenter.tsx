@@ -184,6 +184,9 @@ export function CameraCenter({
   const isSuperDock = provider === 'superdock'
   const providerLabel = isSuperDock ? 'SuperDock' : 'DJI'
   const realtimePushLabel = isSuperDock ? 'WHIP' : 'WebRTC'
+  const gatewayConnected = status === 'connected' && telemetry.some((device) => (
+    device.profileId === profile.id && device.sn === gatewaySn && device.online
+  ))
   const cameras = useMemo(() => {
     return collectCameraSources(profile, telemetry).filter((camera) => camera.gatewaySn === gatewaySn)
   }, [gatewaySn, profile, telemetry])
@@ -292,48 +295,35 @@ export function CameraCenter({
     return result
   }
 
-  const stopPlayback = async (current: ActivePlayback): Promise<boolean> => {
-    setSending(`stop:${current.stream.id}`)
+  const stopStreams = async (videos: CameraVideoStream[], sendingId: string): Promise<void> => {
+    if (!videos.length) return
+    setSending(sendingId)
     try {
-      const response = await stopDeviceStream(current.stream)
-      if (!response.ok && !hasLiveResult(response, 13011)) {
-        onNotify?.(liveCommandError(response, '停止推流失败'), 'error')
-        return false
+      const failures: string[] = []
+      for (const [index, video] of videos.entries()) {
+        try {
+          const response = await stopDeviceStream(video)
+          if (response.ok || hasLiveResult(response, 13011)) {
+            setPlaybacks((active) => {
+              if (!active[video.id]) return active
+              const next = { ...active }
+              delete next[video.id]
+              return next
+            })
+          } else {
+            failures.push(liveCommandError(response, '停止推流失败'))
+          }
+        } catch (error) {
+          failures.push(error instanceof Error ? error.message : String(error))
+        }
+        if (index < videos.length - 1) await wait(350)
       }
-      setPlaybacks((active) => {
-        const next = { ...active }
-        delete next[current.stream.id]
-        return next
-      })
-      onNotify?.('设备已停止推流', 'success')
-      return true
-    } catch (error) {
-      onNotify?.(error instanceof Error ? error.message : String(error), 'error')
-      return false
-    } finally {
-      setSending('')
-    }
-  }
-
-  const stopAllPlaybacks = async (): Promise<void> => {
-    const activePlaybacks = Object.values(playbacks)
-    if (!activePlaybacks.length) return
-    setSending('stop-all')
-    try {
-      const results: ServiceCallResult[] = []
-      for (const current of activePlaybacks) {
-        results.push(await stopDeviceStream(current.stream))
-        if (current !== activePlaybacks.at(-1)) await wait(350)
+      if (failures.length) {
+        const message = videos.length > 1 ? `${failures.length} 路视频停止失败。${failures[0]}` : failures[0]
+        onNotify?.(message, 'error')
+      } else {
+        onNotify?.(sendingId === 'stop-all' ? '已停止全部视频' : '设备已停止推流', 'success')
       }
-      const failedIds = activePlaybacks
-        .filter((_, index) => !results[index]?.ok && !hasLiveResult(results[index], 13011))
-        .map((current) => current.stream.id)
-      setPlaybacks((active) => Object.fromEntries(
-        Object.entries(active).filter(([id]) => failedIds.includes(id)),
-      ))
-      onNotify?.(failedIds.length ? `${failedIds.length} 路视频停止失败` : '已停止全部视频', failedIds.length ? 'error' : 'success')
-    } catch (error) {
-      onNotify?.(error instanceof Error ? error.message : String(error), 'error')
     } finally {
       setSending('')
     }
@@ -441,7 +431,7 @@ export function CameraCenter({
     }
     const currentPlayback = playbacks[video.id]
     if (currentPlayback) {
-      await stopPlayback(currentPlayback)
+      await stopStreams([currentPlayback.stream], `stop:${video.id}`)
       return
     }
 
@@ -636,32 +626,47 @@ export function CameraCenter({
           <div className="camera-source-list" aria-label="相机列表">
             {cameras.map((camera) => {
               const sourceTypeLabel = camera.sourceType === 'aircraft' ? '飞机' : camera.sourceType === 'dock' ? '机场' : '遥控器'
-              const cameraConnected = status === 'connected' && camera.online
-              const live = camera.videos.some((video) => Boolean(playbacks[video.id]) || (cameraConnected && video.status === 1))
+              const liveVideos = gatewayConnected ? camera.videos.filter((video) => video.status === 1) : []
+              const live = liveVideos.length > 0
+              const reportedIdle = camera.videos.length > 0 && camera.videos.every((video) => video.status === 0)
+              const streamStatus = !gatewayConnected ? '离线档案' : live ? '直播中' : reportedIdle ? '未直播' : '尚未上报'
+              const stopId = `stop-camera:${camera.id}`
               const lensTypes = cameraLensTypes(camera.videos)
               return (
-                <button
-                  key={camera.id}
-                  className={`camera-source-row ${selectedCamera?.id === camera.id ? 'selected' : ''}`}
-                  onClick={() => setSelectedCameraId(camera.id)}
-                >
-                  <span className="camera-source-copy">
-                    <strong>{sourceTypeLabel} · {camera.sourceName}</strong>
-                    <small title={camera.sourceSn}>设备 SN：{camera.sourceSn}</small>
-                    <small>相机下标：{camera.cameraIndex}</small>
-                    <span className="camera-source-lenses">
-                      <span className="camera-lens-cluster" aria-hidden="true">
-                        {(lensTypes.length ? lensTypes : ['unknown']).slice(0, 4).map((type) => (
-                          <i key={type} />
-                        ))}
+                <div key={camera.id} className={`camera-source-row ${selectedCamera?.id === camera.id ? 'selected' : ''}`}>
+                  <button type="button" className="camera-source-select" onClick={() => setSelectedCameraId(camera.id)}>
+                    <span className="camera-source-copy">
+                      <strong>{sourceTypeLabel} · {camera.sourceName}</strong>
+                      <small title={camera.sourceSn}>设备 SN：{camera.sourceSn}</small>
+                      <small>相机下标：{camera.cameraIndex}</small>
+                      <span className="camera-source-lenses">
+                        <span className="camera-lens-cluster" aria-hidden="true">
+                          {(lensTypes.length ? lensTypes : ['unknown']).slice(0, 4).map((type) => (
+                            <i key={type} />
+                          ))}
+                        </span>
+                        <small>{lensTypes.length
+                          ? lensTypes.map(videoTypeLabel).join(' / ')
+                          : '镜头信息待上报'}</small>
                       </span>
-                      <small>{lensTypes.length
-                        ? lensTypes.map(videoTypeLabel).join(' / ')
-                        : '镜头信息待上报'}</small>
                     </span>
-                  </span>
-                  <span className={`camera-stream-status ${live ? 'live' : ''}`}>{live ? '直播中' : cameraConnected ? '未直播' : '离线档案'}</span>
-                </button>
+                  </button>
+                  <div className="camera-source-actions">
+                    <span className={`camera-stream-status ${live ? 'live' : ''}`}>{streamStatus}</span>
+                    {live && (
+                      <button
+                        type="button"
+                        className="button compact danger-ghost camera-source-stop"
+                        aria-label={`${sending === stopId ? '停止中' : '停止推流'}：${camera.sourceName} · ${camera.cameraIndex}`}
+                        disabled={busy || Boolean(sending)}
+                        onClick={() => void stopStreams(liveVideos, stopId)}
+                      >
+                        <CircleStop size={12} aria-hidden="true" />
+                        {sending === stopId ? '停止中' : '停止推流'}
+                      </button>
+                    )}
+                  </div>
+                </div>
               )
             })}
           </div>
@@ -696,7 +701,7 @@ export function CameraCenter({
                 </button>
               )}
               {hasActivePlaybacks && (
-                <button className="button secondary compact" disabled={Boolean(sending)} onClick={() => void stopAllPlaybacks()}>
+                <button className="button secondary compact" disabled={Boolean(sending)} onClick={() => void stopStreams(Object.values(playbacks).map(({ stream }) => stream), 'stop-all')}>
                   <CircleStop size={14} />{sending === 'stop-all' ? '停止中' : '全部停止直播'}
                 </button>
               )}
