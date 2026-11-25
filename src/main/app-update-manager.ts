@@ -126,7 +126,7 @@ export class AppUpdateManager {
         resolve()
       })
       child.once('close', (code) => {
-        if (!spawned && code !== 0) reject(new Error(`安装辅助进程退出（${code ?? '未知原因'}）`))
+        if (!spawned) reject(new Error(`安装辅助进程退出（${code ?? '未知原因'}）`))
       })
     })
   }

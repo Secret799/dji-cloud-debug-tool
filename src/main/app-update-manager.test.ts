@@ -224,3 +224,20 @@ it('keeps the current app open when the installer fails to spawn', async () => {
   expect(await manager.openInstaller()).toEqual({ ok: false, error: '启动自动安装失败：启动安装器失败' })
   expect(mocks.quit).not.toHaveBeenCalled()
 })
+
+it('does not wait forever when the installer exits before spawning', async () => {
+  mocks.spawn.mockImplementation(() => {
+    const child = new EventEmitter()
+    Object.assign(child, { unref: vi.fn() })
+    queueMicrotask(() => child.emit('close', 0))
+    return child
+  })
+  const manager = await available(new ReadableStream({ start(controller) { controller.enqueue(payload); controller.close() } }))
+  expect(await manager.download()).toEqual({ ok: true })
+
+  await expect(manager.openInstaller()).resolves.toEqual({
+    ok: false,
+    error: '启动自动安装失败：安装辅助进程退出（0）',
+  })
+  expect(mocks.quit).not.toHaveBeenCalled()
+})
